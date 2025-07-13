@@ -1,8 +1,8 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-12T19:03:41.595Z",
+  "lastUpdated": "2025-07-13T21:56:20.433Z",
   "layout": {
-    "panelSizePercentage": 60
+    "panelSizePercentage": 79.95758218451749
   },
   "resizeHandle": {
     "steppingEnabled": true,
@@ -12,14 +12,14 @@
     "mode": "locked"
   },
   "badgeToggle": {
-    "mode": "show"
+    "mode": "no-badges"
   },
   "resume": {
     "sortRule": {
       "field": "startDate",
       "direction": "desc"
     },
-    "selectedJobNumber": 3
+    "selectedJobNumber": 11
   },
   "theme": {
     "colorPalette": "50_Dark_Grey_Monotone.json",
@@ -402,5 +402,5 @@
       }
     }
   },
-  "colorPalette": "50_Dark_Grey_Monotone.json"
+  "colorPalette": "purpley.json"
 }
