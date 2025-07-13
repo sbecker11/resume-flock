@@ -16,23 +16,32 @@ class BadgeManager extends EventTarget {
     constructor() {
         super();
         
-        // Badge mode state: 'none' | 'show' | 'stats'
-        this._mode = 'none';
+        // Badge mode state: 'no-badges' | 'badges-only' | 'badges-with-stats'
+        this._mode = 'no-badges'; // Default until state is loaded
         
-        // Initialize from AppState if available
-        if (AppState?.badgeToggle?.mode) {
-            this._mode = AppState.badgeToggle.mode;
-        }
-        
-        console.log(`[BadgeManager] Initialized with mode: ${this._mode}`);
+        // Initialization is now deferred and handled by the initializationManager
         
         // Listen for clone creation to update new stats elements
         window.addEventListener('clone-created', this._handleCloneCreated.bind(this));
-        
-        // Initialize DOM elements on next tick
-        setTimeout(() => {
-            this._updateAllVisibility();
-        }, 0);
+    }
+
+    /**
+     * Initializes the BadgeManager's state from the global AppState.
+     * This should be called by the initialization manager after the state has been loaded.
+     */
+    initialize() {
+        if (AppState?.badgeToggle?.mode) {
+            this._mode = AppState.badgeToggle.mode;
+        }
+
+        console.log(`[BadgeManager] Initialized with mode from state: ${this._mode}`);
+        this.refreshVisibility(); // Update visibility now that we have the correct mode.
+
+        // Dispatch an event to notify components that the initial mode is set.
+        // This helps prevent flickering by ensuring all UI elements start with the correct state.
+        this.dispatchEvent(new CustomEvent('badgeModeChanged', {
+            detail: { mode: this._mode, previousMode: null, caller: 'BadgeManager.initialize' }
+        }));
     }
     
     /**
@@ -45,11 +54,11 @@ class BadgeManager extends EventTarget {
     
     /**
      * Set badge mode
-     * @param {string} mode - New mode: 'none' | 'show' | 'stats'
+     * @param {string} mode - New mode: 'no-badges' | 'badges-only' | 'badges-with-stats'
      * @param {string} caller - Optional caller identification for debugging
      */
     setMode(mode, caller = '') {
-        if (!['none', 'show', 'stats'].includes(mode)) {
+        if (!['no-badges', 'badges-only', 'badges-with-stats'].includes(mode)) {
             console.warn(`[BadgeManager] Invalid mode: ${mode}`);
             return;
         }
@@ -86,17 +95,17 @@ class BadgeManager extends EventTarget {
     toggleMode(caller = 'toggleMode') {
         let nextMode;
         switch (this._mode) {
-            case 'none':
-                nextMode = 'show';
+            case 'no-badges':
+                nextMode = 'badges-only';
                 break;
-            case 'show':
-                nextMode = 'stats';
+            case 'badges-only':
+                nextMode = 'badges-with-stats';
                 break;
-            case 'stats':
-                nextMode = 'none';
+            case 'badges-with-stats':
+                nextMode = 'no-badges';
                 break;
             default:
-                nextMode = 'none';
+                nextMode = 'no-badges';
         }
         
         this.setMode(nextMode, caller);
@@ -107,7 +116,7 @@ class BadgeManager extends EventTarget {
      * @returns {boolean} True if badges should be shown
      */
     isBadgesVisible() {
-        return this._mode === 'show' || this._mode === 'stats';
+        return this._mode === 'badges-only' || this._mode === 'badges-with-stats';
     }
     
     /**
@@ -115,7 +124,7 @@ class BadgeManager extends EventTarget {
      * @returns {boolean} True if connection lines should be shown
      */
     isConnectionLinesVisible() {
-        return this._mode === 'show' || this._mode === 'stats';
+        return this._mode === 'badges-only' || this._mode === 'badges-with-stats';
     }
     
     /**
@@ -123,7 +132,7 @@ class BadgeManager extends EventTarget {
      * @returns {boolean} True if statistics should be shown
      */
     isStatsVisible() {
-        return this._mode === 'stats';
+        return this._mode === 'badges-with-stats';
     }
     
     /**
@@ -132,10 +141,10 @@ class BadgeManager extends EventTarget {
      */
     getNextMode() {
         switch (this._mode) {
-            case 'none': return 'show';
-            case 'show': return 'stats';
-            case 'stats': return 'none';
-            default: return 'none';
+            case 'no-badges': return 'badges-only';
+            case 'badges-only': return 'badges-with-stats';
+            case 'badges-with-stats': return 'no-badges';
+            default: return 'no-badges';
         }
     }
     
@@ -147,10 +156,10 @@ class BadgeManager extends EventTarget {
     getDisplayIcon(showNext = false) {
         const mode = showNext ? this.getNextMode() : this._mode;
         switch (mode) {
-            case 'none': return 'B⁰'; // B with superscript zero
-            case 'show': return 'B';  // B with no superscript
-            case 'stats': return 'B⁺'; // B with superscript plus
-            default: return 'B⁰';
+            case 'no-badges': return 'B⁰'; // B with superscript zero
+            case 'badges-only': return 'B';  // B with no superscript
+            case 'badges-with-stats': return 'B⁺'; // B with superscript plus
+            default: return 'B⁰'; // Default to 'no-badges' icon
         }
     }
     
@@ -161,15 +170,15 @@ class BadgeManager extends EventTarget {
      */
     getTooltipText(isHovering = false) {
         const currentModeText = {
-            'none': 'No badges shown',
-            'show': 'Badges visible',
-            'stats': 'Badges + statistics for selected job'
+            'no-badges': 'No badges or lines shown',
+            'badges-only': 'Badges and lines visible',
+            'badges-with-stats': 'Badges, lines, and statistics visible'
         }[this._mode] || 'Unknown mode';
         
         const nextModeText = {
-            'none': 'Hide badges',
-            'show': 'Show badges only',
-            'stats': 'Show badges with statistics'
+            'no-badges': 'Hide badges and lines',
+            'badges-only': 'Show badges and lines only',
+            'badges-with-stats': 'Show badges, lines, and statistics'
         }[this.getNextMode()] || 'Unknown mode';
         
         return isHovering 

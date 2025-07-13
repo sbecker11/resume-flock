@@ -6,7 +6,7 @@
         <div id="scene-plane-btm-gradient"></div>
         <div id="scene-plane">
           <Timeline alignment="left" />
-          <NewConnectionLines />
+          <SankeyConnections />
           <SkillBadges />
         </div>
         <div id="biz-details-div"></div>
@@ -71,7 +71,7 @@ import ResizeHandle from '@/modules/components/ResizeHandle.vue';
 import ResumeContainer from '@/modules/components/ResumeContainer.vue';
 import SceneContainerFooter from '@/modules/components/SceneContainerFooter.vue';
 import SkillBadges from '@/modules/components/SkillBadges.vue';
-import NewConnectionLines from '@/modules/components/NewConnectionLines.vue';
+import SankeyConnections from '@/modules/components/SankeyConnections.vue';
 import BadgeToggle from '@/modules/components/BadgeToggle.vue';
 
 
@@ -83,7 +83,7 @@ export default {
     ResumeContainer,
     SceneContainerFooter,
     SkillBadges,
-    NewConnectionLines,
+    SankeyConnections,
     BadgeToggle,
   },
   async setup() {
@@ -122,6 +122,22 @@ export default {
             initializeTimeline(jobsData);
           },
           [], // No dependencies
+          { priority: 'high' }
+        );
+
+        // Register StateManager as a component with no dependencies
+        initializationManager.register(
+          'StateManager',
+          initializeState, // The function to run
+          [], // No dependencies
+          { priority: 'highest' } // Ensure state is loaded first
+        );
+
+        // Register BadgeManager with its dependency on StateManager
+        initializationManager.register(
+          'BadgeManager',
+          () => badgeManager.initialize(), // The function to run
+          ['StateManager'], // Depends on StateManager
           { priority: 'high' }
         );
         
@@ -215,6 +231,8 @@ export default {
         
         // Wait for all components to be ready
         await initializationManager.waitForComponents([
+          'StateManager',
+          'BadgeManager',
           'Timeline',
           'CardsController', 
           'ResumeItemsController', 
@@ -227,15 +245,22 @@ export default {
           'ConnectionLines'
         ]);
         
-        // Badge manager is automatically initialized - force refresh visibility
-        badgeManager.refreshVisibility();
-        
         window.CONSOLE_LOG_IGNORE('[INIT] AppContent: All components initialized successfully');
         
         // Expose controllers for testing
         window.cardsController = cardsController;
         window.resumeListController = resumeListController;
         
+        // Add a listener to handle rDiv height changes when badge stats are toggled
+        badgeManager.addEventListener('badgeModeChanged', () => {
+          console.log('[AppContent] Badge mode changed, triggering resume list height recalculation.');
+          if (window.resumeListController && window.resumeListController.infiniteScroller) {
+            // Use the existing handleResize logic as it's robust.
+            // It debounces, recalculates all heights, and restores the scroll position.
+            window.resumeListController.infiniteScroller.handleResize();
+          }
+        });
+
         // Add global functions for debugging initialization
         window.checkInitializationStatus = () => {
           window.CONSOLE_LOG_IGNORE('[INIT] Current initialization status:');

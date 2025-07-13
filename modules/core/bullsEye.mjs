@@ -3,85 +3,101 @@
 
 let _bullsEyeElement = null;
 let _isInitialized = false;
+let _initializationPromise = null;
 
 /**
- * Initialize the bullsEye system
+ * Initialize the bullsEye system idempotently and handle race conditions.
  */
 export function initialize() {
-    if (_isInitialized) {
-        window.CONSOLE_LOG_IGNORE("bullsEye.initialize: already initialized, ignoring duplicate initialization request");
-        return;
+    if (_initializationPromise) {
+        return _initializationPromise;
     }
 
-    _bullsEyeElement = document.getElementById('bulls-eye');
-    if (!_bullsEyeElement) {
-        throw new Error("bullsEye.initialize: #bulls-eye element not found in DOM");
-    }
+    _initializationPromise = new Promise((resolve, reject) => {
+        try {
+            if (_isInitialized) {
+                window.CONSOLE_LOG_IGNORE("bullsEye.initialize: already initialized, resolving promise.");
+                resolve();
+                return;
+            }
 
-    window.CONSOLE_LOG_IGNORE('BullsEye: Element found, setting up centering...');
+            _bullsEyeElement = document.getElementById('bulls-eye');
+            if (!_bullsEyeElement) {
+                throw new Error("bullsEye.initialize: #bulls-eye element not found in DOM");
+            }
 
-    // Clear any conflicting inline styles first
-    _bullsEyeElement.style.removeProperty('top');
-    _bullsEyeElement.style.removeProperty('left');
-    _bullsEyeElement.style.removeProperty('transform');
+            window.CONSOLE_LOG_IGNORE('BullsEye: Element found, setting up centering...');
 
-    // Position relative to scene container
-    const sceneContainerForInit = document.getElementById('scene-container');
-    if (sceneContainerForInit) {
-        const sceneRect = sceneContainerForInit.getBoundingClientRect();
-        _bullsEyeElement.style.position = 'fixed';
-        _bullsEyeElement.style.left = `${sceneRect.left + sceneRect.width / 2}px`;
-        _bullsEyeElement.style.top = `${sceneRect.top + sceneRect.height / 2}px`;
-        _bullsEyeElement.style.transform = 'translate(-50%, -50%)';
-        _bullsEyeElement.style.zIndex = '1000';
-    } else {
-        // Fallback to window centering
-        _bullsEyeElement.style.position = 'fixed';
-        _bullsEyeElement.style.top = '50%';
-        _bullsEyeElement.style.left = '50%';
-        _bullsEyeElement.style.transform = 'translate(-50%, -50%)';
-        _bullsEyeElement.style.zIndex = '1000';
-    }
+            // Clear any conflicting inline styles first
+            _bullsEyeElement.style.removeProperty('top');
+            _bullsEyeElement.style.removeProperty('left');
+            _bullsEyeElement.style.removeProperty('transform');
 
-    // Force a layout recalculation
-    void _bullsEyeElement.offsetHeight;
+            // Position relative to scene container
+            const sceneContainerForInit = document.getElementById('scene-container');
+            if (sceneContainerForInit) {
+                const sceneRect = sceneContainerForInit.getBoundingClientRect();
+                _bullsEyeElement.style.position = 'fixed';
+                _bullsEyeElement.style.left = `${sceneRect.left + sceneRect.width / 2}px`;
+                _bullsEyeElement.style.top = `${sceneRect.top + sceneRect.height / 2}px`;
+                _bullsEyeElement.style.transform = 'translate(-50%, -50%)';
+                _bullsEyeElement.style.zIndex = '1000';
+            } else {
+                // Fallback to window centering
+                _bullsEyeElement.style.position = 'fixed';
+                _bullsEyeElement.style.top = '50%';
+                _bullsEyeElement.style.left = '50%';
+                _bullsEyeElement.style.transform = 'translate(-50%, -50%)';
+                _bullsEyeElement.style.zIndex = '1000';
+            }
 
-    // Verify the positioning worked
-    const rect = _bullsEyeElement.getBoundingClientRect();
-    const sceneContainer = document.getElementById('scene-container');
-    let referenceCenter;
-    
-    if (sceneContainer) {
-        const sceneRect = sceneContainer.getBoundingClientRect();
-        referenceCenter = {
-            x: sceneRect.left + sceneRect.width / 2,
-            y: sceneRect.top + sceneRect.height / 2
-        };
-    } else {
-        referenceCenter = {
-            x: window.innerWidth / 2,
-            y: window.innerHeight / 2
-        };
-    }
-    
-    const bullsEyeCenter = {
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2
-    };
-    
-    window.CONSOLE_LOG_IGNORE('BullsEye: Scene center:', referenceCenter);
-    window.CONSOLE_LOG_IGNORE('BullsEye: BullsEye center:', bullsEyeCenter);
-    const distance = Math.sqrt(
-        Math.pow(bullsEyeCenter.x - referenceCenter.x, 2) + 
-        Math.pow(bullsEyeCenter.y - referenceCenter.y, 2)
-    );
-    window.CONSOLE_LOG_IGNORE('BullsEye: Distance from scene center:', distance.toFixed(2) + 'px');
+            // Force a layout recalculation
+            void _bullsEyeElement.offsetHeight;
 
-    // Add resize listener for recentering
-    window.addEventListener('resize', recenterBullsEye);
+            // Verify the positioning worked
+            const rect = _bullsEyeElement.getBoundingClientRect();
+            const sceneContainer = document.getElementById('scene-container');
+            let referenceCenter;
+            
+            if (sceneContainer) {
+                const sceneRect = sceneContainer.getBoundingClientRect();
+                referenceCenter = {
+                    x: sceneRect.left + sceneRect.width / 2,
+                    y: sceneRect.top + sceneRect.height / 2
+                };
+            } else {
+                referenceCenter = {
+                    x: window.innerWidth / 2,
+                    y: window.innerHeight / 2
+                };
+            }
+            
+            const bullsEyeCenter = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+            
+            window.CONSOLE_LOG_IGNORE('BullsEye: Scene center:', referenceCenter);
+            window.CONSOLE_LOG_IGNORE('BullsEye: BullsEye center:', bullsEyeCenter);
+            const distance = Math.sqrt(
+                Math.pow(bullsEyeCenter.x - referenceCenter.x, 2) + 
+                Math.pow(bullsEyeCenter.y - referenceCenter.y, 2)
+            );
+            window.CONSOLE_LOG_IGNORE('BullsEye: Distance from scene center:', distance.toFixed(2) + 'px');
 
-    _isInitialized = true;
-    window.CONSOLE_LOG_IGNORE('BullsEye initialized successfully');
+            // Add resize listener for recentering
+            window.addEventListener('resize', recenterBullsEye);
+
+            _isInitialized = true;
+            window.CONSOLE_LOG_IGNORE('BullsEye initialized successfully');
+            resolve();
+        } catch (error) {
+            console.error("bullsEye.initialize: Failed to initialize", error);
+            reject(error);
+        }
+    });
+
+    return _initializationPromise;
 }
 
 /**

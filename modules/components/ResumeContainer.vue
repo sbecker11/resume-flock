@@ -245,37 +245,32 @@ function selectPrevious() {
 <style>
 /* Global styles for rDivs - not scoped to ensure they apply to dynamically created elements */
 
-/* Base rDiv styling with maximum specificity */
-#resume-content-div .biz-resume-div,
-#resume-content-div-wrapper .biz-resume-div,
-#resume-content .biz-resume-div,
-body #resume-content-div .biz-resume-div,
-body #resume-content-div-wrapper .biz-resume-div,
-body #resume-content .biz-resume-div,
+/* Base rDiv styling */
 .biz-resume-div {
     position: relative !important; /* Force override of any absolute positioning */
     display: flex !important; /* Use flexbox to allow height adjustment */
     flex-direction: column; /* Stack children vertically */
     width: 100%;
-    /* Padding, border, and outline are handled by applyPaletteToElement function */
     border-bottom: 1px solid #eee;
     box-sizing: border-box;
-    color: #333;
     flex-shrink: 0; /* Prevent items from shrinking, force stacking */
-    border-radius: 25px !important;  /* Clip inner content */
     min-height: fit-content; /* Allow height to fit content */
+
+    /* Default state styling using CSS variables */
+    background-color: var(--data-background-color);
+    color: var(--data-foreground-color);
+    padding: var(--data-normal-padding);
+    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
+    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);
+    border-radius: var(--data-normal-border-radius) !important;
+    margin-top: var(--data-normal-margin-top);
+    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s;
 }
 
 /* 
   Force the biz-resume-details-div AND all of its children to have a transparent background.
   This is the definitive fix to ensure the parent's rounded corners and background are visible.
 */
-#resume-content-div .biz-resume-div .biz-resume-details-div,
-#resume-content-div-wrapper .biz-resume-div .biz-resume-details-div,
-#resume-content .biz-resume-div .biz-resume-details-div,
-body #resume-content-div .biz-resume-div .biz-resume-details-div,
-body #resume-content-div-wrapper .biz-resume-div .biz-resume-details-div,
-body #resume-content .biz-resume-div .biz-resume-details-div,
 .biz-resume-div .biz-resume-details-div,
 .biz-resume-div .biz-resume-details-div * {
     background-color: transparent !important;
@@ -295,35 +290,25 @@ body #resume-content .biz-resume-div .biz-resume-details-div,
     overflow: visible; /* Show all content */
 }
 
-/* Hovered state: colors only - padding/border/outline handled by applyPaletteToElement */
-#resume-content-div .biz-resume-div:hover,
-#resume-content-div-wrapper .biz-resume-div:hover,
-#resume-content .biz-resume-div:hover,
-body #resume-content-div .biz-resume-div:hover,
-body #resume-content-div-wrapper .biz-resume-div:hover,
-body #resume-content .biz-resume-div:hover,
-.biz-resume-div:hover,
-#resume-content-div .biz-resume-div.hovered,
-#resume-content-div-wrapper .biz-resume-div.hovered,
-#resume-content .biz-resume-div.hovered,
-body #resume-content-div .biz-resume-div.hovered,
-body #resume-content-div-wrapper .biz-resume-div.hovered,
-body #resume-content .biz-resume-div.hovered,
+/* Hovered state */
 .biz-resume-div.hovered {
-    /* Background, color, padding, border, and outline are handled by applyStateStyling function */
+    background-color: var(--data-background-color-hovered);
+    color: var(--data-foreground-color-hovered);
+    padding: var(--data-hovered-padding);
+    border: var(--data-hovered-inner-border-width) solid var(--data-hovered-inner-border-color);
+    outline: var(--data-hovered-outer-border-width) solid var(--data-hovered-outer-border-color);
+    border-radius: var(--data-hovered-border-radius) !important;
+    margin-top: var(--data-hovered-margin-top);
 }
 
-/* Selected state: colors only - padding/border/outline handled by applyPaletteToElement */
-#resume-content-div .biz-resume-div.selected,
-#resume-content-div-wrapper .biz-resume-div.selected,
-#resume-content .biz-resume-div.selected,
-body #resume-content-div .biz-resume-div.selected,
-body #resume-content-div-wrapper .biz-resume-div.selected,
-body #resume-content .biz-resume-div.selected,
-html body #resume-content-div .biz-resume-div.selected,
-html body #resume-content-div-wrapper .biz-resume-div.selected,
-html body #resume-content .biz-resume-div.selected,
+/* Selected state */
 .biz-resume-div.selected {
-    /* Background, color, padding, border, and outline are handled by applyStateStyling function */
+    background-color: var(--data-background-color-selected);
+    color: var(--data-foreground-color-selected);
+    padding: var(--data-selected-padding);
+    border: var(--data-selected-inner-border-width) solid var(--data-selected-inner-border-color);
+    outline: var(--data-selected-outer-border-width) solid var(--data-selected-outer-border-color);
+    border-radius: var(--data-selected-border-radius) !important;
+    margin-top: var(--data-selected-margin-top);
 }
 </style> 

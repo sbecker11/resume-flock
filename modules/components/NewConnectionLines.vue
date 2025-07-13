@@ -55,7 +55,7 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { TARGET_CDIV_JOB_NUMBER } from "@/modules/constants/targetCDiv.mjs";
-import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { badgeManager } from '@/modules/core/badgeManager.mjs';
 
 export default {
@@ -506,7 +506,7 @@ export default {
           await applyPaletteToElement(selectedClone);
           
           // Re-apply selected state styling
-          applyStateStyling(selectedClone, 'selected');
+          selectedClone.classList.add('selected');
           
           console.log(`[NewConnectionLines] Clone ${selectedClone.id} refreshed successfully`);
         } else {

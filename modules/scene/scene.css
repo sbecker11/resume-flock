@@ -71,12 +71,44 @@ html[native-dark-active] #scene-container,
     cursor: pointer;
     z-index: 5; /* Changed from 4 to 5 to match BIZCARD_Z_INDEX_MIN */
     pointer-events: auto;
-    /* All padding, borders, colors handled by JavaScript applyStateStyling */
+
+    /* Default state styling using CSS variables */
+    background-color: var(--data-background-color);
+    color: var(--data-foreground-color);
+    padding: var(--data-normal-padding);
+    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
+    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);
+    border-radius: var(--data-normal-border-radius);
+    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s, filter 0.3s ease-out;
 }
 
-/* Base styling for resume divs */
+/* Hovered state */
+.biz-card-div.hovered {
+    background-color: var(--data-background-color-hovered);
+    color: var(--data-foreground-color-hovered);
+    padding: var(--data-hovered-padding);
+    border: var(--data-hovered-inner-border-width) solid var(--data-hovered-inner-border-color);
+    outline: var(--data-hovered-outer-border-width) solid var(--data-hovered-outer-border-color);
+    border-radius: var(--data-hovered-border-radius);
+    filter: none !important; /* Override parallax filter */
+    z-index: 98; /* Bring just below selected card */
+}
+
+/* Selected state */
+.biz-card-div.selected {
+    background-color: var(--data-background-color-selected);
+    color: var(--data-foreground-color-selected);
+    padding: var(--data-selected-padding);
+    border: var(--data-selected-inner-border-width) solid var(--data-selected-inner-border-color);
+    outline: var(--data-selected-outer-border-width) solid var(--data-selected-outer-border-color);
+    border-radius: var(--data-selected-border-radius);
+    filter: none !important; /* Override parallax filter */
+    z-index: 99; /* Bring to the very front */
+}
+
+/* Base styling for resume divs (moved to ResumeContainer.vue) */
 .biz-resume-div {
-    /* All colors, borders, padding handled by JavaScript applyStateStyling */
+    /* Base styles are now in ResumeContainer.vue */
 }
 
 .biz-details-z-value {
@@ -85,9 +117,6 @@ html[native-dark-active] #scene-container,
     padding: 0;
     text-align: right;
 }
-
-/* State-based styling is now handled entirely by JavaScript applyStateStyling function */
-/* This eliminates conflicts between CSS and JS styling systems */
 
 .biz-card-details-div {
     padding: 12px;

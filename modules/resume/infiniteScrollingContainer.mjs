@@ -1,6 +1,6 @@
 // modules/resume/infiniteScrollingContainer.mjs
 
-import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { selectionManager } from '../core/selectionManager.mjs';
 import { AppState } from '../core/stateManager.mjs';
 
@@ -240,7 +240,7 @@ class InfiniteScrollingContainer {
     if (clone.hasAttribute('data-color-index')) {
       try {
         applyPaletteToElement(clone);
-        applyStateStyling(clone, 'normal');
+        clone.classList.remove('hovered', 'selected');
       } catch (error) {
         window.CONSOLE_LOG_IGNORE('Failed to apply palette to infinite scroll clone:', error);
       }

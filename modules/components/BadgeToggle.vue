@@ -81,11 +81,11 @@ function toggleBadges(event) {
 }
 
 /* Additional visual feedback for active modes */
-#badge-toggle.show {
+#badge-toggle.badges-only {
   background-color: rgba(0, 120, 0, 0.8); /* Green tint when badges showing */
 }
 
-#badge-toggle.stats {
+#badge-toggle.badges-with-stats {
   background-color: rgba(0, 100, 200, 0.8); /* Blue tint when stats showing */
 }
 

@@ -4,7 +4,7 @@ import * as utils from '../utils/utils.mjs';
 import * as BizDetailsDivModule from './bizDetailsDivModule.mjs';
 import { selectionManager } from '../core/selectionManager.mjs';
 import { cardsController } from './CardsController.mjs';
-import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { initializationManager } from '../core/initializationManager.mjs';
 import { badgeManager } from '../core/badgeManager.mjs';
 // No longer directly manipulating other managers
@@ -124,7 +124,7 @@ class ResumeItemsController {
         await applyPaletteToElement(bizResumeDiv);
 
         // Apply normal state styling after palette application
-        applyStateStyling(bizResumeDiv, 'normal');
+        bizResumeDiv.classList.remove('hovered', 'selected');
 
         this._setupMouseListeners(bizResumeDiv);
 
@@ -204,7 +204,7 @@ class ResumeItemsController {
             bizResumeDiv.classList.add('hovered');
             
             // Apply hover state styling using the new system
-            applyStateStyling(bizResumeDiv, 'hovered');
+            bizResumeDiv.classList.add('hovered');
             
 
         }
@@ -216,7 +216,7 @@ class ResumeItemsController {
             div.classList.remove('hovered');
             // Reset to normal state (only if not selected)
             if (!div.classList.contains('selected')) {
-                applyStateStyling(div, 'normal');
+                div.classList.remove('hovered', 'selected');
             }
         });
     }
@@ -236,7 +236,7 @@ class ResumeItemsController {
             bizResumeDiv.classList.add('selected');
             
             // Apply selected state styling using the new system
-            applyStateStyling(bizResumeDiv, 'selected');
+            bizResumeDiv.classList.add('selected');
             
             // Force browser repaint to ensure stats div visibility updates immediately
             bizResumeDiv.offsetHeight; // Reading offsetHeight forces a reflow
@@ -258,7 +258,7 @@ class ResumeItemsController {
         this.bizResumeDivs.forEach(div => {
             div.classList.remove('selected');
             // Reset to normal state
-            applyStateStyling(div, 'normal');
+            div.classList.remove('hovered', 'selected');
             // Force browser repaint to ensure stats div visibility updates immediately
             div.offsetHeight; // Reading offsetHeight forces a reflow
         });

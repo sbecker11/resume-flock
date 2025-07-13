@@ -795,7 +795,7 @@ cloneItem(originalElement, originalIndex, cloneType) {
   if (clone.hasAttribute('data-color-index')) {
     try {
       applyPaletteToElement(clone);
-      applyStateStyling(clone, 'normal');
+      clone.classList.remove('hovered', 'selected');
     } catch (error) {
       console.log('Failed to apply palette to infinite scroll clone:', error);
     }
@@ -910,11 +910,11 @@ applyItemStyling(item) {
   
   // Apply state-based styling
   if (item.isSelected) {
-    applyStateStyling(item.element, 'selected');
+    item.element.classList.add('selected');
   } else if (item.isHovered) {
-    applyStateStyling(item.element, 'hovered');
+    item.element.classList.add('hovered');
   } else {
-    applyStateStyling(item.element, 'normal');
+    item.element.classList.remove('hovered', 'selected');
   }
 }
 ```

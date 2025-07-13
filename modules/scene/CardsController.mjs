@@ -12,7 +12,7 @@ import * as zUtils from '../utils/zUtils.mjs';
 import * as filters from '../core/filters.mjs';
 import { applyParallaxToBizCardDiv } from '../core/parallaxModule.mjs';
 import { jobs } from '../../static_content/jobs/jobs.mjs';
-import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { AppState } from '../core/stateManager.mjs';
 import { initializationManager } from '../core/initializationManager.mjs';
 // import { resumeListController } from '../resume/ResumeListController.mjs'; // No longer needed
@@ -204,7 +204,7 @@ class CardsController {
         console.log(`[SIMPLE TEST] After palette: cDiv ${bizCardDiv.id} scene-left="${afterPaletteSceneLeft}", scene-top="${afterPaletteSceneTop}"`);
 
         // Apply normal state styling after palette application
-        applyStateStyling(bizCardDiv, 'normal');
+        bizCardDiv.classList.remove('hovered', 'selected');
         
         // Check if attributes were removed by styling
         const afterStylingSceneLeft = bizCardDiv.getAttribute('scene-left');
@@ -571,7 +571,7 @@ class CardsController {
         });
 
         // Apply selected state styling to the clone
-        applyStateStyling(clone, 'selected');
+        clone.classList.add('selected');
         
         // Debug: Check attributes after applying styling
         window.CONSOLE_LOG_IGNORE(`[DEBUG] CardsController._selectBizCardDiv: Clone ${clone.id} attributes after applying styling:`, {
@@ -700,7 +700,7 @@ class CardsController {
                 div.classList.remove('hovered');
                 const isSelected = div.classList.contains('selected');
                 if (!isSelected) {
-                    applyStateStyling(div, 'normal');
+                    div.classList.remove('hovered', 'selected');
                 }
                 // Restore original position if it was moved
                 const originalNextSiblingJobNumber = div.getAttribute('data-original-next-sibling');
@@ -738,7 +738,7 @@ class CardsController {
         }
         
         element.classList.add('hovered');
-        applyStateStyling(element, 'hovered');
+        element.classList.add('hovered');
         
         // Track the currently hovered element
         this.currentlyHoveredElement = element;
@@ -754,7 +754,7 @@ class CardsController {
             element.classList.remove('hovered');
             const isSelected = element.classList.contains('selected');
             if (!isSelected) {
-                applyStateStyling(element, 'normal');
+                element.classList.remove('hovered', 'selected');
             }
             
             // Restore original position
@@ -839,7 +839,7 @@ class CardsController {
                     div.classList.remove('hovered');
                     const isSelected = div.classList.contains('selected');
                     if (!isSelected) {
-                        applyStateStyling(div, 'normal');
+                        div.classList.remove('hovered', 'selected');
                     }
                 }
             });
@@ -851,7 +851,7 @@ class CardsController {
                     clone.classList.remove('hovered');
                     const isSelected = clone.classList.contains('selected');
                     if (!isSelected) {
-                        applyStateStyling(clone, 'normal');
+                        clone.classList.remove('hovered', 'selected');
                     }
                 }
             });
@@ -859,7 +859,7 @@ class CardsController {
             const bizCardDiv = this.getBizCardDivByJobNumber(hoveredJobNumber);
             if (bizCardDiv) {
                 bizCardDiv.classList.add('hovered');
-                applyStateStyling(bizCardDiv, 'hovered');
+                bizCardDiv.classList.add('hovered');
             }
         }
     }
@@ -876,7 +876,7 @@ class CardsController {
                 
                 // Reset to normal state (only if not selected)
                 if (!isSelected) {
-                    applyStateStyling(div, 'normal');
+                    div.classList.remove('hovered', 'selected');
                 }
             }
         });
@@ -893,7 +893,7 @@ class CardsController {
                 
                 // Reset to normal state (only if not selected)
                 if (!isSelected) {
-                    applyStateStyling(clone, 'normal');
+                    clone.classList.remove('hovered', 'selected');
                 }
             }
         });

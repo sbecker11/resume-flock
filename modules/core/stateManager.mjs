@@ -21,7 +21,7 @@ function getDefaultState() {
             mode: 'locked' // Default to locked mode
         },
         badgeToggle: {
-            mode: 'none' // Default to no badges shown
+            mode: 'no-badges' // Default to no badges shown
         },
         resume: {
             sortRule: { field: 'startDate', direction: 'asc' }, // Default to oldest first

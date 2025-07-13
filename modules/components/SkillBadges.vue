@@ -18,7 +18,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useViewport } from '@/modules/composables/useViewport.mjs';
 import { useColorPalette, applyPaletteToElement } from '@/modules/composables/useColorPalette.mjs';
 import { jobs as jobsData } from '@/static_content/jobs/jobs.mjs';
@@ -29,7 +29,8 @@ import { badgePositioner } from '@/modules/utils/BadgePositioner.mjs';
 
 export default {
   name: 'SkillBadges',
-  setup() {
+  emits: ['badges-positioned'],
+  setup(props, { emit }) {
     const viewport = useViewport('SkillBadges');
     const colorPalette = useColorPalette();
     
@@ -157,6 +158,13 @@ export default {
       }
       
       updateBadgeStyles();
+
+      // After all potential position updates, wait for the DOM to update
+      // and then emit an event. This provides a reliable signal for other
+      // components (like SankeyConnections) to know when to draw.
+      nextTick(() => {
+        emit('badges-positioned');
+      });
     };
     
     // Update badge visual styles based on state

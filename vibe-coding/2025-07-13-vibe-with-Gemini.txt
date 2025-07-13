@@ -1,0 +1,542 @@
+Excellent. Let's pick up where we left off with the architectural refactoring, which is the essential groundwork for implementing advanced features like the Sankey diagram.
+
+As you requested, I will continue with the three major recommendations to make the application smaller, faster, and more robust. I'll start with the third recommendation, **Optimize and Stabilize Connection Line Rendering**, as I can make a significant improvement with the files you've provided.
+
+### Suggestion 3 (Part 1): Stabilize Event-Driven Rendering
+
+The current system for drawing connection lines relies on timers (`setTimeout`) to guess when the skill badges have finished moving. This can be unreliable and lead to visual glitches.
+
+The fix is to make the `SkillBadges.vue` component emit a `badges-positioned` event *only after* the DOM has been updated with the new badge positions. This provides a reliable signal for the `NewConnectionLines.vue` component to start drawing. I'll achieve this using Vue's `nextTick` utility.
+
+This change makes the communication between your components more robust and event-driven, eliminating the need for fragile timer-based workarounds.
+
+Here is the change for `/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/SkillBadges.vue`:
+```diff
+--- a/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/SkillBadges.vue
++++ b/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/SkillBadges.vue
+@@ -7,7 +7,7 @@
+ </template>
+ 
+ <script>
+-import { ref, computed, onMounted, onUnmounted } from 'vue';
++import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+ import { useViewport } from '@/modules/composables/useViewport.mjs';
+ import { useColorPalette, applyPaletteToElement } from '@/modules/composables/useColorPalette.mjs';
+ import { jobs as jobsData } from '@/static_content/jobs/jobs.mjs';
+@@ -131,6 +131,14 @@
+               }
+             }
++      });
++     };
++     
+
+### Suggestion 3 (Part 2): Stabilize Connection Line Rendering
+
+With the `SkillBadges` component now emitting a reliable `badges-positioned` event, I will refactor `NewConnectionLines.vue` to use it. This removes the complex and fragile `waitForBadgePositioning` function, which relied on timers and stability checks.
+
+The new, more robust flow is:
+1.  A card is selected.
+2.  `SkillBadges.vue` repositions the badges and emits `badges-positioned`.
+3.  `NewConnectionLines.vue` listens for this event and then triggers the drawing of the connection lines.
+
+This change makes the line rendering event-driven, faster, and more reliable, which is crucial for a smooth user experience and a solid foundation for the future Sankey diagram.
+
+Here is the change for `/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue`:
+
+```diff
+--- a/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue
+++++ b/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue
+@@ -38,7 +38,7 @@
+ </template>
+ 
+ <script>
+-import { ref, computed, onMounted, onUnmounted } from 'vue';
++import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+ import { TARGET_CDIV_JOB_NUMBER } from "@/modules/constants/targetCDiv.mjs";
+ import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+ import { badgeManager } from '@/modules/core/badgeManager.mjs';
+@@ -308,103 +308,6 @@
+       return position;
+     };
+ 
+-    // Wait for badges-positioned event or fall back to stability checking
+-    const waitForBadgePositioning = () => {
+-      return new Promise((resolve) => {
+-        let eventReceived = false;
+-        
+-        // First try: listen for the badges-positioned event
+-        const handleBadgesPositioned = (event) => {
+-          if (eventReceived) return;
+-          eventReceived = true;
+-          console.log('[NewConnectionLines] Received badges-positioned event, proceeding with connections');
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          resolve(true);
+-        };
+-        
+-        window.addEventListener('badges-positioned', handleBadgesPositioned);
+-        
+-        // Fallback: use stability checking if event doesn't fire within reasonable time
+-        setTimeout(() => {
+-          if (eventReceived) return;
+-          
+-          console.log('[NewConnectionLines] No badges-positioned event received, falling back to stability checking');
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          
+-          const skillBadgesContainer = document.getElementById('skill-badges-container');
+-          if (!skillBadgesContainer) {
+-            console.log('[NewConnectionLines] Skill badges container not found');
+-            resolve(false);
+-            return;
+-          }
+-
+-          let stabilityCheckCount = 0;
+-          const requiredStabilityChecks = 2; // Reduced from 3 for faster response
+-          let lastPositions = new Map();
+-          
+-          const checkBadgeStability = () => {
+-            if (eventReceived) return; // Stop if event was received
+-            
+-            const skillBadges = document.querySelectorAll('.skill-badge');
+-            const currentPositions = new Map();
+-            let relevantBadges = 0;
+-            let validPositions = 0;
+-            
+-            skillBadges.forEach((badge, index) => {
+-              // Skip dimmed badges
+-              if (badge.style.filter?.includes('brightness(0.5)')) return;
+-              
+-              relevantBadges++;
+-              const topValue = badge.style.top;
+-              const rect = badge.getBoundingClientRect();
+-              
+-              if (topValue && topValue !== '0px' && rect.width > 0 && rect.height > 0) {
+-                validPositions++;
+-                currentPositions.set(index, {
+-                  top: topValue,
+-                  x: rect.left,
+-                  y: rect.top
+-                });
+-              }
+-            });
+-            
+-            console.log(`[NewConnectionLines] Badge stability check: ${validPositions}/${relevantBadges} badges positioned`);
+-            
+-            // Check if we have enough valid badges and positions are stable
+-            if (validPositions > 0 && validPositions === relevantBadges) {
+-              // Compare with last positions to check stability
+-              let positionsStable = lastPositions.size > 0;
+-              if (positionsStable) {
+-                for (let [index, pos] of currentPositions) {
+-                  const lastPos = lastPositions.get(index);
+-                  if (!lastPos || lastPos.top !== pos.top || Math.abs(lastPos.x - pos.x) > 1 || Math.abs(lastPos.y - pos.y) > 1) {
+-                    positionsStable = false;
+-                    break;
+-                  }
+-                }
+-              }
+-              
+-              if (positionsStable) {
+-                stabilityCheckCount++;
+-                console.log(`[NewConnectionLines] Badge positions stable (${stabilityCheckCount}/${requiredStabilityChecks})`);
+-                
+-                if (stabilityCheckCount >= requiredStabilityChecks) {
+-                  console.log('[NewConnectionLines] Badge positioning completed and stable via fallback!');
+-                  resolve(true);
+-                  return;
+-                }
+-              } else {
+-                stabilityCheckCount = 0; // Reset counter if positions changed
+-              }
+-              
+-              lastPositions = new Map(currentPositions);
+-            } else {
+-              stabilityCheckCount = 0; // Reset counter if not all badges positioned
+-            }
+-            
+-            // Continue checking
+-            setTimeout(checkBadgeStability, 50); // Faster checking
+-          };
+-          
+-          // Start checking
+-          checkBadgeStability();
+-        }, 300); // Wait 300ms for the event before falling back
+-        
+-        // Absolute timeout after 3 seconds
+-        setTimeout(() => {
+-          if (eventReceived) return;
+-          eventReceived = true;
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          console.log('[NewConnectionLines] Badge positioning timeout - proceeding anyway');
+-          resolve(false);
+-        }, 3000);
+-      });
+-    };
+-
+     // Validate badge positioning - ensure badges have proper style.top values
+     const validateBadgePositioning = () => {
+       const skillBadges = document.querySelectorAll('.skill-badge');
+@@ -476,13 +379,6 @@
+       isUpdatingConnections = true;
+       console.log(`[NewConnectionLines] Starting connection update (${reason})`);
+       
+-      try {
+-      // Clear connections array - this is necessary to rebuild them
+-      connections.value = [];
+-      
+-      // Find the selected cDiv - prefer original over clone
+-      let selectedCDiv = document.querySelector('.biz-card-div.selected:not([id*="-clone"])');
+-      if (!selectedCDiv) {
+-        // Fallback to any selected cDiv including clones
+-        selectedCDiv = document.querySelector('.biz-card-div.selected');
+-      }
+-      
+-      if (!selectedCDiv) {
+-        console.log('[NewConnectionLines] No selected cDiv found - clearing connections');
+-        connections.value = [];
+-        return;
+-      }
+-      
+-      // console.log('[NewConnectionLines] Waiting for badge positioning to complete...');
+-      const badgesReady = await waitForBadgePositioning();
+-      
+-      if (!badgesReady) {
+-        // console.log('[NewConnectionLines] Badge positioning not optimal, but proceeding');
+-      }
+-      
++      try {      
+       const cDivPos = getElementPosition(selectedCDiv);
+       if (!cDivPos) {
+         console.log('[NewConnectionLines] Could not get cDiv position');
+@@ -628,12 +518,6 @@
+     };
+ 
+     // Event handlers
+-    const handleCardSelect = (event) => {
+-      const jobNumber = parseInt(event.detail.jobNumber);
+-      debouncedUpdateConnections(250, `card-select-${jobNumber}`);
+-    };
+-
+     const handleCardDeselect = () => {
+       console.log('[NewConnectionLines] Card deselected - clearing connections');
+       // Always clear connections when no card is selected
+@@ -671,13 +555,12 @@
+     
+     const handleBadgesPositioned = (event) => {
+       const jobNumber = event.detail?.jobNumber;
+-      console.log(`[NewConnectionLines] Badges positioned event received for job ${jobNumber}`);
++      console.log(`[NewConnectionLines] Badges positioned event received.`);
+       
+-      // Check if there's a selected cDiv and update connections
++      // When badges are positioned, update the connection lines if a card is selected.
+       const selectedCDiv = document.querySelector('.biz-card-div.selected');
+       if (selectedCDiv) {
+-        const selectedJobNumber = parseInt(selectedCDiv.getAttribute('data-job-number'));
+-        if (jobNumber === selectedJobNumber) {
++        const selectedJobNumber = parseInt(selectedCDiv.getAttribute('data-job-number'), 10);
++        if (jobNumber === selectedJobNumber || !jobNumber) { // Update if event is for the right job or is generic
+           console.log('[NewConnectionLines] Scheduling update for matching job number');
+           debouncedUpdateConnections(75, `badges-positioned-${jobNumber}`);
+         }
+@@ -688,7 +571,6 @@
+         console.log(`[NewConnectionLines] Badge mode: ${badgeManager.getMode()}`);
+       }, 50);
+       
+-      window.addEventListener('card-select', handleCardSelect);
+       window.addEventListener('card-deselect', handleCardDeselect);
+       
+       // Listen for viewport resize events to re-render curves
+@@ -748,7 +630,6 @@
+     });
+ 
+     onUnmounted(() => {
+-      window.removeEventListener('card-select', handleCardSelect);
+       window.removeEventListener('card-deselect', handleCardDeselect);
+       window.removeEventListener('viewport-changed', handleViewportResize);
+       window.removeEventListener('resize', handleViewportResize);
+```
+--------------------------------------
+
+
++      });
++     };
++     
+
+### Suggestion 3 (Part 2): Stabilize Connection Line Rendering
+
+With the `SkillBadges` component now emitting a reliable `badges-positioned` event, I will refactor `NewConnectionLines.vue` to use it. This removes the complex and fragile `waitForBadgePositioning` function, which relied on timers and stability checks.
+
+The new, more robust flow is:
+1.  A card is selected.
+2.  `SkillBadges.vue` repositions the badges and emits `badges-positioned`.
+3.  `NewConnectionLines.vue` listens for this event and then triggers the drawing of the connection lines.
+
+This change makes the line rendering event-driven, faster, and more reliable, which is crucial for a smooth user experience and a solid foundation for the future Sankey diagram.
+
+Here is the change for `/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue`:
+
+```diff
+--- a/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue
+++++ b/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/NewConnectionLines.vue
+@@ -38,7 +38,7 @@
+ </template>
+ 
+ <script>
+-import { ref, computed, onMounted, onUnmounted } from 'vue';
++import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+ import { TARGET_CDIV_JOB_NUMBER } from "@/modules/constants/targetCDiv.mjs";
+ import { applyPaletteToElement, applyStateStyling } from '../composables/useColorPalette.mjs';
+ import { badgeManager } from '@/modules/core/badgeManager.mjs';
+@@ -308,103 +308,6 @@
+       return position;
+     };
+ 
+-    // Wait for badges-positioned event or fall back to stability checking
+-    const waitForBadgePositioning = () => {
+-      return new Promise((resolve) => {
+-        let eventReceived = false;
+-        
+-        // First try: listen for the badges-positioned event
+-        const handleBadgesPositioned = (event) => {
+-          if (eventReceived) return;
+-          eventReceived = true;
+-          console.log('[NewConnectionLines] Received badges-positioned event, proceeding with connections');
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          resolve(true);
+-        };
+-        
+-        window.addEventListener('badges-positioned', handleBadgesPositioned);
+-        
+-        // Fallback: use stability checking if event doesn't fire within reasonable time
+-        setTimeout(() => {
+-          if (eventReceived) return;
+-          
+-          console.log('[NewConnectionLines] No badges-positioned event received, falling back to stability checking');
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          
+-          const skillBadgesContainer = document.getElementById('skill-badges-container');
+-          if (!skillBadgesContainer) {
+-            console.log('[NewConnectionLines] Skill badges container not found');
+-            resolve(false);
+-            return;
+-          }
+-
+-          let stabilityCheckCount = 0;
+-          const requiredStabilityChecks = 2; // Reduced from 3 for faster response
+-          let lastPositions = new Map();
+-          
+-          const checkBadgeStability = () => {
+-            if (eventReceived) return; // Stop if event was received
+-            
+-            const skillBadges = document.querySelectorAll('.skill-badge');
+-            const currentPositions = new Map();
+-            let relevantBadges = 0;
+-            let validPositions = 0;
+-            
+-            skillBadges.forEach((badge, index) => {
+-              // Skip dimmed badges
+-              if (badge.style.filter?.includes('brightness(0.5)')) return;
+-              
+-              relevantBadges++;
+-              const topValue = badge.style.top;
+-              const rect = badge.getBoundingClientRect();
+-              
+-              if (topValue && topValue !== '0px' && rect.width > 0 && rect.height > 0) {
+-                validPositions++;
+-                currentPositions.set(index, {
+-                  top: topValue,
+-                  x: rect.left,
+-                  y: rect.top
+-                });
+-              }
+-            });
+-            
+-            console.log(`[NewConnectionLines] Badge stability check: ${validPositions}/${relevantBadges} badges positioned`);
+-            
+-            // Check if we have enough valid badges and positions are stable
+-            if (validPositions > 0 && validPositions === relevantBadges) {
+-              // Compare with last positions to check stability
+-              let positionsStable = lastPositions.size > 0;
+-              if (positionsStable) {
+-                for (let [index, pos] of currentPositions) {
+-                  const lastPos = lastPositions.get(index);
+-                  if (!lastPos || lastPos.top !== pos.top || Math.abs(lastPos.x - pos.x) > 1 || Math.abs(lastPos.y - pos.y) > 1) {
+-                    positionsStable = false;
+-                    break;
+-                  }
+-                }
+-              }
+-              
+-              if (positionsStable) {
+-                stabilityCheckCount++;
+-                console.log(`[NewConnectionLines] Badge positions stable (${stabilityCheckCount}/${requiredStabilityChecks})`);
+-                
+-                if (stabilityCheckCount >= requiredStabilityChecks) {
+-                  console.log('[NewConnectionLines] Badge positioning completed and stable via fallback!');
+-                  resolve(true);
+-                  return;
+-                }
+-              } else {
+-                stabilityCheckCount = 0; // Reset counter if positions changed
+-              }
+-              
+-              lastPositions = new Map(currentPositions);
+-            } else {
+-              stabilityCheckCount = 0; // Reset counter if not all badges positioned
+-            }
+-            
+-            // Continue checking
+-            setTimeout(checkBadgeStability, 50); // Faster checking
+-          };
+-          
+-          // Start checking
+-          checkBadgeStability();
+-        }, 300); // Wait 300ms for the event before falling back
+-        
+-        // Absolute timeout after 3 seconds
+-        setTimeout(() => {
+-          if (eventReceived) return;
+-          eventReceived = true;
+-          window.removeEventListener('badges-positioned', handleBadgesPositioned);
+-          console.log('[NewConnectionLines] Badge positioning timeout - proceeding anyway');
+-          resolve(false);
+-        }, 3000);
+-      });
+-    };
+-
+     // Validate badge positioning - ensure badges have proper style.top values
+     const validateBadgePositioning = () => {
+       const skillBadges = document.querySelectorAll('.skill-badge');
+@@ -476,13 +379,6 @@
+       isUpdatingConnections = true;
+       console.log(`[NewConnectionLines] Starting connection update (${reason})`);
+       
+-      try {
+-      // Clear connections array - this is necessary to rebuild them
+-      connections.value = [];
+-      
+-      // Find the selected cDiv - prefer original over clone
+-      let selectedCDiv = document.querySelector('.biz-card-div.selected:not([id*="-clone"])');
+-      if (!selectedCDiv) {
+-        // Fallback to any selected cDiv including clones
+-        selectedCDiv = document.querySelector('.biz-card-div.selected');
+-      }
+-      
+-      if (!selectedCDiv) {
+-        console.log('[NewConnectionLines] No selected cDiv found - clearing connections');
+-        connections.value = [];
+-        return;
+-      }
+-      
+-      // console.log('[NewConnectionLines] Waiting for badge positioning to complete...');
+-      const badgesReady = await waitForBadgePositioning();
+-      
+-      if (!badgesReady) {
+-        // console.log('[NewConnectionLines] Badge positioning not optimal, but proceeding');
+-      }
+-      
++      try {      
+       const cDivPos = getElementPosition(selectedCDiv);
+       if (!cDivPos) {
+         console.log('[NewConnectionLines] Could not get cDiv position');
+@@ -628,12 +518,6 @@
+     };
+ 
+     // Event handlers
+-    const handleCardSelect = (event) => {
+-      const jobNumber = parseInt(event.detail.jobNumber);
+-      debouncedUpdateConnections(250, `card-select-${jobNumber}`);
+-    };
+-
+     const handleCardDeselect = () => {
+       console.log('[NewConnectionLines] Card deselected - clearing connections');
+       // Always clear connections when no card is selected
+@@ -671,13 +555,12 @@
+     
+     const handleBadgesPositioned = (event) => {
+       const jobNumber = event.detail?.jobNumber;
+-      console.log(`[NewConnectionLines] Badges positioned event received for job ${jobNumber}`);
++      console.log(`[NewConnectionLines] Badges positioned event received.`);
+       
+-      // Check if there's a selected cDiv and update connections
++      // When badges are positioned, update the connection lines if a card is selected.
+       const selectedCDiv = document.querySelector('.biz-card-div.selected');
+       if (selectedCDiv) {
+-        const selectedJobNumber = parseInt(selectedCDiv.getAttribute('data-job-number'));
+-        if (jobNumber === selectedJobNumber) {
++        const selectedJobNumber = parseInt(selectedCDiv.getAttribute('data-job-number'), 10);
++        if (jobNumber === selectedJobNumber || !jobNumber) { // Update if event is for the right job or is generic
+           console.log('[NewConnectionLines] Scheduling update for matching job number');
+           debouncedUpdateConnections(75, `badges-positioned-${jobNumber}`);
+         }
+@@ -688,7 +571,6 @@
+         console.log(`[NewConnectionLines] Badge mode: ${badgeManager.getMode()}`);
+       }, 50);
+       
+-      window.addEventListener('card-select', handleCardSelect);
+       window.addEventListener('card-deselect', handleCardDeselect);
+       
+       // Listen for viewport resize events to re-render curves
+@@ -748,7 +630,6 @@
+     });
+ 
+     onUnmounted(() => {
+-      window.removeEventListener('card-select', handleCardSelect);
+       window.removeEventListener('card-deselect', handleCardDeselect);
+       window.removeEventListener('viewport-changed', handleViewportResize);
+       window.removeEventListener('resize', handleViewportResize);
+```
+++++++++++++++
++        stroke: '#9966cc', // Example color
++        strokeWidth: Math.max(1, link.width),
++      }));
+
+### 2. Integrate the Sankey Component
+
+Now that the component exists, it needs to be integrated into the main application view to replace the old connection lines. I will update `AppContent.vue` to use `<SankeyConnections />` instead of `<NewConnectionLines />`.
+
+This change wires up the new component so we can begin developing and testing the D3 visualization.
+
+```diff
+--- a/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/AppContent.vue
+++++ b/Users/sbecker11/workspace-flock/flock-of-postcards/modules/components/AppContent.vue
+@@ -6,7 +6,7 @@
+         <div id="scene-plane-btm-gradient"></div>
+         <div id="scene-plane">
+           <Timeline alignment="left" />
+-          <NewConnectionLines />
++          <SankeyConnections />
+           <SkillBadges />
+         </div>
+         <div id="biz-details-div"></div>
+@@ -46,7 +46,7 @@
+ import ResumeContainer from '@/modules/components/ResumeContainer.vue';
+ import SceneContainerFooter from '@/modules/components/SceneContainerFooter.vue';
+ import SkillBadges from '@/modules/components/SkillBadges.vue';
+-import NewConnectionLines from '@/modules/components/NewConnectionLines.vue';
++import SankeyConnections from '@/modules/components/SankeyConnections.vue';
+ import BadgeToggle from '@/modules/components/BadgeToggle.vue';
+ 
+ 
+@@ -57,7 +57,7 @@
+     ResumeContainer,
+     SceneContainerFooter,
+     SkillBadges,
+-    NewConnectionLines,
++    SankeyConnections,
+     BadgeToggle,
+   },
+   async setup() {
+```
+
++        stroke: '#9966cc', // Example color
++        strokeWidth: Math.max(1, link.width),
++      }));
+
+-------------------------
+A code sample in this response was truncated because it exceeded the maximum allowable output. Please use the response carefully. You may also try your question again, selecting a smaller block of code as the context.
+
+"watch-figma": "node scripts/watch-and-sync.mjs"
+
+
+
+A code sample in this response was truncated because it exceeded the maximum allowable output. Please use the response carefully. You may also try your question again, selecting a smaller block of code as the context.
