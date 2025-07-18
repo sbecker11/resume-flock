@@ -29,6 +29,7 @@ import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { badgeManager } from '@/modules/core/badgeManager.mjs';
 import { badgePositioner } from '@/modules/utils/BadgePositioner.mjs';
 import { eventBus } from '@/modules/utils/eventBus.mjs';
+import { projectBizCardDivClone } from '@/modules/core/parallaxModule.mjs';
 
 export default {
   name: 'SkillBadges',
@@ -140,6 +141,17 @@ export default {
 
     // Position badges based on selected job number
     const positionBadges = () => {
+      // Check if no job is selected first - this should always hide badges regardless of mode
+      const currentSelectedJobNumber = getSelectedJobNumber();
+      if ( currentSelectedJobNumber == null ) {
+        // Hide all badges when no job is selected
+        const badgeElements = document.querySelectorAll('.skill-badge');
+        badgeElements.forEach(badge => {
+          badge.style.display = 'none';
+        });
+        return;
+      }
+      
       if (!badgeManager.isBadgesVisible()) {
         return;
       }
@@ -149,17 +161,13 @@ export default {
         return;
       }
       
-      if (selectedJobNumber.value !== 21) return;
-      
-      // query the DOM to find the selected jobNumber
-      const currentSelectedJobNumber = getSelectedJobNumber();
-      if ( currentSelectedJobNumber == null ) {
-        console.log("[SkillBadges] no selected job number found - positionBadges skipped");
-        return;
-      }
-      
       // query the DOM to find all badges
       const badgeElements = document.querySelectorAll('.skill-badge');
+      
+      // Ensure badges are visible again (remove any display:none from previous hiding)
+      badgeElements.forEach(badge => {
+        badge.style.display = 'block';
+      });
       if ( badgeElements.length === 0 ) {
         console.log("[SkillBadges] no badges found");
         return;
@@ -192,15 +200,27 @@ export default {
       //     }
       //   });
         
-        // find the vertical bounds of the selected cDiv
-        const cDivRect = selectedCDiv.getBoundingClientRect();
-        const containerRect = document.getElementById('scene-content').getBoundingClientRect();
-        const scrollTop = document.getElementById('scene-content').scrollTop;
+        // find the vertical bounds of the selected cDiv using proper coordinate projection
+        const selectedCDivClone = getSelectedCDivClone();
+        if (!selectedCDivClone) {
+          console.warn('[SkillBadges] No clone found for selected cDiv');
+          return;
+        }
+        const projectedRect = projectBizCardDivClone(selectedCDivClone);
+        
+        console.log('[SkillBadges] selectedCDiv:', selectedCDiv);
+        console.log('[SkillBadges] selectedCDivClone:', selectedCDivClone);
+        console.log('[SkillBadges] projectedRect:', projectedRect);
+        
+        if (!projectedRect) {
+          console.error('[SkillBadges] projectedRect is null - clone may be missing required data attributes');
+          return;
+        }
         
         const cDivBounds = {
-          top: cDivRect.top - containerRect.top + scrollTop,
-          bottom: cDivRect.bottom - containerRect.top + scrollTop,
-          centerY: (cDivRect.top + cDivRect.bottom) / 2 - containerRect.top + scrollTop
+          top: projectedRect.top,
+          bottom: projectedRect.bottom,
+          centerY: (projectedRect.top + projectedRect.bottom) / 2
         };
                 
         // Create callback to update Vue reactive data
@@ -217,10 +237,47 @@ export default {
               }
             }
           });
+          
+          // Calculate and report final mean positions after positioning
+          const selectedCDivCloneMean = (parseFloat(projectedRect.top) + parseFloat(projectedRect.bottom)) / 2;
+          
+          // Get final positioned badges that are related to current selection
+          const finalRelatedBadgePositions = positionData
+            .filter(({ element }) => {
+              const badgeElement = skillBadges.value.find(sb => sb.id === element.id);
+              return badgeElement && badgeElement.jobNumbers.includes(currentSelectedJobNumber);
+            })
+            .map(({ position }) => position + 20); // Add badge height/2 to get center
+          
+          if (finalRelatedBadgePositions.length > 0) {
+            const finalSelectedBadgesMean = finalRelatedBadgePositions.reduce((sum, pos) => sum + pos, 0) / finalRelatedBadgePositions.length;
+            console.log(`[SkillBadges] FINAL REPORT - Selected cDiv clone center Y: ${selectedCDivCloneMean.toFixed(2)}px`);
+            console.log(`[SkillBadges] FINAL REPORT - Selected badges center Y mean: ${finalSelectedBadgesMean.toFixed(2)}px (${finalRelatedBadgePositions.length} badges)`);
+            console.log(`[SkillBadges] FINAL REPORT - Difference (badges - cDiv): ${(finalSelectedBadgesMean - selectedCDivCloneMean).toFixed(2)}px`);
+            console.log(`[SkillBadges] FINAL REPORT - Selected badge center positions:`, finalRelatedBadgePositions.map(pos => pos.toFixed(2)));
+          }
         };
         
         // categorize and position selected badges
+        console.log('[SkillBadges] Calling badgePositioner.positionBadges with cDivBounds:', cDivBounds);
         const stats = badgePositioner.positionBadges([...badgeElements], relatedBadges, unrelatedBadges, cDivBounds, updatePositions);
+        
+        // Report mean positions
+        const selectedCDivCloneMean = (parseFloat(projectedRect.top) + parseFloat(projectedRect.bottom)) / 2;
+        console.log(`[SkillBadges] REPORT - Selected cDiv clone mean Y position: ${selectedCDivCloneMean.toFixed(2)}px`);
+        
+        // Calculate mean of all selected badges (related badges)
+        if (relatedBadges.length > 0) {
+          const selectedBadgesPositions = relatedBadges.map(badge => {
+            const top = parseFloat(badge.style.top || '0');
+            return top + 20; // Add badge height/2 to get center
+          });
+          const selectedBadgesMean = selectedBadgesPositions.reduce((sum, pos) => sum + pos, 0) / selectedBadgesPositions.length;
+          console.log(`[SkillBadges] REPORT - Selected badges mean Y position: ${selectedBadgesMean.toFixed(2)}px (${relatedBadges.length} badges)`);
+          console.log(`[SkillBadges] REPORT - Individual selected badge positions:`, selectedBadgesPositions.map(pos => pos.toFixed(2)));
+        } else {
+          console.log(`[SkillBadges] REPORT - No selected badges to calculate mean for`);
+        }
         
         // Add debug log before emitting
         console.log('[SkillBadges] EMITTING badgeOrder:', badgeOrder.value);
@@ -283,12 +340,13 @@ export default {
     
     // Event handlers
     const handleCardSelect = (event) => {
-      const newJobNumber = parseInt(event.detail.jobNumber);
-      console.log('[SkillBadges] handleCardSelect called with job number:', newJobNumber);
+      const newJobNumber = parseInt(event.detail.selectedJobNumber);
+      console.log('[SkillBadges] handleCardSelect called with job number:', newJobNumber, 'caller:', event.detail.caller);
       selectedJobNumber.value = newJobNumber;
-      setTimeout(positionBadges, 50);
+      setTimeout(() => {
+        positionBadges();
+      }, 150);
       // Log and emit after selection
-      console.log('[SkillBadges] handleCardSelect, emitting badges-positioned for job', selectedJobNumber.value);
       emit('badges-positioned', { badgeOrder: [...badgeOrder.value] });
       eventBus.emit('badges-positioned', { badgeOrder: [...badgeOrder.value] });
     };
@@ -358,8 +416,8 @@ export default {
       // Set up event listeners
       selectionManager.addEventListener('hoverChanged', handleCardHover);
       selectionManager.addEventListener('hoverCleared', handleCardUnhover);
-      window.addEventListener('card-select', handleCardSelect);
-      window.addEventListener('card-deselect', handleCardDeselect);
+      selectionManager.addEventListener('selectionChanged', handleCardSelect);
+      selectionManager.addEventListener('selectionCleared', handleCardDeselect);
       window.addEventListener('viewport-changed', handleViewportResize);
       window.addEventListener('resize', handleViewportResize);
       window.addEventListener('color-palette-changed', handlePaletteChange);
@@ -409,8 +467,8 @@ export default {
     onUnmounted(() => {
       selectionManager.removeEventListener('hoverChanged', handleCardHover);
       selectionManager.removeEventListener('hoverCleared', handleCardUnhover);
-      window.removeEventListener('card-select', handleCardSelect);
-      window.removeEventListener('card-deselect', handleCardDeselect);
+      selectionManager.removeEventListener('selectionChanged', handleCardSelect);
+      selectionManager.removeEventListener('selectionCleared', handleCardDeselect);
       window.removeEventListener('viewport-changed', handleViewportResize);
       window.removeEventListener('resize', handleViewportResize);
       window.removeEventListener('color-palette-changed', handlePaletteChange);
