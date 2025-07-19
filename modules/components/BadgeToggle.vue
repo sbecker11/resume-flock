@@ -1,13 +1,24 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { badgeManager } from '@/modules/core/badgeManager.mjs';
+import { selectionManager } from '@/modules/core/selectionManager.mjs';
 
 // --- Reactive refs for current mode ---
 const badgeMode = ref(badgeManager.getMode());
+const selectedJobNumber = ref(selectionManager.getSelectedJobNumber());
 
 // Listen for mode changes from BadgeManager
 badgeManager.addEventListener('badgeModeChanged', (event) => {
   badgeMode.value = event.detail.mode;
+});
+
+// Listen for selection changes
+selectionManager.addEventListener('selectionChanged', (event) => {
+  selectedJobNumber.value = event.detail.selectedJobNumber;
+});
+
+selectionManager.addEventListener('selectionCleared', () => {
+  selectedJobNumber.value = null;
 });
 
 const isHovering = ref(false);
@@ -36,14 +47,28 @@ const buttonClasses = computed(() => {
   ];
 });
 
+// Disabled state - disable when no cDiv is selected
+const isDisabled = computed(() => {
+  return selectedJobNumber.value === null;
+});
+
 // Tooltip text
 const tooltipText = computed(() => {
+  if (isDisabled.value) {
+    return 'Select a job card to enable badge controls';
+  }
   return badgeManager.getTooltipText(isHovering.value);
 });
 
 // --- Component Methods ---
 function toggleBadges(event) {
   event.stopPropagation();
+  
+  // Don't toggle if disabled
+  if (isDisabled.value) {
+    return;
+  }
+  
   badgeManager.toggleMode('BadgeToggle');
   // Mark that we just clicked (don't reset hover state yet)
   hasJustClicked.value = true;
@@ -61,6 +86,7 @@ function toggleBadges(event) {
     id="badge-toggle" 
     class="toggle-circle"
     :class="buttonClasses"
+    :disabled="isDisabled"
     @click.stop="toggleBadges" 
     @mouseenter="isHovering = true; hasJustClicked = false"
     @mouseleave="isHovering = false; hasJustClicked = false"
@@ -92,5 +118,13 @@ function toggleBadges(event) {
 /* Maintain hover effect precedence */
 #badge-toggle.hovering {
   background-color: white !important;
+}
+
+/* Disabled state styling */
+#badge-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #666 !important;
+  color: #999 !important;
 }
 </style>

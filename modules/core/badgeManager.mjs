@@ -32,7 +32,15 @@ class BadgeManager extends EventTarget {
      */
     initialize() {
         if (AppState?.badgeToggle?.mode) {
-            this._mode = AppState.badgeToggle.mode;
+            let mode = AppState.badgeToggle.mode;
+            // Disable badges-with-stats mode during initialization
+            if (mode === BadgeMode.BADGES_WITH_STATS) {
+                console.warn(`[BadgeManager] badges-with-stats mode is disabled, falling back to badges-only`);
+                mode = BadgeMode.BADGES_ONLY;
+                // Update the state to reflect the change
+                AppState.badgeToggle.mode = mode;
+            }
+            this._mode = mode;
             console.log(`[BadgeManager] Loaded badge mode from app-state.json: ${this._mode}`);
         } else {
             console.log(`[BadgeManager] No badge mode found in app-state.json, using default: ${this._mode}`);
@@ -65,6 +73,12 @@ class BadgeManager extends EventTarget {
         if (!isValidBadgeMode(mode)) {
             console.warn(`[BadgeManager] Invalid mode: ${mode}`);
             return;
+        }
+        
+        // Disable badges-with-stats mode
+        if (mode === BadgeMode.BADGES_WITH_STATS) {
+            console.warn(`[BadgeManager] badges-with-stats mode is disabled, falling back to badges-only`);
+            mode = BadgeMode.BADGES_ONLY;
         }
         
         if (this._mode === mode) {

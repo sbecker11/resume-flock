@@ -2,9 +2,10 @@
  * BadgePositioner - Utility for positioning skill badges around cDivs
  * Extracted from SkillBadges.vue to reduce complexity and improve reusability
  */
+import { AppState } from '../core/stateManager.mjs';
 
 export class BadgePositioner {
-    constructor(badgeHeight = 40) {
+    constructor(badgeHeight = 30) { // 2.5em at 12px = 30px
         this.badgeHeight = badgeHeight;
     }
 
@@ -19,31 +20,27 @@ export class BadgePositioner {
      */
     positionBadges(allBadges, relatedBadges, unrelatedBadges, cDivBounds, updateCallback = null) {
         const { top: cDivTop, bottom: cDivBottom, centerY: cDivCenterY } = cDivBounds;
-        const totalBadges = allBadges.length;
         
         // Validate cDiv bounds before positioning
         if (isNaN(cDivCenterY) || cDivCenterY < 0) {
-            console.warn(`[BadgePositioner] Invalid cDivCenterY: ${cDivCenterY}, falling back to viewport positioning`);
-            this.positionBadgesInViewport(allBadges, updateCallback);
+            console.warn(`[BadgePositioner] Invalid cDivCenterY: ${cDivCenterY}, hiding all badges`);
+            this.hideAllBadges(allBadges, updateCallback);
             return { aboveCount: 0, betweenCount: 0, belowCount: 0, badgeCenterYs: [], totalRelated: 0 };
         }
         
-        // Use cDiv center directly for all badges
-        const centerY = Math.max(200, cDivCenterY); // Ensure minimum distance from top
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] NEW POLICY: Only showing ${relatedBadges.length} related badges around clone Y=${cDivCenterY.toFixed(1)}px`);
         
-        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] cDiv bounds: top=${cDivTop.toFixed(1)}px, bottom=${cDivBottom.toFixed(1)}px, centerY=${cDivCenterY.toFixed(1)}px`);
-        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Creating ordered list: ${relatedBadges.length} related badges first, then ${unrelatedBadges.length} unrelated badges`);
+        // Hide all unrelated badges
+        this.hideUnrelatedBadges(unrelatedBadges, updateCallback);
         
-        // Create single ordered list: related badges first, then unrelated badges
-        const orderedBadges = [...relatedBadges, ...unrelatedBadges];
+        // Position only related badges using bucket algorithm around clone center
+        const bucketData = this._calculateBucketPositions(relatedBadges.length, cDivCenterY);
         
-        // Calculate staggered positions for all badges around center
-        const staggeredPositions = this._calculateStaggeredPositions(orderedBadges.length, centerY);
-        
-        // Create position data mapping for the ordered list
-        const positionData = orderedBadges.map((badge, index) => ({
+        // Create position data for related badges only
+        const positionData = relatedBadges.map((badge, index) => ({
             element: badge,
-            position: staggeredPositions[index]
+            position: bucketData[index].position,
+            bucketNumber: bucketData[index].bucketNumber
         }));
         
         // If callback provided, use it to update Vue reactive data
@@ -63,7 +60,7 @@ export class BadgePositioner {
         const stats = this._calculateBadgeStatistics(relatedBadges, cDivTop, cDivBottom);
         
         // Categorize all badges after positioning
-        const categorized = positionData.map(({ element, position }) => {
+        const categorized = positionData.map(({ element, position, bucketNumber }) => {
             const badgeCenterY = position + 20; // badge height / 2
             let category;
             if (badgeCenterY < cDivTop) {
@@ -78,7 +75,8 @@ export class BadgePositioner {
                 name: element.textContent,
                 top: position,
                 centerY: badgeCenterY,
-                category
+                category,
+                bucketNumber: bucketNumber
             };
         });
         
@@ -152,9 +150,17 @@ export class BadgePositioner {
      */
     _calculateStaggeredPositions(totalBadges, centerBucket) {
         const positions = [];
-        let offset = 0;
+        // Use AppState configuration if available, otherwise default
+        const verticalSpacing = (typeof AppState !== 'undefined' && AppState?.badges?.spacing?.vertical) || 10;
+        const badgeSpacing = this.badgeHeight + verticalSpacing; // Badge height + vertical margin
         
-        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Calculating staggered positions for ${totalBadges} badges around centerBucket=${centerBucket}px`);
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Calculating balanced staggered positions for ${totalBadges} badges around centerBucket=${centerBucket}px`);
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Using badgeHeight=${this.badgeHeight}px, verticalSpacing=${verticalSpacing}px, total badgeSpacing=${badgeSpacing}px`);
+        
+        // Create balanced distribution around center point
+        // Pattern: center, above, below, above, below, etc.
+        let aboveOffset = 0;
+        let belowOffset = 0;
         
         for (let i = 0; i < totalBadges; i++) {
             let targetY;
@@ -163,23 +169,24 @@ export class BadgePositioner {
                 // First badge goes at center
                 targetY = centerBucket;
             } else if (i % 2 === 1) {
-                // Odd badges go below center
-                offset++;
-                targetY = centerBucket + (offset * this.badgeHeight);
+                // Odd badges go above center (1st, 3rd, 5th...)
+                aboveOffset++;
+                targetY = centerBucket - (aboveOffset * badgeSpacing);
             } else {
-                // Even badges go above center  
-                targetY = centerBucket - (offset * this.badgeHeight);
+                // Even badges go below center (2nd, 4th, 6th...)
+                belowOffset++;
+                targetY = centerBucket + (belowOffset * badgeSpacing);
             }
             
             positions.push(targetY);
             
             // Debug first few positions
-            if (i < 5) {
-                window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Badge ${i}: targetY=${targetY}px (center=${centerBucket}, offset=${offset})`);
+            if (i < 8) {
+                window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Badge ${i}: targetY=${targetY}px (center=${centerBucket}, aboveOffset=${aboveOffset}, belowOffset=${belowOffset})`);
             }
         }
         
-        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Generated ${positions.length} staggered positions:`, positions.slice(0, 5), '...');
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Generated ${positions.length} balanced staggered positions around center ${centerBucket}px`);
         return positions;
     }
 
@@ -217,6 +224,107 @@ export class BadgePositioner {
             badgeCenterYs,
             totalRelated: relatedBadges.length
         };
+    }
+
+    /**
+     * Calculate bucket positions for badges around clone center using staggered pattern
+     * @private
+     */
+    _calculateBucketPositions(numBadges, cloneCenterY) {
+        const bucketData = [];
+        const badgeSpacing = this.badgeHeight + 10; // Badge height + margin
+        
+        // Define total number of buckets available (e.g., based on viewport height)
+        const sceneContainer = document.getElementById('scene-container');
+        const sceneHeight = sceneContainer ? sceneContainer.clientHeight : 1000;
+        const totalBuckets = Math.floor(sceneHeight / badgeSpacing);
+        
+        // Calculate what bucket (1 to N) the clone center Y falls into
+        const cloneBucketC = Math.max(1, Math.min(totalBuckets, Math.round(cloneCenterY / badgeSpacing) + 1));
+        
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Calculating ${numBadges} bucket positions around clone Y=${cloneCenterY.toFixed(1)} (bucket C=${cloneBucketC})`);
+        
+        // Assign badges to alternating buckets around C: C, C-1, C+1, C-2, C+2, ...
+        let aboveOffset = 0;
+        let belowOffset = 0;
+        
+        for (let i = 0; i < numBadges; i++) {
+            let bucketNumber;
+            let targetY;
+            
+            if (i === 0) {
+                // First badge goes at clone bucket C
+                bucketNumber = cloneBucketC;
+            } else if (i % 2 === 1) {
+                // Odd badges go in buckets above C (C-1, C-2, C-3...)
+                aboveOffset++;
+                bucketNumber = cloneBucketC - aboveOffset;
+            } else {
+                // Even badges go in buckets below C (C+1, C+2, C+3...)
+                belowOffset++;
+                bucketNumber = cloneBucketC + belowOffset;
+            }
+            
+            // Ensure bucket number stays within 1 to totalBuckets range
+            bucketNumber = Math.max(1, Math.min(totalBuckets, bucketNumber));
+            
+            // Convert bucket number to Y coordinate (bucket 1 = Y position 0)
+            targetY = (bucketNumber - 1) * badgeSpacing;
+            
+            bucketData.push({
+                position: targetY,
+                bucketNumber: bucketNumber,
+                cloneBucketC: cloneBucketC  // Include for debug display
+            });
+            
+            if (i < 5) {
+                window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Badge ${i}: Bucket=${bucketNumber}, Y=${targetY.toFixed(1)}px (${bucketNumber === cloneBucketC ? 'CENTER' : bucketNumber < cloneBucketC ? 'ABOVE' : 'BELOW'})`);
+            }
+        }
+        
+        return bucketData;
+    }
+
+    /**
+     * Hide unrelated badges
+     * @private
+     */
+    hideUnrelatedBadges(unrelatedBadges, updateCallback) {
+        if (updateCallback) {
+            // Use callback to hide badges via Vue
+            const hiddenData = unrelatedBadges.map(badge => ({
+                element: badge,
+                position: -2000, // Move off-screen
+                hidden: true
+            }));
+            updateCallback(hiddenData);
+        } else {
+            // Direct DOM manipulation fallback
+            unrelatedBadges.forEach(badge => {
+                badge.style.display = 'none';
+            });
+        }
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Hid ${unrelatedBadges.length} unrelated badges`);
+    }
+
+    /**
+     * Hide all badges
+     * @private
+     */
+    hideAllBadges(allBadges, updateCallback) {
+        if (updateCallback) {
+            const hiddenData = allBadges.map(badge => ({
+                element: badge,
+                position: -2000,
+                hidden: true
+            }));
+            updateCallback(hiddenData);
+        } else {
+            allBadges.forEach(badge => {
+                badge.style.display = 'none';
+            });
+        }
+        window.CONSOLE_LOG_IGNORE(`[BadgePositioner] Hid all ${allBadges.length} badges`);
     }
 
     /**

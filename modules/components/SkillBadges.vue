@@ -59,8 +59,7 @@ export default {
         const skillEntries = Object.entries(jobSkills);
         
         if (jobNumber === 21) {
-          console.log('[SkillBadges] Processing job 21 skills:', Object.keys(jobSkills).length, 'skills');
-          console.log('[SkillBadges] Job 21 skill names:', Object.values(jobSkills));
+          window.LOG_JOB?.(21, `skills: ${Object.keys(jobSkills).length}`);
         }
         
         skillEntries.forEach(([skillKey, skillName]) => {
@@ -340,8 +339,12 @@ export default {
     
     // Event handlers
     const handleCardSelect = (event) => {
+      console.log('SkillBadges.handleCardSelect called with event:', event.detail);
       const newJobNumber = parseInt(event.detail.selectedJobNumber);
-      console.log('[SkillBadges] handleCardSelect called with job number:', newJobNumber, 'caller:', event.detail.caller);
+      console.log('SkillBadges: About to call LOG_JOB with:', newJobNumber, 'selected');
+      // Use new logging system for clean job number output
+      window.LOG_JOB?.(newJobNumber, 'selected');
+      console.log('SkillBadges: Called LOG_JOB');
       selectedJobNumber.value = newJobNumber;
       setTimeout(() => {
         positionBadges();

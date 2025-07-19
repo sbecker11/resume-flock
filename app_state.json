@@ -1,15 +1,15 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-18T17:34:49.049Z",
+  "lastUpdated": "2025-07-19T08:34:44.242Z",
   "layout": {
     "panelSizePercentage": 50,
     "orientation": "scene-left",
-    "scenePercentage": 49.11816578483245,
-    "resumePercentage": 50.88183421516755
+    "scenePercentage": 48.7457627118644,
+    "resumePercentage": 51.2542372881356
   },
   "resizeHandle": {
     "steppingEnabled": true,
-    "stepCount": 6
+    "stepCount": 4
   },
   "focalPoint": {
     "mode": "locked"
@@ -17,17 +17,49 @@
   "badgeToggle": {
     "mode": "badges-only"
   },
+  "badges": {
+    "height": "2.5em",
+    "padding": "0.5em 0.75em",
+    "verticalMargin": "0.1em",
+    "borderRadius": "1.25em",
+    "borderWidth": "1px",
+    "fontSize": "12px",
+    "fontWeight": "500",
+    "transition": "all 0.2s ease",
+    "spacing": {
+      "vertical": 10,
+      "horizontal": 10
+    },
+    "states": {
+      "normal": {
+        "borderWidth": "1px",
+        "transform": "scale(1.0)",
+        "boxShadow": "none"
+      },
+      "hovered": {
+        "borderWidth": "2px",
+        "transform": "scale(1.05)",
+        "boxShadow": "none"
+      },
+      "selected": {
+        "borderWidth": "2px",
+        "transform": "scale(1.1)",
+        "boxShadow": "0 2px 8px rgba(0, 0, 0, 0.2)"
+      }
+    }
+  },
+  "selectedJobNumber": 22,
   "resume": {
     "sortRule": {
       "field": "startDate",
-      "direction": "desc"
+      "direction": "asc"
     },
-    "selectedJobNumber": 21
+    "selectedJobNumber": 22
   },
   "theme": {
     "colorPalette": "50_Dark_Grey_Monotone.json",
     "brightnessFactorSelected": 2,
-    "brightnessFactorHovered": 1.5,
+    "brightnessFactorHovered": 1.75,
     "borderSettings": {
       "normal": {
         "padding": "15px",
@@ -50,9 +82,9 @@
       "selected": {
         "padding": "13px",
         "innerBorderWidth": "3px",
-        "innerBorderColor": "blue",
-        "outerBorderWidth": "3px",
-        "outerBorderColor": "purple",
+        "innerBorderColor": "purple",
+        "outerBorderWidth": "0px",
+        "outerBorderColor": "transparent",
         "borderRadius": "25px",
         "marginTop": "11px"
       }
@@ -61,29 +93,17 @@
       "normal": {
         "padding": "15px",
         "innerBorderWidth": "1px",
-        "marginTop": "11px",
-        "innerBorderColor": "white",
-        "outerBorderWidth": "0px",
-        "outerBorderColor": "transparent",
-        "borderRadius": "25px"
+        "marginTop": "11px"
       },
       "hovered": {
         "padding": "14px",
         "innerBorderWidth": "2px",
-        "marginTop": "11px",
-        "innerBorderColor": "blue",
-        "outerBorderWidth": "0px",
-        "outerBorderColor": "transparent",
-        "borderRadius": "25px"
+        "marginTop": "11px"
       },
       "selected": {
         "padding": "13px",
         "innerBorderWidth": "3px",
-        "marginTop": "11px",
-        "innerBorderColor": "purple",
-        "outerBorderWidth": "0px",
-        "outerBorderColor": "transparent",
-        "borderRadius": "25px"
+        "marginTop": "11px"
       }
     }
   },
@@ -404,6 +424,5 @@
         }
       }
     }
-  },
-  "colorPalette": "sweeps.json"
+  }
 }

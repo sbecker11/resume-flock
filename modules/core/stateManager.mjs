@@ -25,9 +25,40 @@ function getDefaultState() {
         badgeToggle: {
             mode: BadgeMode.NONE // Default to no badges shown
         },
+        badges: {
+            height: '2.5em',
+            padding: '0.5em 0.75em',
+            verticalMargin: '0.1em',
+            borderRadius: '1.25em',
+            borderWidth: '1px',
+            fontSize: '12px',
+            fontWeight: '500',
+            transition: 'all 0.2s ease',
+            spacing: {
+                vertical: 10, // Additional spacing between badges (used by BadgePositioner)
+                horizontal: 10
+            },
+            states: {
+                normal: {
+                    borderWidth: '1px',
+                    transform: 'scale(1.0)',
+                    boxShadow: 'none'
+                },
+                hovered: {
+                    borderWidth: '2px',
+                    transform: 'scale(1.05)',
+                    boxShadow: 'none'
+                },
+                selected: {
+                    borderWidth: '2px',
+                    transform: 'scale(1.1)',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                }
+            }
+        },
+        selectedJobNumber: 22, // Default to the last item (newest job when sorted oldest first)
         resume: {
-            sortRule: { field: 'startDate', direction: 'asc' }, // Default to oldest first
-            selectedJobNumber: 22 // Default to the last item (newest job when sorted oldest first)
+            sortRule: { field: 'startDate', direction: 'asc' } // Default to oldest first
         },
         theme: {
             colorPalette: '50_Dark_Grey_Monotone.json', // Default palette

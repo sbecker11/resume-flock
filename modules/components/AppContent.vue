@@ -77,19 +77,20 @@
         'debug-right': appContainerClass === 'scene-right'
       }"
     >
-      <!-- App-container coordinates -->
-      <div class="debug-line">scL: {{ debugValues['win.scL'] }}</div>
-      <div class="debug-line">scW: {{ debugValues['win.scW'] }}</div>
-      <div class="debug-line">rcL: {{ debugValues['win.rcL'] }}</div>
-      <div class="debug-line">rcW: {{ debugValues['win.rcW'] }}</div>
-      <div class="debug-line">beX: {{ debugValues['win.beX'] }}</div>
-      <div class="debug-line">fpX: {{ debugValues['win.fpX'] }}</div>
-      <!-- Scene container coordinates -->
-      <div class="debug-line">scCx: {{ debugValues['app.scCx'] }}</div>
-      <div class="debug-line">vpRect: {{ debugValues['app.vpRect'] }}</div>
-      <!-- Scene-plane coordinates -->
-      <div class="debug-line">sp.job0: {{ debugValues['sp.job0'] }}</div>
-      <div class="debug-line">sp.job0View: {{ debugValues['sp.job0View'] }}</div>
+      <!-- Job and clone info -->
+      <div class="debug-line">#{{ debugValues['selectedJobNumber'] }}</div>
+      <div class="debug-line">{{ debugValues['cloneCenterY'] }}</div>
+      <div class="debug-line">{{ debugValues['categorySummary'] }}</div>
+      <!-- Related badges positioning -->
+      <div v-for="badge in debugValues['relatedBadgeList']" :key="badge.id" class="debug-line" 
+           :style="{ 
+             fontSize: '12px',
+             border: badge.category === 'LEVEL' ? '2px solid yellow' : 'none',
+             padding: badge.category === 'LEVEL' ? '2px 4px' : '0',
+             margin: badge.category === 'LEVEL' ? '2px 0' : '0'
+           }">
+        {{ badge.displayText }}
+      </div>
     </div>
   </div>
 </template>
@@ -120,6 +121,7 @@ import debugPanel from '@/modules/core/debugPanel.mjs';
 import * as autoScroll from '@/modules/animation/autoScrollModule.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { badgeManager } from '@/modules/core/badgeManager.mjs';
+import { AppState } from '@/modules/core/stateManager.mjs';
 
 
 import Timeline from '@/modules/components/Timeline.vue';
@@ -221,7 +223,7 @@ export default {
         resumeListController.registerForInitialization();
         
         // Register DebugPanel with its dependencies
-        debugPanel.registerForInitialization(initializationManager);
+        // debugPanel.registerForInitialization(initializationManager); // Disabled - using custom debug panel
         
         
         // Register other components that depend on controllers
@@ -352,6 +354,15 @@ export default {
         
         // Also update debug values when viewport changes
         window.addEventListener('viewport-changed', updateDebugValues);
+        
+        // Listen for badges-positioned events to update debug display with real bucket info
+        window.addEventListener('badges-positioned', (event) => {
+          if (event.detail && event.detail.badgeOrder) {
+            // Store the real badge order data for debug display
+            debugValues.value['badgeOrderData'] = event.detail.badgeOrder;
+            updateDebugValues();
+          }
+        });
         
         // Force viewport border to update on viewport changes
         window.addEventListener('viewport-changed', () => {
@@ -712,6 +723,154 @@ export default {
           debugValues.value['sp.job0'] = 'LOADING';
           debugValues.value['sp.job0View'] = 'LOADING';
         }
+        
+        // Update selected job and badge clustering info
+        try {
+          const selectedJobNumber = selectionManager.getSelectedJobNumber();
+          
+          if (selectedJobNumber !== null && selectedJobNumber !== undefined) {
+            debugValues.value['selectedJobNumber'] = selectedJobNumber;
+            
+            const selectedCDivClone = document.getElementById(`biz-card-div-${selectedJobNumber}-clone`);
+            
+            if (selectedCDivClone) {
+              // Use the SAME coordinate projection as BadgePositioner
+              const projectedRect = parallax.projectBizCardDivClone ? parallax.projectBizCardDivClone(selectedCDivClone) : null;
+              if (!projectedRect) {
+                debugValues.value['cloneCenterY'] = 'PROJ_ERR';
+                return;
+              }
+              const cloneCenterY = (projectedRect.top + projectedRect.bottom) / 2;
+              
+              // Calculate clone's bucket number C using EXACT same calculation as BadgePositioner
+              const badgeHeight = 30; // Match BadgePositioner constructor default
+              const badgeSpacing = badgeHeight + 10; // EXACT same calculation: 30 + 10 = 40
+              const sceneContainer = document.getElementById('scene-container');
+              const sceneHeight = sceneContainer ? sceneContainer.clientHeight : 1000;
+              const totalBuckets = Math.floor(sceneHeight / badgeSpacing);
+              const cloneBucketC = Math.max(1, Math.min(totalBuckets, Math.round(cloneCenterY / badgeSpacing) + 1));
+              
+              debugValues.value['cloneCenterY'] = `${cloneCenterY.toFixed(1)} (C=${cloneBucketC})`;
+              
+              // Find selected badges (badges that match this job)
+              const allBadges = document.querySelectorAll('.skill-badge');
+              const selectedBadges = Array.from(allBadges).filter(badge => {
+                const jobNumbers = badge.getAttribute('data-job-numbers');
+                if (jobNumbers) {
+                  try {
+                    const jobNumbersArray = JSON.parse(jobNumbers);
+                    return jobNumbersArray.includes(selectedJobNumber);
+                  } catch (e) {
+                    return false;
+                  }
+                }
+                return false;
+              });
+              
+              // Create focused list for related badges only with ABOVE/LEVEL/BELOW categorization  
+              const cloneTop = projectedRect.top;
+              const cloneBottom = projectedRect.bottom;
+              
+              // Check if we have real badge order data from BadgePositioner
+              const badgeOrderData = debugValues.value['badgeOrderData'];
+              
+              const relatedBadgeList = selectedBadges.map(badge => {
+                // Use scene coordinate from badge's positioned style.top, not viewport coordinates
+                const badgeTop = parseFloat(badge.style.top || '0');
+                const badgeHeight = 30; // Match BadgePositioner badge height
+                const centerY = badgeTop + (badgeHeight / 2);
+                
+                let category;
+                if (centerY < cloneTop) {
+                  category = 'ABOVE';
+                } else if (centerY > cloneBottom) {
+                  category = 'BELOW';
+                } else {
+                  category = 'LEVEL';
+                }
+                
+                // Try to get real bucket number from BadgePositioner data
+                let bucketNumber = 0;
+                if (badgeOrderData && Array.isArray(badgeOrderData)) {
+                  const badgeData = badgeOrderData.find(b => b.id === badge.id);
+                  if (badgeData && badgeData.bucketNumber !== undefined) {
+                    bucketNumber = badgeData.bucketNumber;
+                  } else {
+                    // Fallback: calculate from position (shouldn't happen with new system)
+                    const badgeSpacing = 40; // Badge height + margin
+                    bucketNumber = Math.round((centerY - cloneCenterY) / badgeSpacing);
+                  }
+                } else {
+                  // Fallback: calculate from position
+                  const badgeSpacing = 40; // Badge height + margin  
+                  bucketNumber = Math.round((centerY - cloneCenterY) / badgeSpacing);
+                }
+                
+                return {
+                  id: badge.id,
+                  y: centerY.toFixed(1),
+                  category: category,
+                  centerY: centerY,
+                  distanceToClone: Math.abs(centerY - cloneCenterY),
+                  bucketNumber: bucketNumber
+                };
+              });
+              
+              // Find the closest badge to clone center
+              const closestBadge = relatedBadgeList.reduce((closest, badge) => 
+                badge.distanceToClone < closest.distanceToClone ? badge : closest
+              );
+              
+              // Add bracket formatting with bucket numbers
+              relatedBadgeList.forEach(badge => {
+                const bucketText = `B${badge.bucketNumber >= 0 ? '+' + badge.bucketNumber : badge.bucketNumber}`;
+                if (badge.id === closestBadge.id) {
+                  badge.displayText = `[[${badge.category} ${bucketText}]]`; // Double brackets for closest
+                } else {
+                  badge.displayText = `[${badge.category} ${bucketText}]`; // Single brackets for selected
+                }
+              });
+              
+              debugValues.value['relatedBadgeList'] = relatedBadgeList;
+              
+              // Calculate category summary
+              const aboveCount = relatedBadgeList.filter(b => b.category === 'ABOVE').length;
+              const levelCount = relatedBadgeList.filter(b => b.category === 'LEVEL').length;
+              const belowCount = relatedBadgeList.filter(b => b.category === 'BELOW').length;
+              debugValues.value['categorySummary'] = `ABOVE: ${aboveCount}  LEVEL: ${levelCount}  BELOW: ${belowCount}`;
+              
+              if (selectedBadges.length > 0) {
+                const badgeCenterYs = selectedBadges.map(badge => {
+                  const rect = badge.getBoundingClientRect();
+                  return rect.top + rect.height / 2;
+                });
+                const avgBadgeY = badgeCenterYs.reduce((sum, y) => sum + y, 0) / badgeCenterYs.length;
+                const offset = avgBadgeY - cloneCenterY; // Positive = below clone, Negative = above clone
+                const distance = Math.abs(offset);
+                
+                debugValues.value['badgeOffset'] = (offset >= 0 ? '+' : '') + offset.toFixed(1) + 'px';
+                debugValues.value['clusterDistance'] = distance.toFixed(1) + 'px';
+              } else {
+                debugValues.value['badgeOffset'] = 'N/A';
+                debugValues.value['clusterDistance'] = 'N/A';
+              }
+            } else {
+              debugValues.value['cloneCenterY'] = 'NO CLONE';
+              debugValues.value['categorySummary'] = 'NO CLONE';
+              debugValues.value['relatedBadgeList'] = [];
+            }
+          } else {
+            debugValues.value['selectedJobNumber'] = 'NONE';
+            debugValues.value['cloneCenterY'] = 'NONE';
+            debugValues.value['categorySummary'] = 'NONE';
+            debugValues.value['relatedBadgeList'] = [];
+          }
+        } catch (error) {
+          debugValues.value['selectedJobNumber'] = 'ERR';
+          debugValues.value['cloneCenterY'] = 'ERR';
+          debugValues.value['categorySummary'] = 'ERR';
+          debugValues.value['relatedBadgeList'] = [];
+        }
       } catch (error) {
         // Set error values for all debug fields
         debugValues.value['sp.job0'] = 'ERR';
@@ -1044,17 +1203,23 @@ export default {
 #live-debug-display {
   position: fixed;
   top: 20px;
-  z-index: 1000;
-  background-color: rgba(0, 0, 0, 0.8);
+  z-index: 9999;
+  background-color: rgba(0, 0, 0, 0.9);
   color: #00ff00;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
-  padding: 8px;
-  border-radius: 4px;
-  line-height: 1.2;
+  font-size: 14px;
+  padding: 12px;
+  border-radius: 6px;
+  border: 2px solid yellow;
+  line-height: 1.4;
   pointer-events: none;
   user-select: none;
   white-space: nowrap;
+  min-width: 250px;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  resize: both;
 }
 
 /* Scene-left: debug display to the right of timeline */

@@ -171,7 +171,7 @@ export class InfiniteScrollingContainer {
         const isHeaderVisible = itemTop >= viewportTop && (itemTop + headerAndMargin) <= (viewportTop + viewportHeight);
 
         if (isHeaderVisible) {
-            window.CONSOLE_LOG_IGNORE(`[InfiniteScroller] Job ${jobNumber} header is already visible. No scroll needed.`);
+            window.LOG_JOB?.(jobNumber, 'already visible');
             return;
         }
 
@@ -179,7 +179,7 @@ export class InfiniteScrollingContainer {
         // Aim to place the item's top edge near the top of the viewport, with a margin.
         const targetScrollTop = Math.max(0, itemTop - 50); // 50px margin from top
 
-        window.CONSOLE_LOG_IGNORE(`[InfiniteScroller] Scrolling to job ${jobNumber} at position ${targetScrollTop}px (called by ${caller})`);
+        window.LOG_JOB?.(jobNumber, `scrolling to pos ${targetScrollTop}px`);
 
         this.scrollport.scrollTo({
             top: targetScrollTop,

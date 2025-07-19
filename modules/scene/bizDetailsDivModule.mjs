@@ -9,6 +9,7 @@
 import * as utils from '../utils/utils.mjs';
 import { formatDateRange } from '../utils/dateUtils.mjs';
 import { badgeManager } from '../core/badgeManager.mjs';
+import { BadgeMode } from '../core/BadgeMode.mjs';
 import { BULLET } from '../constants/ui.mjs';
 import { jobs as jobsData } from '../../static_content/jobs/jobs.mjs';
 
@@ -48,9 +49,13 @@ export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
     // Add the resume div's own z-value element right after the dates
     const resumeSceneZ = bizCardDiv.getAttribute('data-sceneZ') || 'N/A';
     const resumeJobNumber = bizResumeDiv.getAttribute('data-job-number');
+    const resumeJobSkills = getJobSkills(resumeJobNumber);
+    const numResumeJobSkills = resumeJobSkills.length;
     const resumeZValueElement = document.createElement('p');
+    const resumeSubContextStr = getBizResumeContextStr(bizResumeDiv);
+    console.log("resumeSubContextStr:", resumeSubContextStr);
     resumeZValueElement.className = 'biz-details-z-value header-text';
-    resumeZValueElement.textContent = `(z: ${resumeSceneZ}, #: ${resumeJobNumber})`;
+    resumeZValueElement.textContent = resumeSubContextStr
     
     // Insert the z-value element right after the dates element
     const datesElement = bizResumeDetailsDiv.querySelector('.biz-details-dates');
@@ -109,16 +114,14 @@ export function createBizCardDetailsDiv(bizCardDiv, job) {
     if (!utils.isNumericString(jobNumber)) throw new Error(' createBizCardDetailsDiv: given non-numeric jobNumber attribute string');
     bizCardDetailsDiv.classList.add('biz-card-details-div');
     bizCardDetailsDiv.id = `biz-card-details-div-${jobNumber}`;
+
+    const jobSkills = getJobSkills(jobNumber);
+    const numJobSkills = jobSkills.length;
     
     // Set pointer-events to none so clicks pass through to the parent bizCardDiv
     bizCardDetailsDiv.style.pointerEvents = 'none';
     bizCardDetailsDiv.style.backgroundColor = 'transparent';
 
-    const currentJobNumber = bizCardDiv.getAttribute('data-job-number');
-    if (parseInt(currentJobNumber) === 21) {
-        console.log('createBizDetailsDiv: bizCardDiv:', bizCardDiv);
-        console.log('createBizDetailsDiv: job:', job);
-    }
     // see createBizDetailsDiv::34  colorIndex format <number>
     let colorIndex = bizCardDiv.getAttribute('data-color-index');
     if ( colorIndex == null ) {
@@ -136,27 +139,24 @@ export function createBizCardDetailsDiv(bizCardDiv, job) {
     const start = job.start || '1970-01-01';
     const end = job.end || '1970-02-01';
     const dates = formatDateRange(start, end);
-    const sceneZ = bizCardDiv.getAttribute('data-sceneZ') || 'N/A';
     const description = job.Description  || 'No description provided';
     const descriptions = description ? description.split(BULLET).filter(d => d.trim()) : [];
-    const jobSkills = job['job-skills'] || {};   
-    const skills = (jobSkills && typeof jobSkills === 'object' && !Array.isArray(jobSkills))
-    ? Object.values(jobSkills) || []
-    : [];
+    const subContextStr = getBizCardDivSubContextString(bizCardDiv);
+    console.log("subContextStr:", subContextStr);
 
     bizCardDetailsDiv.innerHTML = 
     `
     <h2 class="biz-details-employer header-text">${employer}</h2>
     <h3 class="biz-details-role header-text">${role}</h3>
     <p class="biz-details-dates header-text">${dates}</p>
-    <p class="biz-details-z-value header-text">(z: ${sceneZ}, job#: ${currentJobNumber}, #skl: ${skills.length})</p>
+    <p class="biz-details-z-value header-text">${subContextStr}</p>
 
     <div class="job-description-items-container">
         ${descriptions.map(item => `<p class="job-description-item">&bull;&nbsp;${item.trim()}</p>`).join('')}
     </div>
 
     <p class="biz-details-skills">
-        ${skills
+        ${jobSkills
             .map(skill => skill.trim()) // Remove whitespace around skills
             .filter(skill => skill)     // Remove empty skills
             .join(' &bull; ')}
@@ -310,6 +310,16 @@ export function createBizCardStatsDiv(bizCardDiv, jobNumber) {
     return bizCardStatsDiv;
 }
 
+export function getJobSkills(jobNumber) {
+    const job = jobsData[jobNumber];
+    if (!job) throw new Error('getSkills: given null job');
+    const jobSkills = job['job-skills'] || {};   
+    const _jobSkills = (jobSkills && typeof jobSkills === 'object' && !Array.isArray(jobSkills))
+    ? Object.values(jobSkills) || []
+    : [];
+    return _jobSkills;
+}
+
 /**
  * Update bizCardDetailsDiv with skill badge statistics (legacy function - now creates separate div)
  * @param {HTMLElement} bizCardDetailsDiv - The details div to update
@@ -336,3 +346,161 @@ export function appendSkillBadgeStats(bizCardDetailsDiv, jobNumber) {
 }
 
 
+export function getBizCardDivSubContextString(bizCardDiv) {
+    const jobNumber = bizCardDiv.getAttribute('data-job-number');
+    if (!utils.isNumericString(jobNumber)) throw new Error('getBizCardDivSubContextString: given non-numeric jobNumber attribute string');
+    const sceneZ = bizCardDiv.getAttribute('data-sceneZ') || 'N/A';
+    const badgesInfo = getBizCardDivBadges0(bizCardDiv);
+    bizCardDiv.setAttribute('data-badges-info', JSON.stringify(badgesInfo));
+    const subContextStr = `(z:${sceneZ}, #:${jobNumber} #bgs:${badgesInfo.totalCount} above:${badgesInfo.aboveCount},level:${badgesInfo.levelCount},below:${badgesInfo.belowCount})`;
+    return subContextStr;
+}
+
+// use all jobSkills of the given bizCardDiv to create
+// a list of badges that are clustered around the center-most bucket
+// and then place them into the buckets
+// return a list of badges with the following information:
+// - top, bottom, center, index, badgeMode, bucketIndex, badge
+//
+export function getBizCardDivBadges0(bizCardDiv) {
+    const jobNumber = bizCardDiv.getAttribute('data-job-number');
+    if (!utils.isNumericString(jobNumber)) throw new Error('getBizCardDivBadges0: given non-numeric jobNumber attribute string');
+    const bizCardDivTopY = parseFloat(bizCardDiv.getAttribute("data-sceneTop")).toFixed(2);
+    const bizCardDivBottomY = parseFloat(bizCardDiv.getAttribute("data-sceneBottom")).toFixed(2);
+    const bizCardDivCenterY = parseFloat(bizCardDiv.getAttribute("data-sceneCenterY")).toFixed(2);
+
+    // create all buckets that span the entire sceneContainer
+    const bucketHeight = 40;
+    const bucketMargin = 3;
+    const sceneContainer = document.querySelector('.scene-container');
+    const sceneContainerHeight = sceneContainer.clientHeight;
+    const numBuckets = Math.floor(sceneContainerHeight/(bucketHeight+bucketMargin));
+    const allBuckets = [];
+    for (let i = 0; i < numBuckets; i++) {
+        const bucketTop = i * (bucketHeight + bucketMargin);
+        const bucketBottom = bucketTop + bucketHeight;
+        const buckerCenter = bucketTop + bucketHeight/2;
+
+        // classify all buckets in relation to this bizCardDiv
+        let badgeMode = BadgeMode.LEVEL;
+        if ( bucketTop < bizCardDivTopY ) badgeMode = BadgeMode.ABOVE;
+        if ( bucketBottom > bizCardDivBottomY ) BadgeMode = BadgeMode.BELOW;
+        bucket = new Bucket({
+            top: bucketTop, 
+            bottom: bucketBottom, 
+            center: bucketCenter,
+            index: i, 
+            badgeMode: badgeMode,
+            used: false
+        });
+        allBuckets.push(bucket);
+    }
+
+    // create a badge for each jobSkill. 
+    // assign each badge a bucket, which
+    // has precomputed coordinates and 
+    // badgeMode.
+    // 
+    // badges are assigned buckets in 
+    // such a way that they cluster around
+    // the bucket that contains the 
+    // bizCardDivCenterY.
+    const jobSkills = getJobSkills(jobNumber);
+    if ( jobSkills == null ||jobSkills.length == 0 ) {
+        throw new Error('getBizCardDivBadges0: given job with no skills');
+    }
+    const numJobSkills = jobSkills.length;
+    const centerBucketIndex = allBuckets.find(bucket => bizCardDivCenterY >= bucket.top && bizCardDivCenterY <= bucket.bottom);
+    if ( centerBucketIndex == null || centerBucketIndex == undefined ) {
+        throw new Error('centerBucketIndex not found for bizCardDivCenterY:', bizCardDivCenterY);
+    }
+    // use buckets in a staggered way around the center bucket
+    // make the sequence twice as long as the number of jobSkills
+    // so that we can assign each jobSkill a bucket even it if
+    // was originally out of bounds.
+    const alternatingSequence  = generateAlternatingSequence(numJobSkills*2);
+    let aboveCount = 0;
+    let levelCount = 0;
+    let belowCount = 0;
+    let numRebucketed = 0;
+    const bucketedJobSkills = [];
+    const badges = [];
+
+    for (let i = 0; i < alternatingSequence.length; i++) {
+        if ( badges.length >= numJobSkills ) break;
+        const bucketIndex = centerBucketIndex + alternatingSequence[i];
+        // don't assign this bucket for this jobSkill
+        // try to use the next bucket for the last jobSkill
+        if ( bucketIndex < 0 || bucketIndex >= allBuckets.length ) {
+            console.log("skipping out of bounds bucket");
+            numRebucketed++;
+            continue; 
+        }
+        const bucket = allBuckets[bucketIndex];
+        if ( bucket.used ) {
+            console.log("skipping used bucket");
+            numRebucketed++;
+            continue; 
+        }
+        const badge = {
+            jobSkill: jobSkills[numBucketedJobSkills],
+            top: bucket.top,
+            bottom: bucket.bottom,
+            center: bucket.center,
+            badgeMode: bucket.badgeMode,
+            bucketIndex: bucketIndex
+        }
+        bucket.used = true;
+        if ( badge.badgeMode == BadgeMode.ABOVE ) aboveCount++;
+        if ( badge.badgeMode == BadgeMode.LEVEL ) levelCount++;
+        if ( badge.badgeMode == BadgeMode.BELOW ) belowCount++;
+        badges.push(badge);
+    } 
+
+    const badgesInfo = {
+        aboveCount: aboveCount,
+        levelCount: levelCount,
+        belowCount: belowCount,
+        totalCount: aboveCount + levelCount + belowCount,
+        aboveRatio: (aboveCount / totalCount).toFixed(2),
+        levelRatio: (levelCount / totalCount).toFixed(2),
+        belowRatio: (belowCount / totalCount).toFixed(2),
+        rebucketed: numRebucketed,
+        badges: badges
+    }
+    return badgesInfo;
+}
+
+/**
+* Generate sequence: 0, 1, -1, 2, -2, 3, -3, 4, -4, ... up to length L
+* @param {number} L - Length of sequence
+* @returns {Array<number>} Sequence [0, 1, -1, 2, -2, 3, -3, 4, -4, ...]
+*/
+export function generateAlternatingSequence(L) {
+   const sequence = [];
+
+   for (let i = 0; i < L; i++) {
+       if (i === 0) {
+           sequence.push(0);
+       } else if (i % 2 === 1) {
+           // Odd indices: positive numbers (1, 2, 3, 4, ...)
+           sequence.push((i + 1) / 2);
+       } else {
+           // Even indices: negative numbers (-1, -2, -3, -4, ...)
+           sequence.push(-i / 2);
+       }
+   }
+   return sequence;
+}
+
+export function getBizResumeContextStr(bizResumeDiv) {
+    const jobNumber = bizResumeDiv.getAttribute('data-job-number');
+    if (!utils.isNumericString(jobNumber)) throw new Error('getBizResumeDivSubContextString: given non-numeric jobNumber attribute string');
+    const jobSkills = getJobSkills(jobNumber);
+    const numJobSkills = jobSkills.length;
+    const top = bizResumeDiv.getAttribute("data-sceneTop");
+    const height = bizResumeDiv.getAttribute("data-sceneHeight");
+    const bottom = top + height;
+    const subContextStr = `(#:${jobNumber} #skl:${numJobSkills} top:${top} btm:${bottom})`;
+    return subContextStr;
+}

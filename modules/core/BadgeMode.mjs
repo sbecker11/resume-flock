@@ -37,9 +37,9 @@ export function getNextBadgeMode(currentMode) {
         case BadgeMode.NONE:
             return BadgeMode.BADGES_ONLY;
         case BadgeMode.BADGES_ONLY:
-            return BadgeMode.BADGES_WITH_STATS;
+            return BadgeMode.NONE; // Skip BADGES_WITH_STATS mode
         case BadgeMode.BADGES_WITH_STATS:
-            return BadgeMode.NONE;
+            return BadgeMode.NONE; // Fallback to NONE if somehow in this mode
         default:
             return BadgeMode.NONE;
     }
@@ -53,13 +53,13 @@ export function getNextBadgeMode(currentMode) {
 export function getBadgeModeIcon(mode) {
     switch (mode) {
         case BadgeMode.NONE:
-            return 'B⁰'; // B with superscript zero
+            return '-B'; // minus B for no badges
         case BadgeMode.BADGES_ONLY:
-            return 'B';  // B with no superscript
+            return '+B'; // plus B for badges only
         case BadgeMode.BADGES_WITH_STATS:
             return 'B⁺'; // B with superscript plus
         default:
-            return 'B⁰';
+            return '-B';
     }
 }
 

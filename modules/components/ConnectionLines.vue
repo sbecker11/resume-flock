@@ -191,14 +191,12 @@ export default {
         selectedJobNumber = parseInt(selectedCDiv.getAttribute('data-job-number'));
       }
       if (selectedJobNumber === null || isNaN(selectedJobNumber)) {
+        // No cDiv selected - ensure badges are also cleared
+        window.dispatchEvent(new CustomEvent('card-deselect'));
         return;
       }
-      
-      if (selectedJobNumber !== 21) return;
       // Use the job number to get the cDiv clone
       const cDivCloneId = `biz-card-div-${selectedJobNumber}-clone`;
-      console.log('[ConnectionLines] ** cDivCloneId:', cDivCloneId);
-      console.log('[ConnectionLines] ** cDivCloneId:', 'biz-card-div-9-clone');
       selectedCDiv = document.getElementById(cDivCloneId);
       if (!selectedCDiv) {
         throw new Error(`[ConnectionLines] No cDiv clone found for cDivCloneId:${cDivCloneId}`);
@@ -216,6 +214,7 @@ export default {
       const cDivHeight = cDivPos.height;
       const padding = 10;
       const arcRadius = 20;
+      console.log(`[ConnectionLines] cDiv bounds: top=${cDivTop.toFixed(1)}, bottom=${cDivBottom.toFixed(1)}, left=${cDivLeft.toFixed(1)}, right=${cDivRight.toFixed(1)}, width=${cDivWidth.toFixed(1)}, height=${cDivHeight.toFixed(1)}`);
       // Build associatedBadges directly from DOM
       const allBadges = Array.from(document.querySelectorAll('.skill-badge'));
       console.log('[ConnectionLines] ** allBadges.length:', allBadges.length);
@@ -236,8 +235,8 @@ export default {
           
           const isAssociated = jobNumbers.map(Number).includes(Number(selectedJobNumber));
           
-          if (selectedJobNumber === 21 && isAssociated) {
-            console.log("[ConnectionLines] Badge", name, "IS associated with job 21");
+          if (isAssociated) {
+            console.log("[ConnectionLines] Badge", name, "IS associated with job", selectedJobNumber);
           }
           
           if (!isAssociated) return null;
@@ -268,12 +267,18 @@ export default {
       const below = associatedBadges.filter(b => b.category === 'BELOW');
       const level = associatedBadges.filter(b => b.category === 'LEVEL');
       
+      console.log(`[ConnectionLines] Badge categories: ABOVE=${above.length}, BELOW=${below.length}, LEVEL=${level.length}`);
+      console.log(`[ConnectionLines] ABOVE badges:`, above.map(b => `${b.name}(Y=${b.centerY.toFixed(1)})`));
+      console.log(`[ConnectionLines] BELOW badges:`, below.map(b => `${b.name}(Y=${b.centerY.toFixed(1)})`));
+      console.log(`[ConnectionLines] LEVEL badges:`, level.map(b => `${b.name}(Y=${b.centerY.toFixed(1)})`));
+      
       // Array to collect all connections
       const connectionsArr = [];
-      // ABOVE: terminate at top edge, spaced horizontally
-      const aboveX = distributeHorizontally(above.length, cDivLeft + padding, cDivRight - padding);
-      // BELOW: terminate at bottom edge, spaced horizontally
-      const belowX = distributeHorizontally(below.length, cDivLeft + padding, cDivRight - padding);
+      // ABOVE: terminate at top edge, spaced horizontally (sorted max-x to min-x)
+      const aboveX = distributeHorizontally(above.length, cDivLeft + padding, cDivRight - padding).sort((a, b) => b - a);
+      console.log(`[ConnectionLines] Generated ${above.length} ABOVE termination points (right to left):`, aboveX.map(x => x.toFixed(1)));
+      // BELOW: terminate at bottom edge, spaced horizontally (sorted max-x to min-x)
+      const belowX = distributeHorizontally(below.length, cDivLeft + padding, cDivRight - padding).sort((a, b) => b - a);
       // LEVEL: terminate at vertical center, spaced vertically
       const levelY = distributeVertically(level.length, cDivTop + padding, cDivBottom - padding);
       // Find the badge with the longest string length
@@ -321,60 +326,58 @@ export default {
       
       // The common x midpoint for all line numbers
       const commonTextX = (badgeEdgeFacingCDiv + cDivFacingX) / 2;
-      // Sort ABOVE by startY (top to bottom), assign termination points in reverse order
-      const sortedAbove = above.sort((a, b) => a.centerY - b.centerY).map((info, i) => {
-        // Determine layout orientation to get correct starting edge
-        const appContainer = document.getElementById('app-container');
-        const isSceneLeft = appContainer ? appContainer.classList.contains('scene-left') : false;
+      
+      // ABOVE: Sort badges from bottom to top (max-y to min-y) and assign termination points to prevent intersections
+      const sortedAbove = [];
+      const aboveIterator = above.sort((a, b) => b.centerY - a.centerY);
+      aboveIterator.forEach((badge, i) => {
+        const termX = aboveX[i];
         
+        // Get badge start position
         let startX;
         if (isSceneLeft) {
-          // Scene-left: start from badge left edge
-          startX = getBadgeX(info.id);
+          startX = getBadgeX(badge.id);
         } else {
-          // Scene-right: start from badge right edge
-          startX = getBadgeX(info.id) + getBadgeWidth(info.id);
+          startX = getBadgeX(badge.id) + getBadgeWidth(badge.id);
         }
-        const startY = info.centerY;
-        // Reverse the termination assignment for ABOVE: furthest badge gets furthest termination
-        const termX = aboveX[aboveX.length - 1 - i];
+        const startY = badge.centerY;
+        
         const termY = cDivTop;
         const cornerX = termX;
         const pointA = { x: startX, y: startY };
         const pointB = { x: cornerX, y: startY };
         const pointC = { x: cornerX, y: termY };
         const path = createLShapedCurve(pointA, pointB, pointC, arcRadius);
-        return {
+        
+        sortedAbove.push({
           id: `connection-above-${i}`,
           path,
           case: 'ABOVE',
-          skillText: info.name?.trim() || '',
+          skillText: badge.name?.trim() || '',
           strokeWidth: 2,
           strokeColor: 'red',
-          lineNumber: i + 1, // Set line number directly
+          lineNumber: i + 1,
           textX: commonTextX,
           textY: startY - 5
-        };
+        });
       });
       sortedAbove.forEach((conn) => {
         connectionsArr.push(conn);
       });
-      // Sort BELOW by startY (top to bottom), assign termination points in same order
-      const sortedBelow = below.sort((a, b) => a.centerY - b.centerY).map((info, i) => {
-        // Determine layout orientation to get correct starting edge
-        const appContainer = document.getElementById('app-container');
-        const isSceneLeft = appContainer ? appContainer.classList.contains('scene-left') : false;
-        
+      // BELOW: Sort badges from top to bottom (min-y to max-y) and assign termination points to prevent intersections
+      const sortedBelow = [];
+      const belowIterator = below.sort((a, b) => a.centerY - b.centerY);
+      belowIterator.forEach((badge, i) => {
+        // Get badge start position
         let startX;
         if (isSceneLeft) {
-          // Scene-left: start from badge left edge
-          startX = getBadgeX(info.id);
+          startX = getBadgeX(badge.id);
         } else {
-          // Scene-right: start from badge right edge
-          startX = getBadgeX(info.id) + getBadgeWidth(info.id);
+          startX = getBadgeX(badge.id) + getBadgeWidth(badge.id);
         }
-        const startY = info.centerY;
-        // Same order for BELOW: closest badge to bottom gets nearest termination
+        const startY = badge.centerY;
+        
+        // Simple iteration - badges and termination points are both properly sorted
         const termX = belowX[i];
         const termY = cDivBottom;
         const cornerX = termX;
@@ -382,23 +385,26 @@ export default {
         const pointB = { x: cornerX, y: startY };
         const pointC = { x: cornerX, y: termY };
         const path = createLShapedCurve(pointA, pointB, pointC, arcRadius);
-        return {
+        
+        sortedBelow.push({
           id: `connection-below-${i}`,
           path,
           case: 'BELOW',
-          skillText: info.name?.trim() || '',
+          skillText: badge.name?.trim() || '',
           strokeWidth: 2,
           strokeColor: 'yellow',
-          lineNumber: i + 1, // Set line number directly
+          lineNumber: i + 1,
           textX: commonTextX,
           textY: startY - 5
-        };
+        });
       });
       sortedBelow.forEach((conn) => {
         connectionsArr.push(conn);
       });
-      // Sort LEVEL by startY (top to bottom), assign termination points in same order
-      const sortedLevel = level.sort((a, b) => a.centerY - b.centerY).map((info, i) => {
+      // LEVEL: Sort badges from top to bottom (min-y to max-y) and assign termination points in same order
+      const sortedLevel = [];
+      const levelIterator = level.sort((a, b) => a.centerY - b.centerY);
+      levelIterator.forEach((badge, i) => {
         // Determine layout orientation
         const appContainer = document.getElementById('app-container');
         const isSceneLeft = appContainer ? appContainer.classList.contains('scene-left') : false;
@@ -408,29 +414,29 @@ export default {
         if (isSceneLeft) {
           // Scene-left: badges on right, cDiv on left
           // Start from badge left edge, terminate at cDiv right edge
-          startX = getBadgeX(info.id);
+          startX = getBadgeX(badge.id);
           termX = cDivRight;
         } else {
           // Scene-right: badges on right, cDiv on left  
           // Start from badge right edge, terminate at cDiv left edge
-          startX = getBadgeX(info.id) + getBadgeWidth(info.id);
+          startX = getBadgeX(badge.id) + getBadgeWidth(badge.id);
           termX = cDivLeft;
         }
         
-        const startY = info.centerY;
-        const termY = levelY[i];
+        const startY = badge.centerY;
+        const termY = levelY[i]; // Simple iteration - both sorted top to bottom
         const path = `M ${startX} ${startY} H ${termX}`;
-        return {
+        sortedLevel.push({
           id: `connection-level-${i}`,
           path,
           case: 'LEVEL',
-          skillText: info.name?.trim() || '',
+          skillText: badge.name?.trim() || '',
           strokeWidth: 2,
           strokeColor: 'orange',
           lineNumber: i + 1, // Set line number directly
           textX: commonTextX,
           textY: startY - 5
-        };
+        });
       });
       sortedLevel.forEach((conn) => {
         connectionsArr.push(conn);

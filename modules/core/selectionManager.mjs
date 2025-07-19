@@ -1,3 +1,5 @@
+import { AppState, saveState } from './stateManager.mjs';
+
 class SelectionManager extends EventTarget {
     constructor() {
         super();
@@ -13,8 +15,9 @@ class SelectionManager extends EventTarget {
     }
 
     selectJobNumber(jobNumber, caller = '') {
+        console.log(`SelectionManager.selectJobNumber called with jobNumber=${jobNumber}, caller=${caller}`);
         if (this.selectedJobNumber === jobNumber) {
-            // window.CONSOLE_LOG_IGNORE(`[DEBUG] SelectionManager: Early return - same job already selected: ${jobNumber} from ${caller}`);
+            console.log(`SelectionManager: Early return - same job already selected: ${jobNumber} from ${caller}`);
             return;
         }
 
@@ -23,8 +26,39 @@ class SelectionManager extends EventTarget {
             this.clearHover(`${caller}-auto-clear-before-select`);
         }
 
+        // CRITICAL: Clear any existing selection first before setting new selection
+        if (this.selectedJobNumber !== null) {
+            const previousJobNumber = this.selectedJobNumber;
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Clearing previous selection ${previousJobNumber} before selecting ${jobNumber}`);
+            this.selectedJobNumber = null; // Clear the selection
+            this._clearAllVisualSelection(); // Clear all visual states
+            this.dispatchEvent(new CustomEvent('selectionCleared', {
+                detail: {
+                    caller: `${caller}-auto-clear-before-select`,
+                    previousJobNumber: previousJobNumber,
+                    isPaired: true
+                }
+            }));
+        }
+
         // window.CONSOLE_LOG_IGNORE(`[DEBUG] SelectionManager: [${caller}] Selecting job number: ${jobNumber} (was: ${this.selectedJobNumber})`);
         this.selectedJobNumber = jobNumber;
+        
+        // Apply visual selection to all elements
+        this._applyVisualSelection(jobNumber);
+        
+        // Update AppState to remember the selected job for hard refresh
+        if (AppState) {
+            AppState.selectedJobNumber = jobNumber;
+            // Clean up any stale selectedJob field from resume section
+            if (AppState.resume && AppState.resume.selectedJob !== undefined) {
+                delete AppState.resume.selectedJob;
+                window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Cleaned up stale selectedJob field from resume section`);
+            }
+            saveState(AppState);
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Updated AppState selectedJobNumber to ${jobNumber}`);
+        }
+        
         const event = new CustomEvent('selectionChanged', {
             detail: {
                 selectedJobNumber: this.selectedJobNumber,
@@ -32,7 +66,7 @@ class SelectionManager extends EventTarget {
                 isPaired: true // Flag to indicate both cDiv and rDiv should be selected
             }
         });
-        // window.CONSOLE_LOG_IGNORE(`[DEBUG] SelectionManager: Dispatching selectionChanged event:`, event.detail);
+        console.log(`SelectionManager: Dispatching selectionChanged event:`, event.detail);
         this.dispatchEvent(event);
     }
 
@@ -41,6 +75,22 @@ class SelectionManager extends EventTarget {
         
         window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Clearing selection.`);
         this.selectedJobNumber = null;
+        
+        // Clear all visual selection states
+        this._clearAllVisualSelection();
+        
+        // Update AppState to clear the selected job so it doesn't auto-select on hard refresh
+        if (AppState) {
+            AppState.selectedJobNumber = null;
+            // Clean up any stale selectedJob field from resume section
+            if (AppState.resume && AppState.resume.selectedJob !== undefined) {
+                delete AppState.resume.selectedJob;
+                window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Cleaned up stale selectedJob field from resume section during clear`);
+            }
+            saveState(AppState);
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: [${caller}] Updated AppState selectedJobNumber to null`);
+        }
+        
         this.dispatchEvent(new CustomEvent('selectionCleared', {
             detail: {
                 caller: caller,
@@ -152,6 +202,60 @@ class SelectionManager extends EventTarget {
             ...config
         };
         window.CONSOLE_LOG_IGNORE(`[DEBUG] SelectionManager: Smooth scroll config updated:`, this.smoothScrollConfig);
+    }
+
+    /**
+     * INTERNAL METHOD: Apply visual selection state to all elements for a job
+     * This method should ONLY be called by SelectionManager
+     * @private
+     */
+    _applyVisualSelection(jobNumber) {
+        // Apply selection to cDiv (scene card)
+        const cDiv = document.querySelector(`.biz-card-div[data-job-number="${jobNumber}"]`);
+        if (cDiv) {
+            cDiv.classList.add('selected');
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: Applied 'selected' to cDiv for job ${jobNumber}`);
+        }
+
+        // Apply selection to cDiv clone
+        const cDivClone = document.getElementById(`biz-card-div-${jobNumber}-clone`);
+        if (cDivClone) {
+            cDivClone.classList.add('selected');
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: Applied 'selected' to cDiv clone for job ${jobNumber}`);
+        }
+
+        // Apply selection to rDiv (resume card)
+        const rDiv = document.querySelector(`.biz-resume-div[data-job-number="${jobNumber}"]`);
+        if (rDiv) {
+            rDiv.classList.add('selected');
+            window.CONSOLE_LOG_IGNORE(`SelectionManager: Applied 'selected' to rDiv for job ${jobNumber}`);
+        }
+
+        window.CONSOLE_LOG_IGNORE(`SelectionManager: Applied visual selection to job ${jobNumber}`);
+    }
+
+    /**
+     * INTERNAL METHOD: Clear visual selection state from all elements
+     * This method should ONLY be called by SelectionManager
+     * @private
+     */
+    _clearAllVisualSelection() {
+        // Clear selection from all cDivs
+        document.querySelectorAll('.biz-card-div').forEach(div => {
+            div.classList.remove('selected', 'hovered');
+        });
+
+        // Clear selection from all rDivs
+        document.querySelectorAll('.biz-resume-div').forEach(div => {
+            div.classList.remove('selected', 'hovered');
+        });
+
+        // Clear selection from all clones
+        document.querySelectorAll('[id$="-clone"]').forEach(clone => {
+            clone.classList.remove('selected', 'hovered');
+        });
+
+        window.CONSOLE_LOG_IGNORE(`SelectionManager: Cleared all visual selection states`);
     }
 }
 

@@ -118,13 +118,19 @@ class ResumeListController {
     // Select the saved job index after a delay to ensure infinite scroller is ready
     setTimeout(() => {
       if (this.sortedIndices.length > 0) {
-        let savedJobNumber = AppState.resume.selectedJobNumber;
-        window.CONSOLE_LOG_IGNORE('ResumeListController initialization:', { savedJobNumber, sortedIndices: this.sortedIndices, infiniteScrollerReady: !!this.infiniteScroller });
+        let savedJobNumber = AppState.selectedJobNumber;
+        window.CONSOLE_LOG_IGNORE('ResumeListController initialization:', { 
+          topLevelSelectedJobNumber: AppState.selectedJobNumber,
+          resumeSectionSelectedJobNumber: AppState.resume?.selectedJobNumber,
+          savedJobNumber, 
+          sortedIndices: this.sortedIndices, 
+          infiniteScrollerReady: !!this.infiniteScroller 
+        });
         
         // If no saved job index, default to the first item
         if (savedJobNumber === undefined || savedJobNumber === null) {
           savedJobNumber = this.sortedIndices[0];
-          AppState.resume.selectedJobNumber = savedJobNumber;
+          AppState.selectedJobNumber = savedJobNumber;
           saveState(AppState);
           window.CONSOLE_LOG_IGNORE('ResumeListController: No saved job index, defaulting to:', savedJobNumber);
         }
@@ -133,7 +139,9 @@ class ResumeListController {
           window.CONSOLE_LOG_IGNORE('ResumeListController: Selecting saved job index:', savedJobNumber);
           // Add additional delay to ensure infinite scroller is fully positioned
           setTimeout(() => {
+            console.log('ResumeListController: About to select job number:', savedJobNumber);
             selectionManager.selectJobNumber(savedJobNumber, 'ResumeListController.initialize');
+            console.log('ResumeListController: Called selectionManager.selectJobNumber');
           }, 200);
         } else {
           // If saved index is invalid (e.g., data changed), select the first item
@@ -216,39 +224,21 @@ class ResumeListController {
     }
 
     /**
-     * Update visual selection state of resume divs
+     * DEPRECATED: Visual selection is now handled by SelectionManager
+     * @deprecated Use selectionManager.selectJobNumber() instead
      */
     updateVisualSelection(selectedJobNumber) {
-        if (!this.bizResumeDivs) return;
-        
-        // Clear all previous selections
-        this.bizResumeDivs.forEach(div => {
-            if (div) {
-                div.classList.remove('selected', 'hovered');
-            }
-        });
-        
-        // Apply selection to the target div
-        const selectedDiv = this.getBizResumeDivByJobNumber(selectedJobNumber);
-        if (selectedDiv) {
-            selectedDiv.classList.add('selected');
-            console.log(`[DEBUG] ResumeListController.updateVisualSelection: Applied 'selected' class to job ${selectedJobNumber}`);
-        }
+        console.warn('[DEPRECATED] ResumeListController.updateVisualSelection is deprecated. Use selectionManager.selectJobNumber() instead.');
+        // Visual selection is now handled by SelectionManager
     }
 
     /**
-     * Clear visual selection state of all resume divs
+     * DEPRECATED: Visual selection is now handled by SelectionManager
+     * @deprecated Use selectionManager.clearSelection() instead
      */
     clearVisualSelection() {
-        if (!this.bizResumeDivs) return;
-        
-        this.bizResumeDivs.forEach(div => {
-            if (div) {
-                div.classList.remove('selected', 'hovered');
-            }
-        });
-        
-        console.log(`[DEBUG] ResumeListController.clearVisualSelection: Cleared all selection classes`);
+        console.warn('[DEPRECATED] ResumeListController.clearVisualSelection is deprecated. Use selectionManager.clearSelection() instead.');
+        // Visual selection is now handled by SelectionManager
     }
   // endregion
 

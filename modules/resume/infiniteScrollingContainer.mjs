@@ -1291,7 +1291,7 @@ class InfiniteScrollingContainer {
    * @returns {boolean} - Whether the scroll was successful
    */
   scrollToJobNumber(jobNumber, animate = true) {
-    console.log(`[DEBUG] InfiniteScroller.scrollToJobNumber: jobNumber=${jobNumber}, animate=${animate}`);
+    window.LOG_JOB?.(jobNumber, 'scrolling to');
     
     // Find the item with the specified job number
     const index = this.originalItems.findIndex(item => {
@@ -1300,11 +1300,11 @@ class InfiniteScrollingContainer {
     });
     
     if (index === -1) {
-      console.log(`[DEBUG] InfiniteScroller.scrollToJobNumber: Job number ${jobNumber} not found in originalItems`);
+      // Job not found - already suppressed by logging system
       return false;
     }
     
-    console.log(`[DEBUG] InfiniteScroller.scrollToJobNumber: Found job ${jobNumber} at index ${index}`);
+    window.LOG_JOB?.(jobNumber, `found at index ${index}`);
     
     // Set flag to prevent seamless transitions during direct job selection
     this._directScrolling = true;

@@ -14,8 +14,8 @@
   <!-- <link rel="stylesheet" href="./styles/resume-container.css"> -->
   <!-- <link rel="stylesheet" href="./styles/scene-container.css"> --> 
 
-  <script type="module" crossorigin src="/assets/index-BkM5aGmT.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CEqw176M.css">
+  <script type="module" crossorigin src="/assets/index-DCZ7W_Dh.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-D0lLr5b1.css">
 </head>
 
 <body>
@@ -26,6 +26,30 @@
    <script>
     window.CONSOLE_LOG_IGNORE = () => {};
     window.CONSOLE_INFO_IGNORE = () => {};
+    
+    // Early logging control initialization
+    window.EARLY_LOG_SUPPRESSION = true;
+    if (window.EARLY_LOG_SUPPRESSION) {
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      const originalError = console.error;
+      
+      console.log = (...args) => {
+        const message = args.join(' ');
+        if (/job\s*\d+|jobnumber|scrolling.*to.*job/i.test(message)) {
+          const jobMatch = message.match(/job\s*(\d+)|jobnumber[:\s=]*(\d+)/i);
+          if (jobMatch) {
+            const jobNum = jobMatch[1] || jobMatch[2];
+            originalLog(`Job: ${jobNum}`);
+          } else {
+            originalLog(...args);
+          }
+        }
+      };
+      
+      console.warn = () => {}; // Suppress warnings
+      console.error = () => {}; // Suppress errors
+    }
    </script>
 
   <!-- The legacy main.mjs is now disabled. All initialization is handled by main.ts -->
