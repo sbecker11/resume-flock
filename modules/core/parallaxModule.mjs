@@ -204,29 +204,6 @@ export function projectBizCardDivClone(bizCardDivClone) {
     const sceneHeight = parseFloat(bizCardDivClone.getAttribute("data-sceneHeight"));
     const sceneCenterY = parseFloat(bizCardDivClone.getAttribute("data-sceneCenterY"));
     
-    // Debug log to verify all attributes are available
-    console.log('[parallaxModule.projectBizCardDivClone] Reading attributes from clone:', bizCardDivClone.id, {
-        sceneLeft, sceneRight, sceneWidth, sceneCenterX,
-        sceneTop, sceneBottom, sceneHeight, sceneCenterY
-    });
-    
-    // Check for any NaN values which would indicate missing attributes
-    const hasNaN = [sceneLeft, sceneRight, sceneWidth, sceneCenterX, sceneTop, sceneBottom, sceneHeight, sceneCenterY].some(val => isNaN(val));
-    if (hasNaN) {
-        console.error('[parallaxModule.projectBizCardDivClone] Missing or invalid data attributes on clone:', bizCardDivClone.id);
-        console.error('[parallaxModule.projectBizCardDivClone] All attributes:', {
-            'data-sceneLeft': bizCardDivClone.getAttribute("data-sceneLeft"),
-            'data-sceneRight': bizCardDivClone.getAttribute("data-sceneRight"),
-            'data-sceneWidth': bizCardDivClone.getAttribute("data-sceneWidth"),
-            'data-sceneCenterX': bizCardDivClone.getAttribute("data-sceneCenterX"),
-            'data-sceneTop': bizCardDivClone.getAttribute("data-sceneTop"),
-            'data-sceneBottom': bizCardDivClone.getAttribute("data-sceneBottom"),
-            'data-sceneHeight': bizCardDivClone.getAttribute("data-sceneHeight"),
-            'data-sceneCenterY': bizCardDivClone.getAttribute("data-sceneCenterY")
-        });
-        return null;
-    }
-    
     // project the scene-relative coordinates to 
     // viewPort-relative coordinates with no parallax effect
     // by simply transforming x by + sceneContainerWidth/2
