@@ -1,9 +1,9 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-21T05:50:56.130Z",
+  "lastUpdated": "2025-07-21T05:53:29.188Z",
   "layout": {
     "panelSizePercentage": 50,
-    "orientation": "scene-right",
+    "orientation": "scene-left",
     "scenePercentage": 73.32123411978222,
     "resumePercentage": 26.678765880217785
   },

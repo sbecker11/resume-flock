@@ -517,8 +517,75 @@ export default {
         });
       }
       
+      // Create connections for all BELOW badges with L-shaped paths
+      const belowBadges = associatedBadges
+        .filter(badge => badge.category === 'BELOW')
+        .sort((a, b) => a.centerY - b.centerY); // Sort by Y position: top to bottom
+      
+      if (belowBadges.length > 0) {
+        // Calculate evenly distributed termination points along cDiv bottom edge
+        const bottomEdgePoints = distributeHorizontally(belowBadges.length, cDivLeft, cDivRight);
+        
+        // For non-intersecting curves: highest badge (minY) gets rightmost termination point (maxX)
+        // Sort badges by Y position (lowest Y = highest on screen = first)
+        const sortedBelowBadges = [...belowBadges].sort((a, b) => a.centerY - b.centerY);
+        
+        // For line numbering: sort by Y position (lowest Y = top of BELOW section = line 1)
+        const numberedBelowBadges = [...belowBadges].sort((a, b) => a.centerY - b.centerY);
+        
+        sortedBelowBadges.forEach((belowBadge, index) => {
+          // Get badge rect for width calculation
+          const badgeRect = document.getElementById(belowBadge.id)?.getBoundingClientRect();
+          if (!badgeRect) return;
+          
+          // Calculate connection points using scene-container coordinates  
+          // BELOW badges start from LEFT edge in scene-left, RIGHT edge in scene-right
+          const badgeStartX = isSceneLeft ? 
+            (badgeRect.x - sceneRect.left) : // LEFT edge for scene-left
+            (badgeRect.x - sceneRect.left + badgeRect.width); // RIGHT edge for scene-right
+          const badgeStartY = belowBadge.centerY; // Use scene-container Y coordinate
+          
+          // BELOW: L-shaped connection - non-intersecting termination points
+          // Scene-left: Highest badge (lowest Y) gets rightmost point (highest X) to avoid intersections
+          // Scene-right: Highest badge (lowest Y) gets leftmost point (lowest X) to avoid intersections
+          const termX = isSceneLeft ? 
+            bottomEdgePoints[bottomEdgePoints.length - 1 - index] : // Scene-left: reverse order
+            bottomEdgePoints[index]; // Scene-right: normal order
+          const termY = cDivBottom; // Connect to cDiv bottom edge
+          
+          // Create L-shaped path: horizontal towards distributed point, then vertical to bottom edge
+          let path, strokeColor;
+          path = createLShapedCurve(
+            { x: badgeStartX, y: badgeStartY },
+            { x: termX, y: badgeStartY },
+            { x: termX, y: termY }
+          );
+          strokeColor = 'yellow';
+          
+          console.log(`[DEBUG] BELOW badge ${index + 1}: ${belowBadge.id} (${badgeStartX}, ${badgeStartY}) → (${termX}, ${termY}) L-shaped non-intersecting`);
+        
+          // Find this badge's line number (1 = topmost BELOW badge, increasing downward)
+          const lineNumber = numberedBelowBadges.findIndex(b => b.id === belowBadge.id) + 1;
+          
+          // Create the connection for this BELOW badge
+          const connection = {
+            id: `connection-below-${index}`,
+            path,
+            case: 'BELOW',
+            skillText: belowBadge.name?.trim() || '',
+            strokeWidth: 2,
+            strokeColor,
+            lineNumber: lineNumber, // Line numbering: 1 at top, increasing downward
+            textX: commonTextX, // Common X position for all line numbers
+            textY: badgeStartY - 5
+          };
+          
+          connectionsArr.push(connection);
+        });
+      }
+      
       connections.value = connectionsArr;
-      console.log(`[DEBUG] ${connectionsArr.length} total connections added to DOM (${levelBadges.length} LEVEL + ${aboveBadges.length} ABOVE)`);
+      console.log(`[DEBUG] ${connectionsArr.length} total connections added to DOM (${levelBadges.length} LEVEL + ${aboveBadges.length} ABOVE + ${belowBadges.length} BELOW)`);
     }
 
     // Helper function to get badge start position based on scene orientation
