@@ -163,7 +163,12 @@ export default {
       }
       
       if (!badgeManager.isBadgesVisible()) {
-        console.log('[SkillBadges] Badges not visible - skipping positioning');
+        console.log('[SkillBadges] Badge mode is -B (OFF) - hiding all badges and skipping positioning');
+        // Hide all badges when mode is -B
+        const badgeElements = document.querySelectorAll('.skill-badge');
+        badgeElements.forEach(badge => badge.style.display = 'none');
+        emit('badges-positioned', { badgeOrder: [] });
+        eventBus.emit('badges-positioned', { badgeOrder: [] });
         return;
       }
       
@@ -397,16 +402,24 @@ export default {
           if (preSelectedCDiv) {
             const preSelectedJobNumber = parseInt(preSelectedCDiv.getAttribute('data-job-number'));
             console.log('[SkillBadges] Found pre-selected cDiv with job number:', preSelectedJobNumber);
-            console.log('[SkillBadges] Setting selectedJobNumber from', selectedJobNumber.value, 'to', preSelectedJobNumber);
-            selectedJobNumber.value = preSelectedJobNumber;
+            console.log('[SkillBadges] Badge mode is:', badgeManager.isBadgesVisible() ? 'ON' : 'OFF');
             
-            // SkillBadges are now ready with known selectedJobId - trigger repositioning
-            console.log('[SkillBadges] SkillBadges ready with selectedJobId:', preSelectedJobNumber, '- triggering repositioning');
-            positionBadges();
+            if (badgeManager.isBadgesVisible()) {
+              console.log('[SkillBadges] Setting selectedJobNumber from', selectedJobNumber.value, 'to', preSelectedJobNumber);
+              selectedJobNumber.value = preSelectedJobNumber;
+              
+              // SkillBadges are now ready with known selectedJobId - trigger repositioning
+              console.log('[SkillBadges] SkillBadges ready with selectedJobId:', preSelectedJobNumber, '- triggering repositioning');
+              positionBadges();
+            } else {
+              console.log('[SkillBadges] Badge mode OFF - not positioning badges for preselected job');
+            }
           } else {
             // No pre-selected job, just position badges in default state
             console.log('[SkillBadges] No pre-selected cDiv found - positioning badges in default state');
-            positionBadges();
+            if (badgeManager.isBadgesVisible()) {
+              positionBadges();
+            }
           }
         }, 200);
         

@@ -31,10 +31,13 @@ class BadgeManager extends EventTarget {
      * This should be called by the initialization manager after the state has been loaded.
      */
     initialize() {
+        console.log(`[BadgeManager] Initializing - AppState:`, AppState);
+        console.log(`[BadgeManager] AppState.badgeToggle:`, AppState?.badgeToggle);
+        
         if (AppState?.badgeToggle?.mode) {
             let mode = AppState.badgeToggle.mode;
             this._mode = mode;
-            // console.log(`[BadgeManager] Loaded badge mode from app-state.json: ${this._mode}`);
+            console.log(`[BadgeManager] Loaded badge mode from app-state.json: ${this._mode}`);
         } else {
             console.log(`[BadgeManager] No badge mode found in app-state.json, using default: ${this._mode}`);
         }

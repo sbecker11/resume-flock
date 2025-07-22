@@ -257,8 +257,12 @@ export default {
       // Fallback attempts to ensure connections are drawn (only if conditions are met)
       setTimeout(() => {
         const selectedCDiv = document.querySelector('.biz-card-div.selected');
-        if (selectedCDiv && badgeManager.isBadgesVisible()) {
+        const badgesExist = document.querySelectorAll('.skill-badge').length > 0;
+        if (selectedCDiv && badgeManager.isBadgesVisible() && badgesExist) {
+          console.log('[ConnectionLines] Fallback: Drawing connections with badges ready');
           updateConnections();
+        } else {
+          console.log('[ConnectionLines] Fallback: Skipping - badges not ready or conditions not met');
         }
       }, 500);
     });
@@ -274,6 +278,7 @@ export default {
 
     // Refactor updateConnections to use badgeOrder
     function updateConnections() {
+      console.log('🔴🔴🔴 [ConnectionLines] updateConnections() CALLED! 🔴🔴🔴');
       connections.value = [];
       
       // First check: Are connection lines enabled at all?
@@ -282,11 +287,17 @@ export default {
         return;
       }
       
-      // Second check: Are badges visible? (No connection lines without badges)
-      if (!badgeManager.isBadgesVisible()) {
-        // console.log(`[DEBUG] Badges not visible - no connection lines needed`);
+      // Second check: Are badges visible? (No connection lines without badges)  
+      const badgesVisible = badgeManager.isBadgesVisible();
+      console.log(`[ConnectionLines] Badge manager state: isBadgesVisible()=${badgesVisible}`);
+      
+      if (!badgesVisible) {
+        console.log(`[ConnectionLines] Badge mode is -B (OFF) - clearing connections and returning`);
+        connections.value = [];
         return;
       }
+      
+      console.log(`[ConnectionLines] Badge mode is ON (+B) - proceeding with connections`);
       
       // Third check: Is a cDiv selected?
       let selectedJobNumber = null;
@@ -338,6 +349,13 @@ export default {
       const arcRadius = 20;
       // Build associatedBadges directly from DOM
       const allBadges = Array.from(document.querySelectorAll('.skill-badge'));
+      console.log(`[ConnectionLines] Found ${allBadges.length} badge elements in DOM`);
+      
+      if (allBadges.length === 0) {
+        console.log(`[ConnectionLines] No badge elements found - not drawing connections`);
+        return;
+      }
+      
       const associatedBadges = allBadges
         .map(el => {
           const id = el.id;

@@ -1,15 +1,15 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-22T03:30:09.429Z",
+  "lastUpdated": "2025-07-22T03:51:15.525Z",
   "layout": {
     "panelSizePercentage": 50,
-    "orientation": "scene-right",
-    "scenePercentage": 73.09136420525657,
-    "resumePercentage": 26.90863579474343
+    "orientation": "scene-left",
+    "scenePercentage": 74.33155080213903,
+    "resumePercentage": 25.668449197860966
   },
   "resizeHandle": {
-    "steppingEnabled": true,
-    "stepCount": 4
+    "steppingEnabled": false,
+    "stepCount": 1
   },
   "focalPoint": {
     "mode": "locked"
@@ -48,7 +48,7 @@
       }
     }
   },
-  "selectedJobNumber": 0,
+  "selectedJobNumber": 11,
   "resume": {
     "sortRule": {
       "field": "startDate",
@@ -437,8 +437,8 @@
   "debugPanel": {
     "position": {
       "scene-left": {
-        "top": 0,
-        "left": 0
+        "top": 149,
+        "left": 371
       },
       "scene-right": {
         "top": 124,
