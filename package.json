@@ -36,6 +36,7 @@
     "node-server": "nodemon server.mjs",
     "open-chrome": "open-cli http://localhost:5173",
     "kill-listeners": "pkill -f 'node server.mjs' && pkill -f 'nodemon' && pkill -f 'vite' || true",
+    "clean": "npm run kill-listeners && rm -rf node_modules dist .vite npm-debug.log* && npm cache clean --force",
     "extract-tokens": "node scripts/extract-design-tokens.mjs",
     "figma-sync": "node scripts/figma-sync.mjs",
     "watch-figma": "node scripts/watch-and-sync.mjs"

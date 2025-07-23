@@ -6,10 +6,11 @@
 // BizDetailsDivs do not add themselves to a bizCardDiv or 
 // a bizResumeDiv.
 
+import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';
 import * as utils from '../utils/utils.mjs';
 import { formatDateRange } from '../utils/dateUtils.mjs';
 import { BULLET } from '../constants/ui.mjs';
-import { jobs as jobsData, getValidatedJobNumber } from '../../static_content/jobs/jobs.mjs';
+import { getValidatedJobNumber } from '../../static_content/jobs/jobs.mjs';
 import { 
     createBizCardDivId,
     createBizResumeDivId, 
@@ -19,14 +20,41 @@ import {
     createBizCardDetailsDivClass
 } from '../scene/CardsController.mjs';
 
+class BizDetailsDivModule extends BaseComponent {
+    constructor() {
+        super('BizDetailsDivModule');
+    }
 
-/**
- * Creates a business resume details div
- * @param {HTMLElement} bizResumeDiv - The business resume div (in progress)
- * @param {HTMLElement} bizCardDiv - The business card div (in progress)
- * @returns {HTMLElement} The created business resume details div
- */
-export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
+    async initialize({ JobsDataManager }) {
+        this.jobsDataManager = JobsDataManager;
+        console.log('[BizDetailsDivModule] Initialized with JobsDataManager');
+    }
+
+    destroy() {
+        this.jobsDataManager = null;
+    }
+
+    getJobSkills(jobNumber) {
+        if (!this.jobsDataManager) {
+            throw new Error('getJobSkills: JobsDataManager not available');
+        }
+        
+        const job = this.jobsDataManager.getJob(jobNumber);
+        if (!job) throw new Error('getSkills: given null job');
+        const jobSkills = job['job-skills'] || {};   
+        const _jobSkills = (jobSkills && typeof jobSkills === 'object' && !Array.isArray(jobSkills))
+        ? Object.values(jobSkills) || []
+        : [];
+        return _jobSkills;
+    }
+
+    /**
+     * Creates a business resume details div
+     * @param {HTMLElement} bizResumeDiv - The business resume div (in progress)
+     * @param {HTMLElement} bizCardDiv - The business card div (in progress)
+     * @returns {HTMLElement} The created business resume details div
+     */
+    createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
     if (!bizResumeDiv) throw new Error('createBizResumeDetailsDiv: bizResumeDiv is null');
     if (!bizCardDiv) throw new Error('createBizResumeDetailsDiv: bizCardDiv is null');
     
@@ -39,8 +67,8 @@ export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
     if ( bizResumeDivColorIndex != bizCardDivColorIndex ) throw new Error('createBizResumeDetailsDiv: bizResumeDivColorIndex != bizCardDivColorIndex');
 
     // Create details info and use unified function with 'resume' context
-    const detailsInfo = createBizCardDetailsInfo(bizCardDiv);
-    const bizResumeDetailsDiv = createBizDetailsDiv(detailsInfo, 'resume');
+    const detailsInfo = this.createBizCardDetailsInfo(bizCardDiv);
+    const bizResumeDetailsDiv = this.createBizDetailsDiv(detailsInfo, 'resume');
     
     return bizResumeDetailsDiv;
 }
@@ -52,7 +80,7 @@ export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
  * @param {HTMLElement} bizCardDiv 
  * @returns {HTMLElement} the bizCardDivClone or null if not found
  */
-export function getBizCardDivClone(bizCardDiv) {
+    getBizCardDivClone(bizCardDiv) {
     if ( bizCardDiv == null ) {
         throw new Error('getBizCardDivClone: bizCardDiv is null');
     }
@@ -75,7 +103,7 @@ export function getBizCardDivClone(bizCardDiv) {
  * @param {HTMLElement} bizCardDiv 
  * @returns {HTMLElement} the bizCardDivClone or null if not found
  */
-export function getOriginalBizCardDiv(bizCardDiv) {
+    getOriginalBizCardDiv(bizCardDiv) {
     if ( bizCardDiv == null ) {
         console.log("DEBUG: getOriginalBizCardDiv bizCardDiv is null");
         return null;
@@ -99,7 +127,7 @@ export function getOriginalBizCardDiv(bizCardDiv) {
    * @param {*} bizCardDiv
    * @returns float or throws error if non-numeric sceneZ
    */
-export function getValidatedSceneZ(bizCardDiv) {
+    getValidatedSceneZ(bizCardDiv) {
     if ( bizCardDiv ==  null ) {
         // console.log("DEBUG: getValidatedSceneZ: bizCardDiv null");
         return null;
@@ -129,18 +157,22 @@ export function getValidatedSceneZ(bizCardDiv) {
  * @returns an informative context string that can be used
  * for bizCardDivs and bizResumeDivs.
  */
-export function createBizCardDetailsInfo(bizCardDiv) {
+    createBizCardDetailsInfo(bizCardDiv) {
     if (!bizCardDiv) throw new Error('createBizCardDetailsDiv: bizCardDiv is null');
     const jobNumber = getValidatedJobNumber(bizCardDiv);
-    const jobSkills = getJobSkills(jobNumber);
+    const jobSkills = this.getJobSkills(jobNumber);
     let colorIndex = bizCardDiv.getAttribute('data-color-index');
     if ( colorIndex == null || !utils.isNumericString(colorIndex) ) {
         throw new Error(`createBizCardDetailsInfo: given null or non-numeric colorIndex "${colorIndex}" from bizCardDiv.id: ${bizCardDiv.id || 'unknown'}`);
     }
     if ( colorIndex != jobNumber ) throw new Error('createBizCardDetailsInfo: colorIndex != jobNumber');
 
-    // gather the job details
-    const job = jobsData[jobNumber];
+    // Get job data from injected JobsDataManager
+    if (!this.jobsDataManager) {
+        throw new Error('createBizCardDetailsInfo: JobsDataManager not available');
+    }
+    
+    const job = this.jobsDataManager.getJob(jobNumber);
     if ( job == null ) throw new Error('createBizCardDetailsInfo: job not found');
 
     const description = job.Description  || 'No description provided';
@@ -150,7 +182,7 @@ export function createBizCardDetailsInfo(bizCardDiv) {
     // will have created a badges_info object and attached it to the bizCardDivClone
     // as an attribute.
     let badgesInfo = null;
-    const bizCardDivClone = getBizCardDivClone(bizCardDiv);
+    const bizCardDivClone = this.getBizCardDivClone(bizCardDiv);
     if (bizCardDivClone !== null) {
         badgesInfo = bizCardDivClone.getAttribute('data-badges-info');
     }
@@ -177,7 +209,7 @@ export function createBizCardDetailsInfo(bizCardDiv) {
  * @param {string} context - 'card' for limited space, 'resume' for full content
  * @returns {HTMLElement} The created details div
  */
-export function createBizDetailsDiv(detailsInfo, context = 'card') {
+    createBizDetailsDiv(detailsInfo, context = 'card') {
     if (!detailsInfo) throw new Error('createBizDetailsDiv: detailsInfo is null');
     
     const isCardContext = context === 'card';
@@ -257,21 +289,12 @@ export function createBizDetailsDiv(detailsInfo, context = 'card') {
  * @param {*} bizCardDiv 
  * @returns 
  */
-export function createBizCardDetailsDiv(bizCardDiv) {
-    const detailsInfo = createBizCardDetailsInfo(bizCardDiv);
-    return createBizDetailsDiv(detailsInfo, 'card');
+    createBizCardDetailsDiv(bizCardDiv) {
+    const detailsInfo = this.createBizCardDetailsInfo(bizCardDiv);
+    return this.createBizDetailsDiv(detailsInfo, 'card');
 }
 
 
-export function getJobSkills(jobNumber) {
-    const job = jobsData[jobNumber];
-    if (!job) throw new Error('getSkills: given null job');
-    const jobSkills = job['job-skills'] || {};   
-    const _jobSkills = (jobSkills && typeof jobSkills === 'object' && !Array.isArray(jobSkills))
-    ? Object.values(jobSkills) || []
-    : [];
-    return _jobSkills;
-}
 
 /**
  * Returns the sceneZ of the original bizCardDiv. 
@@ -281,7 +304,7 @@ export function getJobSkills(jobNumber) {
  * @param {HTMLElement} bizCardDiv - The bizCardDiv (original or clone)
  * @returns {string} sceneZ
  */
-export function getSceneZ(jobNumber) {
+    getSceneZ(jobNumber) {
     const bizCardDivId = createBizCardDivId(jobNumber);
     const bizCardDiv = document.getElementById(bizCardDivId);
     if (!bizCardDiv) {
@@ -302,7 +325,7 @@ export function getSceneZ(jobNumber) {
  * when a clone is selected, so we just need to get badge info from it.
  * @param {*} bizCardDiv 
  */
-export function createBizCardSubContextString(bizCardDiv) {
+    createBizCardSubContextString(bizCardDiv) {
     try {
         const jobNumber = getValidatedJobNumber(bizCardDiv);
         let sceneZ = getValidatedSceneZ(bizCardDiv);
@@ -310,7 +333,7 @@ export function createBizCardSubContextString(bizCardDiv) {
             console.log("DEBUG: createBizCardSubContextString: sceneZ is splat");
             sceneZ = 'splat';
         }
-        const jobSkills = getJobSkills(jobNumber);
+        const jobSkills = this.getJobSkills(jobNumber);
         const numJobSkills = jobSkills.length;
 
         // create the basic subContextStr that can be used
@@ -319,7 +342,7 @@ export function createBizCardSubContextString(bizCardDiv) {
 
         // if a bizCardDivClone is available in the DOM, the SkillBadges component
         // will handle badge creation and positioning automatically through Vue reactivity
-        const bizCardDivClone = getBizCardDivClone(bizCardDiv);
+        const bizCardDivClone = this.getBizCardDivClone(bizCardDiv);
         if (bizCardDivClone != null) {
             // The SkillBadges.vue component manages badge positioning automatically
             // We can get badge counts from the existing badgesInfo if available
@@ -349,9 +372,9 @@ export function createBizCardSubContextString(bizCardDiv) {
 
 
 
-export function getBizResumeContextStr(bizResumeDiv) {
+    getBizResumeContextStr(bizResumeDiv) {
     const jobNumber = getValidatedJobNumber(bizResumeDiv);
-    const jobSkills = getJobSkills(jobNumber);
+    const jobSkills = this.getJobSkills(jobNumber);
     const numJobSkills = jobSkills.length;
     
     // Get the actual DOM bounds instead of relying on potentially NaN data-scene attributes
@@ -369,11 +392,11 @@ export function getBizResumeContextStr(bizResumeDiv) {
  * @param {HTMLElement} bizCardDivClone - The biz card div clone element
  * @returns {Object} Badge information with counts and badges array
  */
-export function createBadgesInfo(bizCardDivClone) {
+    createBadgesInfo(bizCardDivClone) {
     if (!bizCardDivClone) throw new Error('createBadgesInfo: bizCardDivClone is null');
     
     const jobNumber = getValidatedJobNumber(bizCardDivClone);
-    const jobSkills = getJobSkills(jobNumber);
+    const jobSkills = this.getJobSkills(jobNumber);
  
     const badgesInfo = {
         aboveCount: 0,
@@ -394,3 +417,8 @@ export function createBadgesInfo(bizCardDivClone) {
     
     return badgesInfo;
 }
+
+}
+
+// Create and export singleton instance
+export const bizDetailsDivModule = new BizDetailsDivModule();

@@ -7,6 +7,7 @@ import * as viewPort from './viewPortModule.mjs';
 import * as zUtils from '../utils/zUtils.mjs';
 import * as mathUtils from '../utils/mathUtils.mjs';
 import { selectionManager } from './selectionManager.mjs';
+import { focalPointManager } from './focalPointManager.mjs';
 
 export const TEST_PARALLAX = false;
 export const EPSILON = 0.01
@@ -15,7 +16,6 @@ export const PARALLAX_X_EXAGGERATION_FACTOR = 0.9;
 export const PARALLAX_Y_EXAGGERATION_FACTOR = 1.0;
 
 let _isInitialized = false;
-let _focalPoint = null;
 
 // Create a reactive reference to the scene container rect
 const sceneContainerRect = ref({ left: 0, top: 0, width: 0, height: 0 });
@@ -38,9 +38,8 @@ function updateSceneContainerRect() {
 
 /**
  * Initializes the parallax effect.
- * @param {Object} focalPoint - The focalPoint composable instance
  */
-export function initialize(focalPoint = null) {
+export function initialize() {
     if (_isInitialized) {
         return;
     }
@@ -49,8 +48,7 @@ export function initialize(focalPoint = null) {
         return;
     }
 
-    // Store the focal point reference
-    _focalPoint = focalPoint;
+    // FocalPointManager is now available as an IM component
 
     // Listen for viewport-changed event to update the rect
     window.addEventListener('viewport-changed', updateSceneContainerRect);
@@ -58,8 +56,9 @@ export function initialize(focalPoint = null) {
     updateSceneContainerRect();
 
     // Watch for focal point position changes and apply parallax
-    watchEffect(() => {
-        if (!_focalPoint || !_focalPoint.position) {
+    // Using event-driven approach instead of watchEffect since focalPointManager handles its own reactivity
+    window.addEventListener('focal-point-changed', () => {
+        if (!focalPointManager.isInitialized) {
             return;
         }
 
@@ -76,7 +75,7 @@ export function initialize(focalPoint = null) {
 
     // Initial application of parallax to all cards
     // This ensures cards are properly positioned even if focal point doesn't change
-    if (_focalPoint && _focalPoint.position) {
+    if (focalPointManager.isInitialized) {
         const { dh, dv } = calculateParallaxDisplacements();
         const bizCardDivs = document.getElementsByClassName("biz-card-div");
         
@@ -104,11 +103,12 @@ export function getSceneContainerWidth() {
 // use current focalPoint and sceneContainer origin
 // to calculate the parallax displacements for all bizCardDivs
 // which is scaled according to the scene-Z of each bizCardDiv
-// this is called by the watchEffect in initialie()
+// this is called by the event listener in initialize()
 export function calculateParallaxDisplacements() {
 
     const {x: vpX, y: vpY} = viewPort.getViewPortOrigin();
-    const {x: fpX, y: fpY} = _focalPoint.position.value;
+    const focalPosition = focalPointManager.getPosition();
+    const {x: fpX, y: fpY} = focalPosition;
 
     //const dh = (scX - fpX) * PARALLAX_X_EXAGGERATION_FACTOR;
     //const dv = (scY - fpY) * PARALLAX_Y_EXAGGERATION_FACTOR;

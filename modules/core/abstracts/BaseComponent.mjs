@@ -5,7 +5,8 @@
  */
 
 import { initializationManager } from '../initializationManager.mjs';
-import { dependencyChecker } from '../dependencyChecker.mjs';
+// import { dependencyChecker } from '../dependencyChecker.mjs'; // Removed - functionality moved inline
+import { importParser } from '../importParser.mjs';
 
 export class BaseComponent {
     constructor(name) {
@@ -20,34 +21,33 @@ export class BaseComponent {
         // Force subclass to define dependencies
         this._validateAbstractMethods();
         
-        // Auto-register with InitializationManager
-        this._autoRegister();
+        // Auto-register with InitializationManager (synchronous registration, async init)
+        this._registerSync();
     }
 
     /**
-     * ABSTRACT METHOD - MUST BE OVERRIDDEN
-     * Define component dependencies - FAILS if not overridden
+     * OPTIONAL METHOD - Get component dependencies
+     * If not overridden, dependencies will be auto-discovered from imports
      */
     getDependencies() {
-        throw new Error(`❌ FATAL: ${this.componentName} MUST override getDependencies() method.
-        
-        Example:
-        getDependencies() {
-            return ['selectionManager', 'badgeManager', 'DOM'];
-        }
-        
-        Component will NOT work until this is fixed.`);
+        // Return null to indicate auto-discovery should be used
+        return null;
     }
 
     /**
      * ABSTRACT METHOD - MUST BE OVERRIDDEN  
-     * Component initialization logic - FAILS if not overridden
+     * Component initialization logic with dependency injection - FAILS if not overridden
+     * @param {Object} dependencies - Map of dependency names to component instances
      */
-    async initialize() {
-        throw new Error(`❌ FATAL: ${this.componentName} MUST override initialize() method.
+    async initialize(dependencies = {}) {
+        throw new Error(`❌ FATAL: ${this.componentName} MUST override initialize(dependencies) method.
         
         Example:
-        async initialize() {
+        async initialize(dependencies) {
+            // Access dependencies directly from parameter
+            this.stateManager = dependencies.StateManager;
+            this.selectionManager = dependencies.SelectionManager;
+            
             this.setupEventListeners();
             this.createElements();
             // console.log('${this.componentName} initialized');
@@ -87,11 +87,42 @@ export class BaseComponent {
     // =============================================================
 
     /**
+     * Get the file path of the component for import analysis
+     * @private
+     */
+    _getComponentFilePath() {
+        try {
+            // Use stack trace to determine the file path
+            const stack = new Error().stack;
+            const stackLines = stack.split('\n');
+            
+            // Look for the first line that's not this BaseComponent file
+            for (const line of stackLines) {
+                if (line.includes('.mjs') || line.includes('.vue')) {
+                    // Extract path from stack trace
+                    const match = line.match(/https?:\/\/[^\/]+(\/.+?\.(mjs|vue|js))/);
+                    if (match) {
+                        return match[1]; // Return the path part
+                    }
+                }
+            }
+            
+            // Fallback: try to construct path from component name
+            const camelCase = this.componentName.charAt(0).toLowerCase() + this.componentName.slice(1);
+            return `/modules/core/${camelCase}.mjs`; // Default guess
+            
+        } catch (error) {
+            console.warn(`[BaseComponent] Could not determine file path for ${this.componentName}:`, error);
+            return null;
+        }
+    }
+
+    /**
      * Validates that subclass has overridden required abstract methods
      * PRIVATE - called in constructor
      */
     _validateAbstractMethods() {
-        const requiredMethods = ['getDependencies', 'initialize', 'destroy'];
+        const requiredMethods = ['initialize', 'destroy']; // getDependencies is now optional
         const errors = [];
 
         for (const method of requiredMethods) {
@@ -113,22 +144,200 @@ This is MANDATORY for proper dependency management.`);
     }
 
     /**
-     * Auto-registration with InitializationManager
+     * Parse dependencies from the initialize function signature
+     * @returns {Array<string>} Array of dependency names
+     * @private
+     */
+    _parseDependenciesFromSignature() {
+        if (!this.initialize || typeof this.initialize !== 'function') {
+            return [];
+        }
+
+        const funcStr = this.initialize.toString();
+        
+        // Match function parameters - handles various formats:
+        // async initialize(dependencies)
+        // async initialize({ VueDomManager, SceneContainer })
+        // initialize(dependencies = {})
+        const paramMatch = funcStr.match(/(?:async\s+)?initialize\s*\(\s*([^)]*)\s*\)/);
+        
+        if (!paramMatch || !paramMatch[1].trim()) {
+            return []; // No parameters
+        }
+        
+        const paramStr = paramMatch[1].trim();
+        
+        // Handle destructured parameters: { VueDomManager, SceneContainer, BadgeManager }
+        const destructureMatch = paramStr.match(/\{\s*([^}]+)\s*\}/);
+        if (destructureMatch) {
+            const params = destructureMatch[1]
+                .split(',')
+                .map(p => p.trim())
+                .filter(p => p && !p.includes('=')) // Skip default values
+                .map(p => p.split(':')[0].trim()); // Handle { VueDomManager: vm } syntax
+            
+            console.log(`[BaseComponent] ${this.componentName} parsed destructured dependencies:`, params);
+            return params;
+        }
+        
+        // Handle single parameter name (assumes it's a dependencies object)
+        const singleParam = paramStr.split('=')[0].trim(); // Remove default values
+        if (singleParam && singleParam !== 'dependencies') {
+            console.log(`[BaseComponent] ${this.componentName} single parameter '${singleParam}' found - assuming no dependencies`);
+            return [];
+        }
+        
+        // If parameter is named 'dependencies', can't infer specific deps from signature
+        console.log(`[BaseComponent] ${this.componentName} generic 'dependencies' parameter found - no signature parsing possible`);
+        return [];
+    }
+
+    /**
+     * Check if initialize function uses destructured parameters
+     * @returns {boolean} True if uses destructuring
+     * @private
+     */
+    _usesDestructuredParameters() {
+        if (!this.initialize || typeof this.initialize !== 'function') {
+            return false;
+        }
+
+        const funcStr = this.initialize.toString();
+        const paramMatch = funcStr.match(/(?:async\s+)?initialize\s*\(\s*([^)]*)\s*\)/);
+        
+        if (!paramMatch || !paramMatch[1].trim()) {
+            return false;
+        }
+        
+        const paramStr = paramMatch[1].trim();
+        return /\{\s*[^}]+\s*\}/.test(paramStr); // Has destructuring pattern
+    }
+
+    /**
+     * Synchronous registration with InitializationManager
      * PRIVATE - called in constructor
      */
-    _autoRegister() {
+    _registerSync() {
         try {
-            // Get dependencies from subclass
-            this.dependencies = this.getDependencies();
+            // Parse dependencies from initialize function signature first
+            const signatureDependencies = this._parseDependenciesFromSignature();
+            
+            if (signatureDependencies.length > 0) {
+                console.log(`[BaseComponent] ${this.componentName} parsed dependencies from signature:`, signatureDependencies);
+                this.dependencies = signatureDependencies;
+            } else {
+                // Fall back to getDependencies method
+                const manualDependencies = this.getDependencies();
+                
+                if (manualDependencies === null) {
+                    console.warn(`[BaseComponent] ${this.componentName} requested auto-discovery, using empty dependencies for now`);
+                    this.dependencies = [];
+                } else {
+                    this.dependencies = manualDependencies;
+                }
+            }
+            
+            // Register synchronously with InitializationManager
+            this._registerWithManager();
+            
+        } catch (error) {
+            console.error(`[BaseComponent] ${this.componentName} failed to register:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Register with InitializationManager (synchronous)
+     * PRIVATE - called from _registerSync
+     */
+    _registerWithManager() {
+        // Create wrapped initialization function
+        const wrappedInit = async (dependenciesMap = {}) => {
+            console.log(`🔍 [${this.componentName}] Starting initialization with dependencies:`, Object.keys(dependenciesMap));
+            
+            // Simple dependency validation - just check if they're strings
+            for (const dep of this.dependencies) {
+                if (typeof dep !== 'string' || dep.trim().length === 0) {
+                    throw new Error(`❌ [${this.componentName}] Invalid dependency: '${dep}' must be a non-empty string`);
+                }
+            }
+
+            // Run component-specific validation
+            const componentValidation = this.validateComponent();
+            if (!componentValidation.valid) {
+                throw new Error(`❌ [${this.componentName}] Component validation failed:\\n${componentValidation.errors.join('\\n')}`);
+            }
+
+            // Call the actual initialize method with dependency injection
+            console.log(`🚀 [${this.componentName}] Starting initialization...`);
+            
+            // Check if initialize function uses destructured parameters
+            const usesDestructuring = this._usesDestructuredParameters();
+            
+            if (usesDestructuring) {
+                // Call with destructured parameters: initialize({ VueDomManager, SceneContainer })
+                await this.initialize(dependenciesMap);
+            } else {
+                // Call with dependencies object: initialize(dependencies)
+                await this.initialize(dependenciesMap);
+            }
+            
+            this.isInitialized = true;
+            
+            // Register this component instance in the central registry for service lookup
+            initializationManager.registerComponentInstance(this.componentName, this);
+            // console.log(`✅ [${this.componentName}] Registered in service locator registry`);
+            
+            console.log(`✅ [${this.componentName}] Initialization complete`);
+            
+            return this;
+        };
+
+        // Register with InitializationManager (this must be synchronous)
+        // We'll use a promise-based approach but register immediately
+        initializationManager.registerSync(
+            this.componentName,
+            wrappedInit,
+            this.dependencies,
+            { priority: this.getPriority?.() || 'medium' }
+        );
+    }
+
+    /**
+     * Auto-registration with InitializationManager (async version - kept for compatibility)
+     * PRIVATE - called in constructor
+     */
+    async _autoRegister() {
+        try {
+            // Get dependencies - either manual or auto-discovered
+            const manualDependencies = this.getDependencies();
+            
+            if (manualDependencies === null) {
+                // Auto-discover dependencies from imports
+                // First, register this component's file path for analysis
+                const filePath = this._getComponentFilePath();
+                if (filePath) {
+                    importParser.registerComponentPath(this.componentName, filePath);
+                    this.dependencies = await importParser.getDependencies(this.componentName);
+                } else {
+                    console.warn(`[BaseComponent] Could not determine file path for ${this.componentName}, using empty dependencies`);
+                    this.dependencies = [];
+                }
+            } else {
+                // Use manually defined dependencies
+                this.dependencies = manualDependencies;
+                // console.log(`[BaseComponent] ${this.componentName} using manual dependencies:`, this.dependencies);
+            }
             
             // Create wrapped initialization function
-            const wrappedInit = async () => {
+            const wrappedInit = async (dependenciesMap = {}) => {
                 // console.log(`🔍 [${this.componentName}] Validating dependencies...`);
                 
-                // Validate dependencies exist
-                const validation = dependencyChecker.checkDependencies(this.dependencies, this.componentName);
-                if (!validation.valid) {
-                    throw new Error(`❌ [${this.componentName}] Dependency validation failed:\\n${validation.errors.join('\\n')}`);
+                // Simple dependency validation - just check if they're strings
+                for (const dep of this.dependencies) {
+                    if (typeof dep !== 'string' || dep.trim().length === 0) {
+                        throw new Error(`❌ [${this.componentName}] Invalid dependency: '${dep}' must be a non-empty string`);
+                    }
                 }
 
                 // Run component-specific validation
@@ -137,23 +346,34 @@ This is MANDATORY for proper dependency management.`);
                     throw new Error(`❌ [${this.componentName}] Component validation failed:\\n${componentValidation.errors.join('\\n')}`);
                 }
 
-                // Call the actual initialize method
+                // Call the actual initialize method with dependency injection
                 // console.log(`🚀 [${this.componentName}] Starting initialization...`);
-                await this.initialize();
+                await this.initialize(dependenciesMap);
                 
                 this.isInitialized = true;
+                
+                // Register this component instance in the central registry for service lookup
+                initializationManager.registerComponentInstance(this.componentName, this);
+                // console.log(`✅ [${this.componentName}] Registered in service locator registry`);
+                
                 // console.log(`✅ [${this.componentName}] Initialization complete`);
                 
                 return this;
             };
 
-            // Register with InitializationManager
-            initializationManager.register(
+            // Register with InitializationManager and wait for it to complete
+            await initializationManager.register(
                 this.componentName,
                 wrappedInit,
                 this.dependencies,
                 { priority: this.getPriority?.() || 'medium' }
             );
+            
+            // Immediately try to initialize if no dependencies
+            if (this.dependencies.length === 0) {
+                // No dependencies, can initialize immediately
+                await initializationManager.checkDependencies();
+            }
 
             // console.log(`📋 [${this.componentName}] Auto-registered with dependencies:`, this.dependencies);
 
@@ -183,6 +403,15 @@ This is MANDATORY for proper dependency management.`);
     }
 
     /**
+     * Get another component instance from the IM registry
+     * @param {string} componentName - Name of component to retrieve
+     * @returns {Object|null} Component instance or null if not found
+     */
+    getComponent(componentName) {
+        return initializationManager.getComponent(componentName);
+    }
+
+    /**
      * Get component status for debugging
      */
     getStatus() {
@@ -204,27 +433,15 @@ export const BaseVueComponentMixin = {
         this._componentName = this.$options.name || 'UnnamedVueComponent';
         // console.log(`🔍 [${this._componentName}] Vue component created - checking dependencies...`);
         
-        // Check if component has defined dependencies
-        if (!this.getComponentDependencies) {
-            throw new Error(`❌ FATAL: Vue component ${this._componentName} MUST implement getComponentDependencies() method.
-            
-            Example:
-            methods: {
-                getComponentDependencies() {
-                    return ['selectionManager', 'badgeManager'];
-                }
-            }
-            
-            Component will NOT work until this is fixed.`);
-        }
-
-        // Check if component has defined initialization
+        // Check if component has defined initialization with destructured dependencies
         if (!this.initializeWithDependencies) {
             throw new Error(`❌ FATAL: Vue component ${this._componentName} MUST implement initializeWithDependencies() method.
             
             Example:
             methods: {
-                async initializeWithDependencies() {
+                async initializeWithDependencies({ selectionManager, badgeManager }) {
+                    this.selectionManager = selectionManager;
+                    this.badgeManager = badgeManager;
                     this.setupEventListeners();
                     this.createElements();
                 }
@@ -236,16 +453,7 @@ export const BaseVueComponentMixin = {
 
     async mounted() {
         try {
-            const dependencies = this.getComponentDependencies();
-            // console.log(`📋 [${this._componentName}] Vue component dependencies:`, dependencies);
-            
-            // Validate dependencies
-            const validation = dependencyChecker.checkDependencies(dependencies, this._componentName);
-            if (!validation.valid) {
-                throw new Error(`❌ [${this._componentName}] Vue component dependency validation failed:\\n${validation.errors.join('\\n')}`);
-            }
-
-            // Initialize with validated dependencies
+            // Initialize with dependencies - specific dependency resolution handled by the component
             await this.initializeWithDependencies();
             // console.log(`✅ [${this._componentName}] Vue component initialization complete`);
 

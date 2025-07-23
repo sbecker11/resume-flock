@@ -1,7 +1,6 @@
 <script>
-import { badgeManager } from '@/modules/core/badgeManager.mjs';
-import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
+import { initializationManager } from '@/modules/core/initializationManager.mjs';
 
 export default {
   name: 'BadgeToggle',
@@ -12,15 +11,15 @@ export default {
       badgeMode: 'no-badges',
       selectedJobNumber: null,
       isHovering: false,
-      hasJustClicked: false,
-      isInitialized: false
+      hasJustClicked: false
+      // isInitialized removed - managed by BaseComponent
     };
   },
   
   computed: {
     // Mode progression: none -> show -> none
     nextMode() {
-      return badgeManager.getNextMode();
+      return this.badgeManager ? this.badgeManager.getNextMode() : 'no-badges';
     },
     
     // The mode whose icon we're currently displaying (for CSS class styling)
@@ -30,7 +29,7 @@ export default {
     
     // The actual icon to show with superscripts
     displayIcon() {
-      return badgeManager.getDisplayIcon(this.isHovering);
+      return this.badgeManager ? this.badgeManager.getDisplayIcon(this.isHovering) : '○';
     },
     
     // CSS classes for the button
@@ -51,7 +50,7 @@ export default {
       if (this.isDisabled) {
         return 'Select a job card to enable badge controls';
       }
-      return badgeManager.getTooltipText(this.isHovering);
+      return this.badgeManager ? this.badgeManager.getTooltipText(this.isHovering) : '';
     }
   },
   
@@ -63,25 +62,33 @@ export default {
     async initializeWithDependencies() {
       console.log('[BadgeToggle] initializing with dependencies');
       
+      // Get dependencies from service locator
+      this.badgeManager = initializationManager.getComponent('BadgeManager');
+      this.selectionManager = initializationManager.getComponent('SelectionManager');
+      
       // Set up event listeners first
-      badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged);
-      selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged);
-      selectionManager.addEventListener('selectionCleared', this.handleSelectionCleared);
+      this.badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged);
+      this.selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged);
+      this.selectionManager.addEventListener('selectionCleared', this.handleSelectionCleared);
       
       // Then initialize with current values
       await this.$nextTick();
-      this.badgeMode = badgeManager.getMode();
-      this.selectedJobNumber = selectionManager.getSelectedJobNumber();
-      this.isInitialized = true;
+      this.badgeMode = this.badgeManager.getMode();
+      this.selectedJobNumber = this.selectionManager.getSelectedJobNumber();
+      // isInitialized is managed by BaseComponent automatically
       
       console.log(`[BadgeToggle] Initialized - badgeMode=${this.badgeMode}, selectedJobNumber=${this.selectedJobNumber}, disabled=${this.isDisabled}`);
     },
     
     cleanupDependencies() {
       console.log('[BadgeToggle] cleanup');
-      badgeManager.removeEventListener('badgeModeChanged', this.handleBadgeModeChanged);
-      selectionManager.removeEventListener('selectionChanged', this.handleSelectionChanged);
-      selectionManager.removeEventListener('selectionCleared', this.handleSelectionCleared);
+      if (this.badgeManager) {
+        this.badgeManager.removeEventListener('badgeModeChanged', this.handleBadgeModeChanged);
+      }
+      if (this.selectionManager) {
+        this.selectionManager.removeEventListener('selectionChanged', this.handleSelectionChanged);
+        this.selectionManager.removeEventListener('selectionCleared', this.handleSelectionCleared);
+      }
     },
     
     // Event handlers
@@ -112,7 +119,9 @@ export default {
         return;
       }
       
-      badgeManager.toggleMode('BadgeToggle');
+      if (this.badgeManager) {
+        this.badgeManager.toggleMode('BadgeToggle');
+      }
       // Mark that we just clicked (don't reset hover state yet)
       this.hasJustClicked = true;
       

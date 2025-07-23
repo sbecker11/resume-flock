@@ -1,58 +1,77 @@
+import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';
 import * as viewPort from '../core/viewPortModule.mjs';
 
-let _sceneContainer = null;
-let _isInitialized = false;
-
 /**
- * Initializes the scene container, gets the DOM element, and sets up event listeners.
+ * SceneContainer - Manages the scene container DOM element and provides it to other components
+ * This component ensures the scene-container element is ready before other components try to access it
  */
-export function initialize() {
-    if (_isInitialized) {
-        window.CONSOLE_LOG_IGNORE("sceneContainer.initialize: already initialized");
-        return;
+class SceneContainer extends BaseComponent {
+    constructor() {
+        super('SceneContainer');
+        this._sceneContainer = null;
     }
-    
-    // Wait for DOM to be ready
-    const waitForElement = () => {
-        return new Promise((resolve) => {
-            const checkElement = () => {
-                _sceneContainer = document.getElementById('scene-container');
-                if (_sceneContainer) {
-                    resolve();
-                } else {
-                    setTimeout(checkElement, 10);
-                }
-            };
-            checkElement();
-        });
-    };
-    
-    return waitForElement().then(() => {
-        _isInitialized = true;
+
+    getPriority() {
+        return 'high'; // High priority since many components depend on this
+    }
+
+    async initialize({ VueDomManager }) {
+        console.log('[SceneContainer] Initializing with Vue DOM ready...');
         
-        // Log scene container height as soon as it's available during startup
-        const sceneHeight = _sceneContainer.clientHeight;
-        const sceneOffsetHeight = _sceneContainer.offsetHeight;
-        const sceneBoundingHeight = _sceneContainer.getBoundingClientRect().height;
-        console.log(`[SCENE-CONTAINER-INIT] Scene container height available:`, {
+        // VueDomManager dependency ensures Vue DOM is ready before we access DOM elements
+        this._sceneContainer = document.getElementById('scene-container');
+        
+        if (!this._sceneContainer) {
+            throw new Error('[SceneContainer] scene-container element not found - check Vue template');
+        }
+        
+        // Log scene container dimensions once ready
+        const sceneHeight = this._sceneContainer.clientHeight;
+        const sceneOffsetHeight = this._sceneContainer.offsetHeight;
+        const sceneBoundingHeight = this._sceneContainer.getBoundingClientRect().height;
+        console.log(`[SCENE-CONTAINER-INIT] Scene container ready:`, {
             clientHeight: sceneHeight,
             offsetHeight: sceneOffsetHeight,
             boundingHeight: sceneBoundingHeight,
-            element: _sceneContainer
+            element: this._sceneContainer
         });
         
-        window.CONSOLE_LOG_IGNORE('Scene container initialized');
-    });
+        // Flexbox layout is managed via CSS - Timeline has order: 0 to ensure it's first
+        
+        console.log('[SceneContainer] Initialization complete');
+    }
+
+    destroy() {
+        this._sceneContainer = null;
+    }
+
+
+    // Public API methods
+    getSceneContainer() {
+        return this._sceneContainer;
+    }
+
+    isReady() {
+        return this._sceneContainer !== null;
+    }
 }
 
+// Create singleton instance - this will auto-register with InitializationManager
+const sceneContainer = new SceneContainer();
+
+// Export the instance for service locator access
+export { sceneContainer };
+export default sceneContainer;
+
+// Backward compatibility functions
 export function isInitialized() {
-    return _isInitialized;
+    return sceneContainer.isReady();
 }
 
 // called from updateResumeContainer
 export function updateSceneContainer() {
-    // viewPort updates interal properties and its chlldren
-    // using the current sceneContainer.offsetWidth and resumeContainerw.offset
+    // viewPort updates internal properties and its children
+    // using the current sceneContainer.offsetWidth and resumeContainer.offset
     viewPort.updateViewPort();
 }
 
@@ -61,20 +80,20 @@ export function updateSceneContainer() {
  * This is especially important when the focal point is locked
  */
 export function ensurePointerEvents() {
-    const sceneContainer = document.getElementById('scene-container');
-    if (!sceneContainer) {
-        window.CONSOLE_LOG_IGNORE("Scene container not found");
+    const sceneContainerElement = sceneContainer.getSceneContainer();
+    if (!sceneContainerElement) {
+        window.CONSOLE_LOG_IGNORE("Scene container not ready");
         return;
     }
     
     // Ensure scene container has pointer events
-    if (sceneContainer.style.pointerEvents !== 'auto') {
+    if (sceneContainerElement.style.pointerEvents !== 'auto') {
         window.CONSOLE_LOG_IGNORE("Fixing scene container pointer-events");
-        sceneContainer.style.pointerEvents = 'auto';
+        sceneContainerElement.style.pointerEvents = 'auto';
     }
     
     // Ensure all bizCardDivs have pointer events
-    const bizCardDivs = sceneContainer.querySelectorAll('.biz-card-div');
+    const bizCardDivs = sceneContainerElement.querySelectorAll('.biz-card-div');
     bizCardDivs.forEach(div => {
         if (div.style.pointerEvents !== 'auto') {
             window.CONSOLE_LOG_IGNORE(`Fixing pointer-events for ${div.id}`);

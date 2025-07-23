@@ -7,6 +7,7 @@
 import { componentScanner } from './componentScanner.mjs';
 import { componentEnforcer } from './abstracts/BaseComponent.mjs';
 import { initializationManager } from './initializationManager.mjs';
+import { imMigrationValidator } from './imMigrationValidator.mjs';
 
 export class DependencyEnforcement {
     constructor() {
@@ -35,17 +36,23 @@ export class DependencyEnforcement {
             console.log('📡 Scanning project files...');
             const scanResults = await componentScanner.scanProject(projectRoot);
 
-            // Step 2: Check runtime registration
+            // Step 2: Validate IM migration status
+            console.log('🔄 Validating IM migration compliance...');
+            const migrationResults = await imMigrationValidator.validateIMMigration(projectRoot);
+
+            // Step 3: Check runtime registration
             console.log('🔍 Checking runtime component registration...');
             await this._checkRuntimeRegistration();
 
-            // Step 3: Generate report if requested
+            // Step 4: Generate reports if requested
             if (generateReport) {
-                const report = componentScanner.generateReport();
-                console.log('📋 Compliance report generated');
+                const complianceReport = componentScanner.generateReport();
+                const migrationReport = imMigrationValidator.generateMigrationReport();
+                console.log('📋 Compliance reports generated');
                 
-                // Save report to file
-                await this._saveReport(report);
+                // Save reports to files
+                await this._saveReport(complianceReport, 'compliance-report.md');
+                await this._saveReport(migrationReport, 'im-migration-report.md');
             }
 
             // Step 4: Enforce based on level
@@ -70,7 +77,11 @@ export class DependencyEnforcement {
                 success: true,
                 enforcementLevel,
                 scanResults,
-                report: generateReport ? componentScanner.generateReport() : null
+                migrationResults,
+                reports: generateReport ? {
+                    compliance: componentScanner.generateReport(),
+                    migration: imMigrationValidator.generateMigrationReport()
+                } : null
             };
 
         } catch (error) {
@@ -94,11 +105,15 @@ export class DependencyEnforcement {
     async _enforceStrict() {
         console.log('🚨 STRICT enforcement mode - application will FAIL if violations found');
         
-        // This will throw if violations exist
+        // Check general component compliance
         componentScanner.enforceCompliance();
         componentEnforcer.enforceRegistration();
         
-        console.log('✅ STRICT enforcement passed - all components compliant');
+        // NEW: Check IM migration compliance
+        console.log('🔄 Enforcing IM migration compliance...');
+        imMigrationValidator.enforceIMCompliance();
+        
+        console.log('✅ STRICT enforcement passed - all components compliant and migrated');
     }
 
     /**
@@ -110,10 +125,19 @@ export class DependencyEnforcement {
         try {
             componentScanner.enforceCompliance();
             componentEnforcer.enforceRegistration();
-            console.log('✅ No violations found');
+            console.log('✅ No general compliance violations found');
         } catch (error) {
             console.warn('⚠️ COMPLIANCE VIOLATIONS FOUND:', error.message);
             console.warn('⚠️ Application continuing but should be fixed');
+        }
+
+        // Also check IM migration in warn mode
+        try {
+            imMigrationValidator.enforceIMCompliance();
+            console.log('✅ No IM migration violations found');
+        } catch (error) {
+            console.warn('⚠️ IM MIGRATION VIOLATIONS FOUND:', error.message);
+            console.warn('⚠️ Components should be migrated to dependency injection pattern');
         }
     }
 
@@ -139,15 +163,15 @@ export class DependencyEnforcement {
     /**
      * Save compliance report to file
      */
-    async _saveReport(report) {
+    async _saveReport(report, filename = 'compliance-report.md') {
         try {
             const fs = await import('fs/promises');
-            const reportPath = './compliance-report.md';
+            const reportPath = `./${filename}`;
             
             await fs.writeFile(reportPath, report);
-            console.log(`📄 Compliance report saved to: ${reportPath}`);
+            console.log(`📄 Report saved to: ${reportPath}`);
         } catch (error) {
-            console.warn('⚠️ Could not save compliance report:', error.message);
+            console.warn(`⚠️ Could not save report ${filename}:`, error.message);
         }
     }
 

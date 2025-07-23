@@ -3,11 +3,14 @@
  * Ensures all coordinate-dependent systems stay synchronized
  */
 
-class CoordinateManager {
+import { BaseComponent } from './abstracts/BaseComponent.mjs';
+
+class CoordinateManager extends BaseComponent {
     constructor() {
+        super('CoordinateManager');
         this.coordinateSystems = new Map();
         this.listeners = new Set();
-        this.isInitialized = false;
+        // isInitialized is managed by BaseComponent
     }
 
     /**
@@ -77,9 +80,15 @@ class CoordinateManager {
     /**
      * Initialize the coordinate manager
      */
-    initialize() {
-        this.isInitialized = true;
+    async initialize() {
+        // isInitialized is managed by BaseComponent automatically
         window.CONSOLE_LOG_IGNORE('[COORDS] Coordinate manager initialized');
+    }
+
+    destroy() {
+        this.coordinateSystems.clear();
+        this.listeners.clear();
+        window.CONSOLE_LOG_IGNORE('[COORDS] Coordinate manager destroyed');
     }
 
     /**

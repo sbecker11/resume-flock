@@ -45,24 +45,93 @@
   </svg>
 </template>
 
-<script setup>
-import { useTimeline } from '@/modules/composables/useTimeline.mjs';
-import { watchEffect } from 'vue';
+<script>
+import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
+import { initializationManager } from '@/modules/core/initializationManager.mjs';
+import { watchEffect, ref, computed } from 'vue';
 
-const props = defineProps({
-  alignment: {
-    type: String,
-    default: 'left', // 'left' or 'right'
+export default {
+  name: 'Timeline',
+  mixins: [BaseVueComponentMixin],
+  
+  props: {
+    alignment: {
+      type: String,
+      default: 'left', // 'left' or 'right'
+    },
   },
-});
-
-const { timelineHeight, years } = useTimeline();
-
-// Debug the alignment prop - reactive to changes
-watchEffect(() => {
-  // console.log('Timeline alignment prop changed to:', props.alignment);
-  // console.log('Timeline should position years at:', props.alignment === 'left' ? '70px' : 'calc(100% - 150px)');
-});
+  
+  data() {
+    return {
+      timelineManager: null,
+      timelineState: null,
+      timelineHeight: ref(0),
+      startYear: ref(2020),
+      endYear: ref(2025)
+    };
+  },
+  
+  computed: {
+    // Calculate years for display
+    years() {
+      if (!this.timelineState || !this.timelineState.isInitialized.value) {
+        return [];
+      }
+      
+      const yearsList = [];
+      const YEAR_HEIGHT = 200;
+      
+      for (let year = this.startYear.value; year <= this.endYear.value; year++) {
+        const yearIndex = year - this.startYear.value;
+        const y = (yearIndex + 1) * YEAR_HEIGHT; // Position from top
+        yearsList.push({ year, y });
+      }
+      
+      return yearsList;
+    }
+  },
+  
+  methods: {
+    getComponentDependencies() {
+      return ['TimelineManager'];
+    },
+    
+    async initializeWithDependencies() {
+      console.log('[Timeline] initializing with dependencies');
+      
+      // Get dependencies from service locator
+      this.timelineManager = initializationManager.getComponent('TimelineManager');
+      this.timelineState = this.timelineManager ? this.timelineManager.getTimelineState() : null;
+      
+      // Use TimelineManager data or fallback to defaults
+      if (this.timelineState) {
+        this.timelineHeight = this.timelineState.timelineHeight;
+        this.startYear = this.timelineState.startYear;
+        this.endYear = this.timelineState.endYear;
+      }
+      
+      console.log('[Timeline] Initialized with TimelineManager');
+    },
+    
+    cleanupDependencies() {
+      console.log('[Timeline] cleanup');
+      this.timelineManager = null;
+      this.timelineState = null;
+    }
+  },
+  
+  mounted() {
+    // Debug the alignment prop - reactive to changes
+    watchEffect(() => {
+      // console.log('Timeline alignment prop changed to:', this.alignment);
+      // console.log('Timeline should position years at:', this.alignment === 'left' ? '70px' : 'calc(100% - 150px)');
+    });
+  },
+  
+  beforeUnmount() {
+    this.cleanupDependencies();
+  }
+};
 </script>
 
 <style scoped>

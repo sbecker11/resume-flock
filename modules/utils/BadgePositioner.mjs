@@ -4,10 +4,8 @@
  * VIOLATION: Uses selectionManager without proper registration
  */
 
-import { selectionManager } from '../core/selectionManager.mjs';
 import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';
 import { useTimeline } from '../composables/useTimeline.mjs';
-import { getBizCardDivClone } from '../scene/bizDetailsDivModule.mjs';
 
 // Badge positioning modes relative to bizCardDiv
 const BadgePositionMode = Object.freeze({
@@ -22,13 +20,11 @@ export class BadgePositioner extends BaseComponent {
         this.badgeHeight = this._parseEmToPx('1.5em');
         this.badgeMargin = 10;
     }
-    
-    getDependencies() {
-        return ['selectionManager'];
-    }
-    
-    async initialize() {
-        // BadgePositioner initialized
+
+    async initialize({ SelectionManager, BizDetailsDivModule }) {
+        this.selectionManager = SelectionManager;
+        this.bizDetailsDivModule = BizDetailsDivModule;
+        console.log('[BadgePositioner] Initialized with SelectionManager and BizDetailsDivModule');
     }
     
     destroy() {
@@ -79,7 +75,7 @@ export class BadgePositioner extends BaseComponent {
             console.error('bizCardDiv is null, cannot position badges');
             return null;
         } 
-        const bizCardDivClone = getBizCardDivClone(bizCardDiv);
+        const bizCardDivClone = this.bizDetailsDivModule.getBizCardDivClone(bizCardDiv);
         if (bizCardDivClone == null) {
             console.error('bizCardDivClone is null, cannot position badges');
             return null;
@@ -483,8 +479,11 @@ export class BadgePositioner extends BaseComponent {
      * @private
      */
     _getSelectedJobNumber() {
-        // VIOLATION: Direct use of selectionManager without registration
-        return selectionManager.getSelectedJobNumber();
+        if (!this.selectionManager) {
+            console.warn('[BadgePositioner] SelectionManager not initialized');
+            return null;
+        }
+        return this.selectionManager.getSelectedJobNumber();
     }
 }
 

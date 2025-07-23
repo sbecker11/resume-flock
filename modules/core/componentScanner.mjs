@@ -190,9 +190,6 @@ export class ComponentScanner {
         }
 
         if (analysis.componentType === 'vue' && analysis.usesManagers.length > 0) {
-            if (!content.includes('getComponentDependencies')) {
-                analysis.violations.push('Vue component missing getComponentDependencies() method');
-            }
             if (!content.includes('initializeWithDependencies')) {
                 analysis.violations.push('Vue component missing initializeWithDependencies() method');
             }
@@ -202,6 +199,26 @@ export class ComponentScanner {
             if (!content.includes('extends BaseComponent')) {
                 analysis.violations.push('Class component should extend BaseComponent');
             }
+        }
+
+        // Check for custom isInitialized getter implementations (conflicts with BaseComponent's getter)
+        if (content.includes('get isInitialized()')) {
+            analysis.violations.push('Components should not implement custom isInitialized getter - BaseComponent provides this');
+        }
+
+        // Check for manual isInitialized assignments (BaseComponent handles this automatically)
+        if (content.includes('this.isInitialized = true') || content.includes('this.isInitialized = false')) {
+            analysis.violations.push('Components should not manually set this.isInitialized - BaseComponent manages this automatically');
+        }
+
+        // Check for private _isInitialized properties (should use BaseComponent's)
+        if (content.includes('_isInitialized = false') || content.includes('_isInitialized = true') || content.includes('this._isInitialized')) {
+            analysis.violations.push('Components should not implement private _isInitialized - BaseComponent manages initialization state');
+        }
+
+        // Check for getIsInitialized method (deprecated pattern)
+        if (content.includes('getIsInitialized')) {
+            analysis.violations.push('getIsInitialized() method is deprecated - use component.isInitialized property instead');
         }
 
         return analysis;
@@ -244,14 +261,23 @@ export class ComponentScanner {
         if (violation.includes('not registered')) {
             return 'Add component registration with InitializationManager or extend BaseComponent';
         }
-        if (violation.includes('getComponentDependencies')) {
-            return 'Add getComponentDependencies() method returning array of required dependencies';
-        }
         if (violation.includes('initializeWithDependencies')) {
             return 'Add initializeWithDependencies() method for component setup';
         }
         if (violation.includes('extends BaseComponent')) {
             return 'Change class to extend BaseComponent instead of base class';
+        }
+        if (violation.includes('custom isInitialized getter')) {
+            return 'Remove custom isInitialized getter - BaseComponent provides isInitialized property automatically';
+        }
+        if (violation.includes('manually set this.isInitialized')) {
+            return 'Remove manual this.isInitialized assignments - BaseComponent sets this automatically after initialize() completes';
+        }
+        if (violation.includes('private _isInitialized')) {
+            return 'Remove private _isInitialized property - use BaseComponent\'s this.isInitialized instead';
+        }
+        if (violation.includes('getIsInitialized')) {
+            return 'Replace getIsInitialized() method with component.isInitialized property access';
         }
         return 'Follow dependency management guidelines';
     }

@@ -34,50 +34,43 @@ export function initialize() {
         return Promise.resolve();
     }
 
-    // Wait for DOM to be ready
-    const waitForElement = () => {
-        return new Promise((resolve) => {
-            const checkElement = () => {
-                _sceneContainer = document.getElementById('scene-container');
-                if (_sceneContainer) {
-                    resolve();
-                } else {
-                    setTimeout(checkElement, 10);
-                }
-            };
-            checkElement();
-        });
-    };
+    // Get scene-container element - should be available since IM manages Vue DOM lifecycle
+    _sceneContainer = document.getElementById('scene-container');
+    if (!_sceneContainer) {
+        throw new Error('[VIEWPORT-INIT] scene-container element not found - IM should have ensured DOM readiness');
+    }
     
-    return waitForElement().then(() => {
-        // Log scene container height during viewport initialization
-        const sceneHeight = _sceneContainer.clientHeight;
-        const sceneOffsetHeight = _sceneContainer.offsetHeight;
-        const sceneBoundingHeight = _sceneContainer.getBoundingClientRect().height;
-        console.log(`[VIEWPORT-INIT] Scene container height during viewport setup:`, {
-            clientHeight: sceneHeight,
-            offsetHeight: sceneOffsetHeight,
-            boundingHeight: sceneBoundingHeight,
-            element: _sceneContainer
-        });
-        
-        // Initial calculation
-        calculateViewPortProperties();
-
-        // Listen for resize events to recalculate properties
-        window.addEventListener('resize', calculateViewPortProperties);
-
-        // Add ResizeObserver to detect scene container size changes
-        if (typeof ResizeObserver !== 'undefined') {
-            const resizeObserver = new ResizeObserver(() => {
-                updateViewPort();
-            });
-            resizeObserver.observe(_sceneContainer);
-        }
-
-        _isInitialized = true;
-        window.CONSOLE_LOG_IGNORE('Viewport initialized');
+    console.log('[VIEWPORT-INIT] scene-container element found immediately (IM managed lifecycle)');
+    
+    // Log scene container height during viewport initialization
+    const sceneHeight = _sceneContainer.clientHeight;
+    const sceneOffsetHeight = _sceneContainer.offsetHeight;
+    const sceneBoundingHeight = _sceneContainer.getBoundingClientRect().height;
+    console.log(`[VIEWPORT-INIT] Scene container height during viewport setup:`, {
+        clientHeight: sceneHeight,
+        offsetHeight: sceneOffsetHeight,
+        boundingHeight: sceneBoundingHeight,
+        element: _sceneContainer
     });
+    
+    // Initial calculation
+    calculateViewPortProperties();
+
+    // Listen for resize events to recalculate properties
+    window.addEventListener('resize', calculateViewPortProperties);
+
+    // Add ResizeObserver to detect scene container size changes
+    if (typeof ResizeObserver !== 'undefined') {
+        const resizeObserver = new ResizeObserver(() => {
+            updateViewPort();
+        });
+        resizeObserver.observe(_sceneContainer);
+    }
+
+    _isInitialized = true;
+    window.CONSOLE_LOG_IGNORE('Viewport initialized');
+    
+    return Promise.resolve();
 }
 
 export function isInitialized() {

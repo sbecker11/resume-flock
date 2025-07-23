@@ -406,8 +406,7 @@ function generateFixInstructions(violation) {
                     To: <code class="code">export class BadgePositioner extends BaseComponent {</code>
                 </li>
                 <li><strong>Update constructor:</strong> Add <code class="code">super('BadgePositioner')</code> as first line</li>
-                <li><strong>Add dependencies method:</strong> <code class="code">getDependencies() { return ['selectionManager']; }</code></li>
-                <li><strong>Add initialize method:</strong> <code class="code">async initialize() { /* setup code */ }</code></li>
+                <li><strong>Add initialize method:</strong> <code class="code">async initialize({ selectionManager }) { /* setup code */ }</code></li>
                 <li><strong>Add destroy method:</strong> <code class="code">destroy() { /* cleanup code */ }</code></li>
             </ol>
         `;
@@ -417,23 +416,54 @@ function generateFixInstructions(violation) {
                 <li><strong>Open file:</strong> <code class="code">${violation.file}</code></li>
                 <li><strong>Add import:</strong> <code class="code">import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';</code></li>
                 <li><strong>Add mixin:</strong> <code class="code">mixins: [BaseVueComponentMixin]</code></li>
-                <li><strong>Add dependencies method:</strong> <code class="code">getComponentDependencies() { return ['manager1', 'manager2']; }</code></li>
-                <li><strong>Add initialize method:</strong> <code class="code">async initializeWithDependencies() { /* setup */ }</code></li>
+                <li><strong>Add initialize method:</strong> <code class="code">async initializeWithDependencies({ manager1, manager2, manager3 }) { /* setup */ }</code></li>
                 <li><strong>Add cleanup method:</strong> <code class="code">cleanupDependencies() { /* cleanup */ }</code></li>
             </ol>
         `;
     } else {
-        return `
+        // Handle different violation types with specific instructions
+        let instructions = `
             <ol class="fix-steps">
                 <li><strong>Open file:</strong> <code class="code">${violation.file}</code></li>
+        `;
+
+        // Check for specific violation types and add targeted instructions
+        if (violation.violations && violation.violations.some(v => v.includes('manually set this.isInitialized'))) {
+            instructions += `
+                <li><strong>Remove manual isInitialized assignments:</strong> Delete lines with <code class="code">this.isInitialized = true</code> or <code class="code">this.isInitialized = false</code></li>
+                <li><strong>BaseComponent handles this automatically:</strong> After your <code class="code">initialize()</code> method completes, BaseComponent sets <code class="code">this.isInitialized = true</code></li>
+                <li><strong>Only read, don't write:</strong> Use <code class="code">if (this.isInitialized)</code> to check status, but never assign values</li>
+            `;
+        } else if (violation.violations && violation.violations.some(v => v.includes('custom isInitialized getter'))) {
+            instructions += `
+                <li><strong>Remove custom getter:</strong> Delete <code class="code">get isInitialized() { ... }</code> method</li>
+                <li><strong>BaseComponent provides this:</strong> Use <code class="code">this.isInitialized</code> directly as a property</li>
+            `;
+        } else if (violation.violations && violation.violations.some(v => v.includes('private _isInitialized'))) {
+            instructions += `
+                <li><strong>Remove private property:</strong> Delete <code class="code">this._isInitialized</code> assignments and references</li>
+                <li><strong>Use BaseComponent's property:</strong> Replace with <code class="code">this.isInitialized</code></li>
+            `;
+        } else if (violation.violations && violation.violations.some(v => v.includes('getIsInitialized'))) {
+            instructions += `
+                <li><strong>Remove deprecated method:</strong> Delete <code class="code">getIsInitialized()</code> method</li>
+                <li><strong>Use property access:</strong> Replace <code class="code">component.getIsInitialized()</code> with <code class="code">component.isInitialized</code></li>
+            `;
+        } else {
+            // General IM component setup
+            instructions += `
                 <li><strong>Add import:</strong> <code class="code">import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';</code></li>
                 <li><strong>Extend BaseComponent:</strong> <code class="code">class ${componentName} extends BaseComponent</code></li>
                 <li><strong>Add constructor:</strong> <code class="code">super('${componentName}')</code></li>
-                <li><strong>Override getDependencies():</strong> Define required managers</li>
-                <li><strong>Override initialize():</strong> Setup logic</li>
+                <li><strong>Override initialize():</strong> <code class="code">async initialize({ manager1, manager2 }) { /* setup logic */ }</code></li>
                 <li><strong>Override destroy():</strong> Cleanup logic</li>
+            `;
+        }
+
+        instructions += `
             </ol>
         `;
+        return instructions;
     }
 }
 

@@ -12,10 +12,14 @@
 
 import { AppState, saveState } from './stateManager.mjs';
 import { BadgeMode, isValidBadgeMode, getNextBadgeMode, getBadgeModeIcon, getBadgeModeDescription, getBadgeModeAction } from './BadgeMode.mjs';
+import { BaseComponent } from './abstracts/BaseComponent.mjs';
 
-class BadgeManager extends EventTarget {
+class BadgeManager extends BaseComponent {
     constructor() {
-        super();
+        super('BadgeManager');
+        
+        // Add EventTarget functionality since BaseComponent doesn't provide it
+        this.eventTarget = new EventTarget();
         
         // Badge mode state: BadgeMode enumeration
         this._mode = BadgeMode.NONE; // Default until state is loaded
@@ -26,11 +30,37 @@ class BadgeManager extends EventTarget {
         window.addEventListener('clone-created', this._handleCloneCreated.bind(this));
     }
 
+    getDependencies() {
+        return ['StateManager']; // BadgeManager needs state to be loaded first
+    }
+
+    getPriority() {
+        return 'high'; // Initialize early, after StateManager
+    }
+
+    destroy() {
+        this._mode = BadgeMode.NONE;
+        // Remove any event listeners if needed
+    }
+
+    // EventTarget method delegation
+    addEventListener(type, listener, options) {
+        return this.eventTarget.addEventListener(type, listener, options);
+    }
+
+    removeEventListener(type, listener, options) {
+        return this.eventTarget.removeEventListener(type, listener, options);
+    }
+
+    dispatchEvent(event) {
+        return this.eventTarget.dispatchEvent(event);
+    }
+
     /**
      * Initializes the BadgeManager's state from the global AppState.
      * This should be called by the initialization manager after the state has been loaded.
      */
-    initialize() {
+    async initialize(dependencies = {}) {
         console.log(`[BadgeManager] Initializing - AppState:`, AppState);
         console.log(`[BadgeManager] AppState.badgeToggle:`, AppState?.badgeToggle);
         

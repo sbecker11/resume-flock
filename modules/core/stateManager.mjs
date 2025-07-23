@@ -1,5 +1,6 @@
 import { deepMerge } from '../utils/utils.mjs';
 import { BadgeMode } from './BadgeMode.mjs';
+import { BaseComponent } from './abstracts/BaseComponent.mjs';
 
 const STORAGE_KEY = 'flockOfPostcards_appState';
 
@@ -332,10 +333,58 @@ export async function saveState(state) {
 }
 
 /**
+ * StateManager component - handles application state with proper dependency management
+ */
+class StateManager extends BaseComponent {
+    constructor() {
+        super('StateManager');
+        this.appState = null;
+    }
+
+    getDependencies() {
+        return []; // No dependencies - StateManager is foundational
+    }
+
+    getPriority() {
+        return 'highest'; // Initialize first
+    }
+
+    async initialize() {
+        console.log('[StateManager] Initializing state management...');
+        this.appState = await this._loadState();
+        AppState = this.appState; // Set the global export
+        console.log('[StateManager] State initialized');
+    }
+
+    destroy() {
+        this.appState = null;
+        AppState = null;
+    }
+
+    // Public API
+    getState() {
+        return this.appState;
+    }
+
+    async saveState(state) {
+        return await saveState(state);
+    }
+
+    async _loadState() {
+        // Use the existing loadState function
+        return await loadState();
+    }
+}
+
+// Create singleton instance - this will auto-register with InitializationManager
+const stateManager = new StateManager();
+
+/**
  * A global state object to hold the current application state.
- * This will be populated by initializeState.
+ * This will be populated by StateManager initialization.
  */
 export let AppState = null;
+export { stateManager };
 
 let initStatePromise = null;
 

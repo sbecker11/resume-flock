@@ -117,19 +117,27 @@ import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mj
 
 
 import { initializeState, saveState } from '@/modules/core/stateManager.mjs';
-import { jobs as jobsData } from '@/static_content/jobs/jobs.mjs';
+// Remove direct jobs import - will use JobsDataManager
 import * as keyDown from '@/modules/core/keyDownModule.mjs';
-import * as sceneContainer from '@/modules/scene/sceneContainerModule.mjs';
+import { sceneContainer } from '@/modules/scene/sceneContainerModule.mjs';
 import * as viewPort from '@/modules/core/viewPortModule.mjs';
 import { cardsController } from '@/modules/scene/CardsController.mjs';
+import '@/modules/core/aimPoint.mjs';
+import '@/modules/core/bullsEye.mjs'; // Import to trigger BullsEye instance creation
+import * as resizeHandle from '@/modules/resize/resizeHandler.mjs';
 import { resumeListController } from '@/modules/resume/ResumeListController.mjs';
 import { initializationManager } from '@/modules/core/initializationManager.mjs';
+import { jobsDataManager } from '@/modules/core/jobsDataManager.mjs'; // Import to trigger registration
+import { colorPaletteManager } from '@/modules/core/colorPaletteManager.mjs'; // Import to trigger registration
+import { timelineManager } from '@/modules/core/timelineManager.mjs'; // Import to trigger registration
+import { vueDomManager } from '@/modules/core/vueDomManager.mjs'; // Import to trigger registration
 import * as scenePlane from '@/modules/scene/scenePlaneModule.mjs';
 import * as parallax from '@/modules/core/parallaxModule.mjs';
 import debugPanel from '@/modules/core/debugPanel.mjs';
 import * as autoScroll from '@/modules/animation/autoScrollModule.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { badgeManager } from '@/modules/core/badgeManager.mjs';
+import '@/modules/core/badgeManager.mjs'; // Import to trigger BadgeManager instance creation
 import { AppState } from '@/modules/core/stateManager.mjs';
 
 
@@ -158,6 +166,7 @@ export default {
   methods: {
     getComponentDependencies() {
       return [
+        'SceneContainer', // Ensure DOM is ready before using viewport
         'useColorPalette',
         'useViewport',
         'useBullsEye',
@@ -179,7 +188,16 @@ export default {
     },
 
     async initializeWithDependencies() {
-      // Initialize with dependencies
+      // SceneContainer dependency ensures DOM is ready, now safe to initialize viewport
+      console.log('[AppContent] DOM ready, initializing viewport...');
+      
+      // Get viewport instance from setup and initialize it now that DOM is ready
+      const viewport = this.getViewportInstance();
+      if (viewport) {
+        viewport.initialize();
+        console.log('[AppContent] Viewport initialized successfully');
+      }
+      
       onUnmounted(() => {
         this.cleanupDependencies();
       });
@@ -187,11 +205,78 @@ export default {
 
     cleanupDependencies() {
       // Event listeners are cleaned up in the setup() onUnmounted hook
+    },
+    
+    getViewportInstance() {
+      // Access viewport instance created in setup()
+      return this._viewportInstance;
     }
   },
 
   async setup() {
 
+    // Declare variables that will be used throughout the component
+    let debugInterval;
+    const viewportBorderTrigger = ref(0);
+    const badgeMode = ref('no-badges');
+
+    // Simple debug update function - DebugPanel component handles its own state now
+    const updateDebugValues = () => {
+      // DebugPanel is now a Vue component that manages its own debug values
+      // This function just triggers reactivity for viewport border updates
+    };
+
+    // Function to reinitialize scene components after layout changes
+    const reinitializeSceneComponents = async () => {
+      try {
+        // PHASE 1: Wait for DOM and CSS transitions to stabilize
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // PHASE 2: Force layout recalculation and viewport update (CRITICAL FIRST STEP)
+        const sceneContainerElement = document.getElementById('scene-container');
+        if (sceneContainerElement && viewPort.isInitialized()) {
+          // Force layout recalculation
+          void sceneContainerElement.offsetHeight;
+          
+          // Update viewport with new scene container position
+          viewPort.updateViewPort();
+          
+          // Critical wait for viewport changes to propagate
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+        // PHASE 3: Container scroll reset (before repositioning)
+        const sceneContent = document.getElementById('scene-content');
+        if (sceneContent) {
+          // Reset scroll to ensure correct positioning base
+          sceneContent.scrollTop = 0;
+          sceneContent.scrollLeft = 0;
+        }
+        
+        // PHASE 4: Trigger parallax recalculation
+        // Force parallax to recalculate by dispatching viewport changed event
+        window.dispatchEvent(new CustomEvent('viewport-changed', {
+          detail: { source: 'scene-reinitialization' }
+        }));
+        
+        // PHASE 5: Wait for parallax calculations to complete
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        // PHASE 6: Timeline realignment (CRITICAL for cDiv positioning)
+        // Timeline needs to be realigned after any container or viewport changes
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('timeline-realign-needed'));
+        }, 50);
+        
+        // PHASE 7: Card repositioning moved to component-managed system
+        
+        // PHASE 8: Final scene refresh
+        window.dispatchEvent(new CustomEvent('scene-refresh-needed'));
+        
+      } catch (error) {
+        console.error('Error during scene reinitialization:', error);
+      }
+    };
 
     // Register lifecycle hooks immediately (before any await statements)
     let handleSceneWidthChanged = null;
@@ -229,11 +314,28 @@ export default {
     const colorPalette = useColorPalette();
     
     // Register lifecycle hooks before any await statements
-    onMounted(async () => {
-      // Component mounted
+    onMounted(() => {
+      // Component mounted - DOM elements are ready immediately
+      console.log('[AppContent] Vue mounted - DOM elements ready, dispatching dom-ready event');
       
-      // Scene container initialization
+      // Debug: Check DOM elements exist before dispatching event
+      console.log('[AppContent] DOM Check - scene-container:', !!document.getElementById('scene-container'));
+      console.log('[AppContent] DOM Check - scene-plane:', !!document.getElementById('scene-plane'));
+      console.log('[AppContent] DOM Check - bulls-eye:', !!document.getElementById('bulls-eye'));
+      console.log('[AppContent] DOM Check - aim-point:', !!document.getElementById('aim-point'));
       
+      window.dispatchEvent(new CustomEvent('vue-dom-ready', { 
+        detail: { timestamp: Date.now() } 
+      }));
+      
+      console.log('[AppContent] vue-dom-ready event dispatched');
+      
+      // Start async initialization without blocking onMounted
+      initializeAsync();
+    });
+
+    // Separate async function to avoid lifecycle hook issues
+    const initializeAsync = async () => {
       try {
         // Starting component initialization
         
@@ -360,196 +462,54 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
           }
         }
         
-        // Register Timeline as the first component (no dependencies)
-        initializationManager.register(
-          'Timeline',
-          async () => {
-            initializeTimeline(jobsData);
-          },
-          [], // No dependencies
-          { priority: 'high' }
-        );
-
-        // Register StateManager as a component with no dependencies
-        initializationManager.register(
-          'StateManager',
-          initializeState, // The function to run
-          [], // No dependencies
-          { priority: 'highest' } // Ensure state is loaded first
-        );
-
-        // Register BadgeManager with its dependency on StateManager
-        initializationManager.register(
-          'BadgeManager',
-          () => badgeManager.initialize(), // The function to run
-          ['StateManager'], // Depends on StateManager
-          { priority: 'high' }
-        );
-
-        // Register LayoutToggle with its dependencies on StateManager
-        initializationManager.register(
-          'LayoutToggle',
-          () => {
-            layoutToggle = useLayoutToggle();
-            return layoutToggle;
-          },
-          ['StateManager'],
-          { priority: 'high' }
-        );
+        // Initialize Vue composables and systems that need to be ready before IM startup
         
-        // Register all controllers with their dependencies
-        cardsController.registerForInitialization();
-        resumeListController.registerForInitialization();
+        // LayoutToggle is a Vue composable, not a component - initialize directly  
+        layoutToggle = useLayoutToggle();
         
-        // Register DebugPanel with its dependencies
-        debugPanel.registerForInitialization(initializationManager);
+        // Viewport initialization moved to initializeWithDependencies() after DOM is ready
+        // await viewPort.initialize(); // Legacy viewPort still needs initialization
         
+        // Timeline is now managed by TimelineManager IM component - no manual initialization needed
         
-        // Register other components that depend on controllers
-        initializationManager.register(
-          'Viewport',
-          async () => {
-            initializationManager.waitForComponents(['CardsController', 'ResumeListController']);
-            viewport.initialize();
-            await viewPort.initialize();
-          },
-          ['CardsController', 'ResumeListController'],
-          { priority: 'medium' }
-        );
+        // Let InitializationManager handle all BaseComponent initialization
+        console.log('[AppContent] Starting application via InitializationManager...');
+        const initStatus = await initializationManager.startApplication();
+        console.log('[AppContent] Application initialization complete:', initStatus);
         
-        initializationManager.register(
-          'Layout',
-          async () => {
-            initializationManager.waitForComponents(['Viewport', 'LayoutToggle']);
-            resizeHandle.initializeResizeHandleState(viewport, bullsEye);
-            const { applyInitialLayout } = resizeHandle;
-            applyInitialLayout();
-          },
-          ['Viewport', 'LayoutToggle'],
-          { priority: 'medium' }
-        );
+        // Initialize coordination systems after BaseComponents are ready
+        resizeHandle.initializeResizeHandleState(viewport, bullsEye);
+        const { applyInitialLayout } = resizeHandle;
+        applyInitialLayout();
         
-        initializationManager.register(
-          'ReactiveSystems',
-          async () => {
-            initializationManager.waitForComponent('Viewport');
-            bullsEye.initialize();
-            aimPoint.initialize();
-            focalPoint.initialize();
-          },
-          ['Viewport'],
-          { priority: 'medium' }
-        );
+        // Initialize scene systems
+        autoScroll.initialize();
+        await scenePlane.initialize();
+        parallax.initialize(focalPoint);
         
-        initializationManager.register(
-          'SceneSystems',
-          async () => {
-            initializationManager.waitForComponents(['Viewport', 'Layout']);
-            await sceneContainer.initialize();
-            autoScroll.initialize();
-            await scenePlane.initialize();
-            parallax.initialize(focalPoint);
-          },
-          ['Viewport', 'Layout'],
-          { priority: 'low' }
-        );
+        // Initialize reactive composables that depend on IM components
+        bullsEye.initialize();
+        aimPoint.initialize();
+        focalPoint.initialize();
         
-        // Register SkillBadges component - needs CardsController and ColorPalette ready
-        initializationManager.register(
-          'SkillBadges',
-          async () => {
-            // Wait for both CardsController and color palette to be ready
-            initializationManager.waitForComponents(['CardsController']);
-            colorPalette.readyPromise;
-            
-            // Dispatch event to trigger SkillBadges initialization
-            window.dispatchEvent(new CustomEvent('skill-badges-init-ready'));
-          },
-          ['CardsController'],
-          { priority: 'low' }
-        );
+        // Dispatch events for Vue components that need to know IM components are ready
+        window.dispatchEvent(new CustomEvent('skill-badges-init-ready'));
+        window.dispatchEvent(new CustomEvent('connection-lines-init-ready'));
         
-        // Register ConnectionLines component - needs CardsController and SkillBadges
-        initializationManager.register(
-          'ConnectionLines',
-          async () => {
-            console.log('[INIT] Initializing ConnectionLines');
-            initializationManager.waitForComponents(['CardsController', 'SkillBadges']);
-            
-            // Dispatch event to trigger ConnectionLines initialization
-            window.dispatchEvent(new CustomEvent('connection-lines-init-ready'));
-          },
-          ['CardsController', 'SkillBadges'],
-          { priority: 'low' }
-        );
-        
-        // Wait for all components to be ready
-        initializationManager.waitForComponents([
-          'StateManager',
-          'BadgeManager',
-          'LayoutToggle',
-          'Timeline',
-          'CardsController', 
-          'ResumeItemsController', 
-          'ResumeListController',
-          'Viewport',
-          'Layout',
-          'ReactiveSystems',
-          'SceneSystems',
-          'SkillBadges',
-          'ConnectionLines'
-        ]);
+        // Manual initialization of coordination systems after BaseComponents are ready
+        // (These are not BaseComponents, just coordination logic)
         
         // All components initialized successfully
         
         // Scene container post-initialization check complete
         
-        // Check if we should scroll to lastVisitedJobNumber on page load
-        setTimeout(() => {
-          // If selectedJobNumber is null but lastVisitedJobNumber is valid, scroll to it
-          if (AppState.selectedJobNumber === null && AppState.lastVisitedJobNumber !== null && AppState.lastVisitedJobNumber !== undefined) {
-            console.log('[AppContent] Page load: scrolling to lastVisitedJobNumber:', AppState.lastVisitedJobNumber);
-            if (window.cardsController) {
-              window.cardsController.scrollToJobNumber(AppState.lastVisitedJobNumber);
-            }
-          }
-        }, 300);
+        // Auto-scroll functionality removed - now handled by DebugPanel or user interaction
         
         // Ensure scene components are properly initialized after initial load
-        setTimeout(() => {
-          reinitializeSceneComponents();
-        }, 200);
+        reinitializeSceneComponents();
         
-        // Expose controllers and modules for testing and inter-module communication
-        window.cardsController = cardsController;
-        window.resumeListController = resumeListController;
-        window.viewPortModule = viewPort;
-        
-        // Expose reactive composables for debug panel
-        window.bullsEye = bullsEye;
-        window.focalPoint = focalPoint;
-        window.aimPoint = aimPoint;
-        
-
-        // Set up debug interval after everything is initialized
-        debugInterval = setInterval(() => {
-          updateDebugValues();
-          // Also trigger viewport border update
-          viewportBorderTrigger.value++;
-        }, 100);
-        
-        // Also update debug values when viewport changes
-        window.addEventListener('viewport-changed', updateDebugValues);
-        
-        // Listen for badge mode changes to control debug panel visibility
-        handleBadgeModeChanged = (event) => {
-          badgeMode.value = event.detail.mode;
-          // Badge mode changed
-        };
-        badgeManager.addEventListener('badgeModeChanged', handleBadgeModeChanged);
-        
-        // Initialize badge mode with current state
-        badgeMode.value = badgeManager.getMode();
+        // Debug-related functionality moved to DebugPanel component
+        // No debug interval, window properties, or debug event listeners needed
         
         // Listen for badges-positioned events to update debug display with real bucket info
         window.addEventListener('badges-positioned', (event) => {
@@ -636,11 +596,12 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       } catch (error) {
         console.error("AppContent: Error in event-driven initialization:", error);
       }
-    });
-    
-    // Wait for everything to be ready before any initialization
-    
-    // Load color palettes
+    }; // End of initializeAsync function
+
+    // Call the async initialization
+    initializeAsync();
+
+    // Load color palettes at setup level
     await colorPalette.loadPalettes();
     
     await initializeState();
@@ -869,11 +830,9 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       'sp.job0View': 'N/A'   // Job 0 view coordinates relative to scene plane
     });
 
-    // Badge mode state for hiding debug panel when badges are disabled
-    const badgeMode = ref('no-badges');
+    // Badge mode state for hiding debug panel when badges are disabled (moved to top of setup)
 
-    // Force viewport border reactivity
-    const viewportBorderTrigger = ref(0);
+    // Force viewport border reactivity (moved to top of setup)
 
     // Debug panel position state - separate positions for each scene orientation
     const debugPanelPosition = ref({
@@ -1004,275 +963,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       debugValues.value['relatedBadgeList'] = [];
     };
 
-    // Function to update debug values using the debug panel component
-    const updateDebugValues = () => {
-      try {
-        // Check all required dependencies before proceeding
-        
-        // 1. Check if viewport is initialized
-        if (!viewPort || !viewPort.isInitialized()) {
-          setDebugValuesToStatus('VIEWPORT_NOT_READY');
-          return;
-        }
-        
-        // 2. Check if CardsController is ready and has cDivs
-        if (!window.cardsController || !window.cardsController.bizCardDivs || window.cardsController.bizCardDivs.length === 0) {
-          setDebugValuesToStatus('CARDS_NOT_READY');
-          return;
-        }
-        
-        // 3. Check if SelectionManager is ready
-        if (!selectionManager) {
-          setDebugValuesToStatus('SELECTION_NOT_READY');
-          return;
-        }
-        
-        // 4. Check if DebugPanel component is ready
-        if (!debugPanel.isReady()) {
-          setDebugValuesToStatus('DEBUG_PANEL_NOT_READY');
-          return;
-        }
-        
-        // All dependencies ready - proceed with normal update
-        if (debugPanel.isReady()) {
-          // Get all values from the debug panel
-          const values = debugPanel.getAllDebugValues();
-          
-          // Update the reactive debugValues with the panel values
-          Object.assign(debugValues.value, values);
-          
-          // Update job 0 scene rectangle (keep existing logic for this)
-          const cardElement = document.querySelector('[data-job-number="0"]');
-          if (cardElement) {
-            const sceneLeft = parseFloat(cardElement.getAttribute('data-sceneLeft') || '0');
-            const sceneTop = parseFloat(cardElement.getAttribute('data-sceneTop') || '0');
-            const sceneRight = parseFloat(cardElement.getAttribute('data-sceneRight') || '0');
-            const sceneBottom = parseFloat(cardElement.getAttribute('data-sceneBottom') || '0');
-            const sceneWidth = sceneRight - sceneLeft;
-            const sceneCenterX = sceneLeft + (sceneWidth / 2);
-            
-            debugValues.value['sp.job0'] = `T:${sceneTop.toFixed(0)} L:${sceneLeft.toFixed(0)} R:${sceneRight.toFixed(0)} B:${sceneBottom.toFixed(0)} Cx:${sceneCenterX.toFixed(0)}`;
-            
-            // View rectangle - check if job 0 is selected and show clone position
-            let targetElement = cardElement;
-            let displayLabel = 'viewJob0';
-            
-            // Check if job 0 is selected (has a clone)
-            if (cardElement.classList.contains('hasClone')) {
-              // Find the clone element (has "clone" in its id)
-              const cloneElement = document.querySelector(`[id*="clone"][data-job-number="0"]`);
-              if (cloneElement) {
-                targetElement = cloneElement;
-                displayLabel = 'viewJob0-clone';
-              }
-            }
-            
-            const sceneContainer = document.getElementById('scene-container');
-            if (sceneContainer) {
-              const sceneRect = sceneContainer.getBoundingClientRect();
-              const cardRect = targetElement.getBoundingClientRect();
-              
-              // Convert screen coordinates to scene-relative coordinates
-              const viewLeft = cardRect.left - sceneRect.left;
-              const viewTop = cardRect.top - sceneRect.top;
-              const viewWidth = cardRect.width;
-              const viewHeight = cardRect.height;
-              
-              const viewRight = viewLeft + viewWidth;
-              const viewBottom = viewTop + viewHeight;
-              const viewCenterX = viewLeft + (viewWidth / 2);
-              
-              debugValues.value['sp.job0View'] = `${displayLabel}: T:${viewTop.toFixed(0)} L:${viewLeft.toFixed(0)} R:${viewRight.toFixed(0)} B:${viewBottom.toFixed(0)} Cx:${viewCenterX.toFixed(0)}`;
-            } else {
-              debugValues.value['sp.job0'] = 'NoSC';
-              debugValues.value['sp.job0View'] = 'NoSC';
-            }
-          } else {
-            debugValues.value['sp.job0'] = 'NoJ0';
-            debugValues.value['sp.job0View'] = 'NoJ0';
-          }
-        } else {
-          // Debug panel not ready yet
-          debugValues.value['sp.job0'] = 'LOADING';
-          debugValues.value['sp.job0View'] = 'LOADING';
-        }
-        
-        // Update selected job and badge clustering info
-        try {
-          const selectedJobNumber = selectionManager.getSelectedJobNumber();
-          
-          if (selectedJobNumber !== null && selectedJobNumber !== undefined) {
-            debugValues.value['selectedJobNumber'] = selectedJobNumber;
-
-            const selectedCDivClone = document.getElementById(`biz-card-div-${selectedJobNumber}-clone`);
-            
-            if (selectedCDivClone) {
-              // Get clone position using data attributes (more reliable than parallax function) - using camelCase
-              const sceneTop = parseFloat(selectedCDivClone.getAttribute('data-sceneTop') || '0');
-              const sceneBottom = parseFloat(selectedCDivClone.getAttribute('data-sceneBottom') || '0');
-              
-              // Debug: log all available data attributes on the clone (disabled to prevent loop)
-              // console.log('[Debug] cDiv clone attributes for job', selectedJobNumber, ':', {
-              //   id: selectedCDivClone.id,
-              //   attributes: Array.from(selectedCDivClone.attributes).filter(attr => attr.name.startsWith('data-')).map(attr => ({ name: attr.name, value: attr.value }))
-              // });
-              
-              if (isNaN(sceneTop) || isNaN(sceneBottom) || sceneTop === sceneBottom) {
-                debugValues.value['cloneCenterY'] = `NO_SCENE_DATA (top=${sceneTop}, bottom=${sceneBottom})`;
-                return;
-              }
-              
-              const cloneCenterY = (sceneTop + sceneBottom) / 2;
-              
-              // Calculate clone's bucket number using BadgePositioner's exact calculation
-              const badgeHeight = 30; // Match BadgePositioner constructor default  
-              const badgeMargin = 10; // Match BadgePositioner constructor default
-              const bucketSpacing = badgeHeight + badgeMargin; // Should be 40px
-              
-              // Use the same bucket calculation as BadgePositioner: ci = floor((centerY-0)/40) 
-              const SCENE_START = 0; // Current buckets start at 0, not 50
-              const bucketIndex = Math.floor((cloneCenterY - SCENE_START) / bucketSpacing);
-              
-              debugValues.value['cloneCenterY'] = `cDiv.centerY:${cloneCenterY.toFixed(1)} at bucket:${bucketIndex}`;
-              
-              // Find selected badges (badges that match this job)
-              const allBadges = document.querySelectorAll('.skill-badge');
-              const selectedBadges = Array.from(allBadges).filter(badge => {
-                const jobNumbers = badge.getAttribute('data-job-numbers');
-                if (jobNumbers) {
-                  try {
-                    const jobNumbersArray = JSON.parse(jobNumbers);
-                    return jobNumbersArray.includes(selectedJobNumber);
-                  } catch (e) {
-                    return false;
-                  }
-                }
-                return false;
-              });
-              
-              // Create focused list for related badges only with ABOVE/LEVEL/BELOW categorization  
-              const cloneTop = sceneTop;
-              const cloneBottom = sceneBottom;
-              
-              // Check if we have real badge order data from BadgePositioner
-              const badgeOrderData = debugValues.value['badgeOrderData'];
-              
-              const relatedBadgeList = selectedBadges.map(badge => {
-                // Use scene coordinate from badge's positioned style.top, not viewport coordinates
-                const badgeTop = parseFloat(badge.style.top || '0');
-                const badgeHeight = 30; // Match BadgePositioner badge height
-                const centerY = badgeTop + (badgeHeight / 2);
-                
-                let category;
-                if (centerY < cloneTop) {
-                  category = 'ABOVE';
-                } else if (centerY > cloneBottom) {
-                  category = 'BELOW';
-                } else {
-                  category = 'LEVEL';
-                }
-                
-                // Try to get real bucket number from BadgePositioner data
-                let bucketNumber = 0;
-                if (badgeOrderData && Array.isArray(badgeOrderData)) {
-                  const badgeData = badgeOrderData.find(b => b.id === badge.id);
-                  if (badgeData && badgeData.bucketNumber !== undefined) {
-                    bucketNumber = badgeData.bucketNumber;
-                  } else {
-                    // Fallback: calculate from position (shouldn't happen with new system)
-                    const badgeSpacing = 40; // Badge height + margin
-                    bucketNumber = Math.round((centerY - cloneCenterY) / badgeSpacing);
-                  }
-                } else {
-                  // Fallback: calculate from position
-                  const badgeSpacing = 40; // Badge height + margin  
-                  bucketNumber = Math.round((centerY - cloneCenterY) / badgeSpacing);
-                }
-                
-                return {
-                  id: badge.id,
-                  y: centerY.toFixed(1),
-                  category: category,
-                  centerY: centerY,
-                  distanceToClone: Math.abs(centerY - cloneCenterY),
-                  bucketNumber: bucketNumber
-                };
-              });
-              
-              // Find the closest badge to clone center
-              const closestBadge = relatedBadgeList.length > 0 ? relatedBadgeList.reduce((closest, badge) => 
-                badge.distanceToClone < closest.distanceToClone ? badge : closest
-              ) : null;
-              
-              // Add bracket formatting with bucket numbers and skill names
-              relatedBadgeList.forEach(badge => {
-                // Get the skill name from the DOM element
-                const badgeElement = document.getElementById(badge.id);
-                const skillName = badgeElement ? badgeElement.textContent : 'unknown';
-                
-                if (closestBadge && badge.id === closestBadge.id) {
-                  // Double brackets for closest: [[35] skill text centerY:123.5
-                  badge.displayText = `[[${badge.bucketNumber}] ${skillName} centerY:${badge.centerY.toFixed(1)}`;
-                } else {
-                  // Single brackets for selected: [LEVEL 36] skill text centerY:123.5
-                  badge.displayText = `[${badge.category} ${badge.bucketNumber}] ${skillName} centerY:${badge.centerY.toFixed(1)}`;
-                }
-              });
-              
-              debugValues.value['relatedBadgeList'] = relatedBadgeList;
-              
-              // Calculate category summary
-              const aboveCount = relatedBadgeList.filter(b => b.category === 'ABOVE').length;
-              const levelCount = relatedBadgeList.filter(b => b.category === 'LEVEL').length;
-              const belowCount = relatedBadgeList.filter(b => b.category === 'BELOW').length;
-              debugValues.value['categorySummary'] = `ABOVE: ${aboveCount}  LEVEL: ${levelCount}  BELOW: ${belowCount}`;
-              
-              if (selectedBadges.length > 0) {
-                const badgeCenterYs = selectedBadges.map(badge => {
-                  const rect = badge.getBoundingClientRect();
-                  return rect.top + rect.height / 2;
-                });
-                const avgBadgeY = badgeCenterYs.reduce((sum, y) => sum + y, 0) / badgeCenterYs.length;
-                const offset = avgBadgeY - cloneCenterY; // Positive = below clone, Negative = above clone
-                const distance = Math.abs(offset);
-                
-                debugValues.value['badgeOffset'] = (offset >= 0 ? '+' : '') + offset.toFixed(1) + 'px';
-                debugValues.value['clusterDistance'] = distance.toFixed(1) + 'px';
-              } else {
-                debugValues.value['badgeOffset'] = 'N/A';
-                debugValues.value['clusterDistance'] = 'N/A';
-              }
-            } else {
-              debugValues.value['cloneCenterY'] = 'NO CLONE';
-              debugValues.value['categorySummary'] = 'NO CLONE';
-              debugValues.value['relatedBadgeList'] = [];
-            }
-          } else {
-            debugValues.value['selectedJobNumber'] = 'NONE';
-            debugValues.value['cloneCenterY'] = 'NONE';
-            debugValues.value['categorySummary'] = 'NONE';
-            debugValues.value['relatedBadgeList'] = [];
-          }
-        } catch (error) {
-          debugValues.value['selectedJobNumber'] = 'ERR';
-          debugValues.value['cloneCenterY'] = 'ERR';
-          debugValues.value['categorySummary'] = 'ERR';
-          debugValues.value['relatedBadgeList'] = [];
-        }
-      } catch (error) {
-        // Set error values for all debug fields
-        debugValues.value['sp.job0'] = 'ERR';
-        debugValues.value['sp.job0View'] = 'ERR';
-      }
-    };
-
-    // Update debug values reactively
-    watchEffect(() => {
-      updateDebugValues();
-    });
-
-    // Also update periodically - set up in onMounted callback within the main onMounted
-    let debugInterval;
+    // Duplicate updateDebugValues function removed - using the one declared at top of setup()
 
     const handleSceneContainerClick = (event) => {
       // Only clear selection if clicking directly on the scene container or its immediate children
@@ -1288,77 +979,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       }
     };
     
-    // Function to reinitialize scene components after layout changes
-    const reinitializeSceneComponents = async () => {
-      try {
-        // PHASE 1: Wait for DOM and CSS transitions to stabilize
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        // PHASE 2: Force layout recalculation and viewport update (CRITICAL FIRST STEP)
-        const sceneContainerElement = document.getElementById('scene-container');
-        if (sceneContainerElement && viewPort.isInitialized()) {
-          // Force layout recalculation
-          void sceneContainerElement.offsetHeight;
-          
-          // Update viewport with new scene container position
-          viewPort.updateViewPort();
-          
-          // Critical wait for viewport changes to propagate
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // PHASE 3: BullsEye recentering (depends on viewport)
-        if (bullsEye.isInitialized()) {
-          bullsEye.recenterBullsEye();
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // PHASE 4: AimPoint update (depends on BullsEye)
-        if (aimPoint) {
-          aimPoint.initialize();
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // PHASE 5: Focal Point animation (depends on AimPoint)
-        if (focalPoint.value) {
-          focalPoint.initialize();
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // PHASE 6: Scene container updates
-        if (sceneContainer.isInitialized && sceneContainer.isInitialized()) {
-          sceneContainer.updateSceneContainer();
-          await new Promise(resolve => setTimeout(resolve, 50));
-        }
-        
-        // PHASE 7: Timeline realignment (depends on layout orientation)
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('timeline-realign-needed'));
-        }, 50);
-        
-        // PHASE 8: Card repositioning (CRITICAL for layout changes)
-        if (window.cardsController && window.cardsController.originalJobsData) {
-          try {
-            // Force recalculation of all card positions
-            window.cardsController.bizCardDivs.forEach(card => {
-              const jobNumber = card.getAttribute('data-job-number');
-              const job = window.cardsController.originalJobsData.find(j => j.jobNumber === parseInt(jobNumber));
-              if (job) {
-                window.cardsController._setBizCardDivSceneGeometry(card, job);
-              }
-            });
-          } catch (error) {
-            console.error('[SCENE] Error repositioning cards:', error);
-          }
-        }
-        
-        // PHASE 9: Final scene refresh
-        window.dispatchEvent(new CustomEvent('scene-refresh-needed'));
-        
-      } catch (error) {
-        console.error('Error during scene reinitialization:', error);
-      }
-    };
+    // Duplicate function removed - using the one declared at top of setup()
     
     // Function to force scene update after layout changes are complete
     const forceSceneUpdate = async () => {

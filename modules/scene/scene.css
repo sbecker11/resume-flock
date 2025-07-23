@@ -36,9 +36,8 @@ html[native-dark-active] #scene-container,
     scroll-behavior: smooth;
     z-index: 2; /* Higher than gradients */
     isolation: isolate;
-    display: flex;
-    justify-content: center;
     padding-top: 50px; /* Add padding to align with timeline */
+    /* Note: No flexbox - SkillBadges and ConnectionLines use absolute positioning */
 }
 
 #scene-plane-top-gradient {

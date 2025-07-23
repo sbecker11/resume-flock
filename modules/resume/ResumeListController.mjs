@@ -10,8 +10,11 @@ import { selectionManager } from '../core/selectionManager.mjs';
 import { cardsController } from '../scene/CardsController.mjs';
 import { AppState, saveState } from '../core/stateManager.mjs';
 import { initializationManager } from '../core/initializationManager.mjs';
-import { jobs } from '../../static_content/jobs/jobs.mjs';
-import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
+// Removed direct jobs import - now using JobsDataManager dependency
+// Removed direct color palette import - now using ColorPaletteManager dependency
+// Import fundamental components to ensure they're registered with IM
+import '../core/jobsDataManager.mjs';
+import '../core/colorPaletteManager.mjs';
 import { badgeManager } from '../core/badgeManager.mjs';
 import * as BizDetailsDivModule from '../scene/bizDetailsDivModule.mjs';
 import * as utils from '../utils/utils.mjs';
@@ -48,7 +51,7 @@ class ResumeListController extends BaseComponent {
     this.originalJobsData = null;
     this.currentSortRule = null;
     this.sortedIndices = []; // Maps sorted position to original index
-    this._isInitialized = false;
+    // isInitialized is managed by BaseComponent automatically
     
     // Set up event listeners for badge mode and color palette changes
     this._setupBadgeModeListener();
@@ -68,7 +71,7 @@ class ResumeListController extends BaseComponent {
   }
 
   getDependencies() {
-    return ['CardsController'];
+    return ['CardsController', 'JobsDataManager', 'ColorPaletteManager'];
   }
 
   destroy() {
@@ -78,53 +81,44 @@ class ResumeListController extends BaseComponent {
     this.originalJobsData = null;
     this.currentSortRule = null;
     this.sortedIndices = [];
-    this._isInitialized = false;
+    // isInitialized is managed by BaseComponent automatically
   }
 
-  /**
-   * Register this controller with the initialization manager
-   * This allows other components to wait for ResumeListController to be ready
-   */
-  registerForInitialization() {
-    initializationManager.register(
-      'ResumeListController',
-      async () => {
-        // Wait for CardsController to be ready
-        await initializationManager.waitForComponents(['CardsController']);
-        
-        // Create resume divs directly (no longer using ResumeItemsController)
-        const bizResumeDivs = await this.createAllBizResumeDivs(cardsController.bizCardDivs);
-        
-        // Add resume divs to the DOM
-        const resumeContentDivElement = document.getElementById('resume-content-div');
-        if (resumeContentDivElement) {
-          bizResumeDivs.forEach(div => resumeContentDivElement.appendChild(div));
-        } else {
-          window.CONSOLE_LOG_IGNORE("ResumeListController: #resume-content-div not found!");
-        }
-        
-        // Initialize with the resume divs
-        this.initialize(jobs, bizResumeDivs);
-      },
-      ['CardsController'], // Only depends on CardsController now
-      { priority: 'medium' }
-    );
-  }
+  // registerForInitialization() method removed - BaseComponent handles registration automatically
 
-  initialize(originalJobsData, bizResumeDivs) {
-    // --- Dependency Checks ---
-    if (!cardsController.isInitialized) {
-        throw new Error("ResumeListController requires cardsController to be initialized.");
-    }
-    // --- End Dependency Checks ---
+  async initialize({ CardsController, JobsDataManager, ColorPaletteManager }) {
+    console.log('[ResumeListController] Initializing with dependencies:', {
+      CardsController: !!CardsController,
+      JobsDataManager: !!JobsDataManager,
+      ColorPaletteManager: !!ColorPaletteManager
+    });
+
+    // Store injected dependencies
+    this.cardsController = CardsController;
+    this.jobsDataManager = JobsDataManager;
+    this.colorPaletteManager = ColorPaletteManager;
 
     this.resumeContentDiv = document.getElementById('resume-content-div');
     if ( !this.resumeContentDiv ) throw new Error('ResumeListController: initialize: resume-content-div not found in DOM');
     this.resumeContentWrapper = document.getElementById('resume-content-div-wrapper');
     if ( !this.resumeContentWrapper ) throw new Error('ResumeListController: initialize: resume-content-div-wrapper not found in DOM');
 
-    this.originalJobsData = originalJobsData;
-    this.bizResumeDivs = bizResumeDivs;
+    // Get jobs data from JobsDataManager
+    this.originalJobsData = this.jobsDataManager.getAllJobs();
+    
+    // Create resume divs using CardsController's bizCardDivs
+    this.bizResumeDivs = await this.createAllBizResumeDivs(this.cardsController.bizCardDivs);
+    
+    // Add resume divs to the DOM
+    if (this.resumeContentDiv) {
+      this.bizResumeDivs.forEach((div, index) => {
+        if (div instanceof Node) {
+          this.resumeContentDiv.appendChild(div);
+        } else {
+          console.error(`[ResumeListController] Resume div ${index} is not a Node:`, div);
+        }
+      });
+    }
     
     // Listen for selection changes to save state and manage visual state
     selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged.bind(this));
@@ -171,7 +165,7 @@ class ResumeListController extends BaseComponent {
       }
     }, 1000); // Increased delay to ensure infinite scroller is fully ready
 
-    this._isInitialized = true;
+    // isInitialized is managed by BaseComponent automatically
     window.CONSOLE_LOG_IGNORE("ResumeListController initialized successfully");
     
     // Notify CardsController that ResumeListController is ready
@@ -202,9 +196,7 @@ class ResumeListController extends BaseComponent {
     }
   }
 
-  isInitialized() {
-    return this._isInitialized;
-  }
+  // isInitialized() method removed - use this.isInitialized property from BaseComponent
 
   // region Event Handlers from SelectionManager
       handleSelectionChanged(event) {
@@ -951,6 +943,19 @@ class ResumeListController extends BaseComponent {
   }
 
   updateSortedIndices() {
+    // Safety check - ensure originalJobsData is initialized and is an array
+    if (!this.originalJobsData) {
+      console.error('[ResumeListController] updateSortedIndices called before originalJobsData is set');
+      console.trace('[ResumeListController] Stack trace for updateSortedIndices call:');
+      return;
+    }
+    
+    if (!Array.isArray(this.originalJobsData)) {
+      console.error('[ResumeListController] originalJobsData is not an array:', typeof this.originalJobsData, this.originalJobsData);
+      console.trace('[ResumeListController] Stack trace for non-array originalJobsData:');
+      return;
+    }
+    
     // Create array of indices with their corresponding job data
     const indexedJobs = this.originalJobsData.map((job, index) => ({
       index,
@@ -1411,10 +1416,14 @@ class ResumeListController extends BaseComponent {
       bizResumeDiv.style.pointerEvents = 'auto';
       
       const bizResumeDetailsDiv = BizDetailsDivModule.createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv);
-      bizResumeDiv.appendChild(bizResumeDetailsDiv);
+      if (bizResumeDetailsDiv instanceof Node) {
+        bizResumeDiv.appendChild(bizResumeDetailsDiv);
+      } else {
+        console.error(`[ResumeListController] bizResumeDetailsDiv for job ${jobNumber} is not a Node:`, bizResumeDetailsDiv);
+      }
       
-      // Apply the current color palette
-      await applyPaletteToElement(bizResumeDiv);
+      // Apply the current color palette via ColorPaletteManager
+      this.colorPaletteManager.applyPaletteToElement(bizResumeDiv);
       
       // Set up mouse listeners for the resume div
       this._setupMouseListeners(bizResumeDiv);
@@ -1516,9 +1525,9 @@ class ResumeListController extends BaseComponent {
       this.bizResumeDivs.forEach(div => {
         if (div) {
           // Apply palette to the div itself and all elements with data-color-index within it
-          applyPaletteToElement(div);
+          this.colorPaletteManager.applyPaletteToElement(div);
           const colorElements = div.querySelectorAll('[data-color-index]');
-          colorElements.forEach(applyPaletteToElement);
+          colorElements.forEach(element => this.colorPaletteManager.applyPaletteToElement(element));
         }
       });
     }

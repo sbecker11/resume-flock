@@ -1,8 +1,12 @@
 import { AppState, saveState } from './stateManager.mjs';
+import { BaseComponent } from './abstracts/BaseComponent.mjs';
 
-class SelectionManager extends EventTarget {
+class SelectionManager extends BaseComponent {
     constructor() {
-        super();
+        super('SelectionManager');
+        
+        // Add EventTarget functionality since BaseComponent doesn't provide it
+        this.eventTarget = new EventTarget();
         this.selectedJobNumber = null;
         this.hoveredJobNumber = null;
         
@@ -12,6 +16,37 @@ class SelectionManager extends EventTarget {
             topMargin: 50, // Default margin from top of viewport
             tolerance: 20  // Pixel tolerance for "already positioned" checks
         };
+    }
+
+    getPriority() {
+        return 'high'; // Initialize early
+    }
+
+    getDependencies() {
+        return []; // SelectionManager is a fundamental component with no IM dependencies
+    }
+
+    async initialize(dependencies = {}) {
+        console.log('[SelectionManager] Initialized');
+        // SelectionManager is ready - no special initialization needed
+    }
+
+    destroy() {
+        this.selectedJobNumber = null;
+        this.hoveredJobNumber = null;
+    }
+
+    // EventTarget method delegation
+    addEventListener(type, listener, options) {
+        return this.eventTarget.addEventListener(type, listener, options);
+    }
+
+    removeEventListener(type, listener, options) {
+        return this.eventTarget.removeEventListener(type, listener, options);
+    }
+
+    dispatchEvent(event) {
+        return this.eventTarget.dispatchEvent(event);
     }
 
     selectJobNumber(jobNumber, caller = '') {

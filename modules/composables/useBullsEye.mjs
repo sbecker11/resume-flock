@@ -132,28 +132,19 @@ export function useBullsEye() {
   function updateToSceneCenter() {
     window.CONSOLE_LOG_IGNORE('BullsEye: updateToSceneCenter called, mode:', _mode);
     
+    // Don't try to access InitializationManager until we're ready
+    if (!isComponentReady) {
+      console.log('BullsEye: Not ready yet, skipping updateToSceneCenter');
+      return;
+    }
+    
     if (_mode === MODES.LOCKED) {
-      const sceneContainer = document.getElementById('scene-container');
-      if (!sceneContainer) {
-        console.warn('BullsEye: Scene container not found - DOM may not be ready yet');
-        return; // Don't throw error, just return early
-      }
-      
-      const sceneRect = sceneContainer.getBoundingClientRect();
-      const centerX = sceneRect.left + sceneRect.width / 2;
-      const centerY = sceneRect.top + sceneRect.height / 2;
-      
-      window.CONSOLE_LOG_IGNORE('BullsEye: Scene container center calculated:', { 
-        centerX, 
-        centerY, 
-        sceneRect: { left: sceneRect.left, width: sceneRect.width } 
-      });
-      
-      // Use immediate update - no need to worry about layout transitions
-      try {
-        immediateBullsEyeUpdate(centerX, centerY, 'scene-container-center');
-      } catch (error) {
-        console.warn('BullsEye: Could not update position, bullsEye element may not be ready:', error);
+      // The bullsEye module handles its own SceneContainer dependency through IM
+      // Just call recenter - it will handle the dependency internally
+      if (bullsEyeModule.isInitialized()) {
+        bullsEyeModule.recenter();
+        // Update our reactive state to match
+        updateBullsEyePosition();
       }
     } else {
       window.CONSOLE_LOG_IGNORE('BullsEye: Not in locked mode, skipping update');
@@ -163,9 +154,28 @@ export function useBullsEye() {
   // Watch for layout changes and update bullsEye position reactively
   const layoutToggle = useLayoutToggle();
   let isComponentActive = true;
+  let isComponentReady = false;
+  
+  // Wait for Vue to mount and the IM-managed BullsEye component to be ready
+  onMounted(() => {
+    // The bullsEyeModule has its own IM dependency management
+    // Just wait for it to be initialized through normal IM flow
+    const checkBullsEyeReady = () => {
+      if (bullsEyeModule.isInitialized()) {
+        isComponentReady = true;
+        console.log('[BullsEye] Composable is now ready - BullsEye component initialized');
+        updateToSceneCenter();
+      } else {
+        // Check again in a short while
+        setTimeout(checkBullsEyeReady, 50);
+      }
+    };
+    
+    checkBullsEyeReady();
+  });
   
   watchEffect(() => {
-    if (!isComponentActive) return;
+    if (!isComponentActive || !isComponentReady) return;
     
     const orientation = layoutToggle.orientation.value;
     window.CONSOLE_LOG_IGNORE('BullsEye: Layout orientation changed to:', orientation);
@@ -184,7 +194,7 @@ export function useBullsEye() {
 
   // Listen for window resize events
   const handleResize = () => {
-    if (!isComponentActive) return;
+    if (!isComponentActive || !isComponentReady) return;
     window.CONSOLE_LOG_IGNORE('BullsEye: Window resize event received');
     try {
       updateToSceneCenter();
@@ -198,7 +208,7 @@ export function useBullsEye() {
   // Listen for scene container resize events using ResizeObserver
   let sceneContainerObserver = null;
   const handleSceneContainerResize = () => {
-    if (!isComponentActive) return;
+    if (!isComponentActive || !isComponentReady) return;
     window.CONSOLE_LOG_IGNORE('BullsEye: Scene container resize detected');
     try {
       updateToSceneCenter();
@@ -209,11 +219,18 @@ export function useBullsEye() {
   
   // Set up ResizeObserver for scene container
   const setupSceneContainerObserver = () => {
-    const sceneContainer = document.getElementById('scene-container');
-    if (sceneContainer && window.ResizeObserver) {
-      sceneContainerObserver = new ResizeObserver(handleSceneContainerResize);
-      sceneContainerObserver.observe(sceneContainer);
-      window.CONSOLE_LOG_IGNORE('BullsEye: Scene container observer established');
+    // Let the bullsEye module handle its own scene container access
+    // The composable shouldn't directly access DOM elements
+    if (bullsEyeModule.isInitialized()) {
+      const sceneContainer = document.getElementById('scene-container');
+      if (sceneContainer && window.ResizeObserver) {
+        sceneContainerObserver = new ResizeObserver(handleSceneContainerResize);
+        sceneContainerObserver.observe(sceneContainer);
+        window.CONSOLE_LOG_IGNORE('BullsEye: Scene container observer established');
+      }
+    } else {
+      // Try again later if bullsEye module not ready
+      setTimeout(setupSceneContainerObserver, 100);
     }
   };
   
@@ -364,19 +381,26 @@ export function useBullsEye() {
     setMode(modes[nextIndex]);
   }
 
-  function initialize() {
+  async function initialize() {
     window.CONSOLE_LOG_IGNORE('bullsEye.initialize() called');
     
-    // Initialize the centralized bullsEye module
-    bullsEyeModule.initialize();
+    // The centralized bullsEye module initializes automatically via IM
+    // Just wait for it to be ready
+    const checkBullsEyeReady = () => {
+      if (bullsEyeModule.isInitialized()) {
+        // Set up mouse move listener
+        window.addEventListener('mousemove', handleMouseMove);
+        window.CONSOLE_LOG_IGNORE("bullsEye composable initialized successfully");
+        
+        // Initial position update - center at scene container
+        updateToSceneCenter();
+      } else {
+        // Check again if module not ready yet
+        setTimeout(checkBullsEyeReady, 50);
+      }
+    };
     
-    // Set up mouse move listener
-    window.addEventListener('mousemove', handleMouseMove);
-    
-    window.CONSOLE_LOG_IGNORE("bullsEye initialized successfully");
-    
-    // Initial position update - center at scene container
-    updateToSceneCenter();
+    checkBullsEyeReady();
   }
 
   function isInitialized() {
@@ -416,7 +440,7 @@ export function useBullsEye() {
       clearTimeout(_updateTimeout);
       _updateTimeout = null;
     }
-    bullsEyeModule.cleanup();
+    // Note: bullsEyeModule doesn't have a cleanup function - it's managed by IM
   }
 
   return {
