@@ -47,7 +47,6 @@
 
 <script>
 import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
-import { initializationManager } from '@/modules/core/initializationManager.mjs';
 import { watchEffect, ref, computed } from 'vue';
 
 export default {
@@ -96,19 +95,17 @@ export default {
       return ['TimelineManager'];
     },
     
-    async initializeWithDependencies() {
-      console.log('[Timeline] initializing with dependencies');
+    async initialize(dependencies) {
+      console.log('[Timeline] initializing with dependencies:', Object.keys(dependencies));
       
-      // Get dependencies from service locator
-      this.timelineManager = initializationManager.getComponent('TimelineManager');
-      this.timelineState = this.timelineManager ? this.timelineManager.getTimelineState() : null;
+      // Dependencies are guaranteed to be available - no null checks needed!
+      this.timelineManager = dependencies.TimelineManager;
+      this.timelineState = this.timelineManager.getTimelineState();
       
-      // Use TimelineManager data or fallback to defaults
-      if (this.timelineState) {
-        this.timelineHeight = this.timelineState.timelineHeight;
-        this.startYear = this.timelineState.startYear;
-        this.endYear = this.timelineState.endYear;
-      }
+      // Use TimelineManager data
+      this.timelineHeight = this.timelineState.timelineHeight;
+      this.startYear = this.timelineState.startYear;
+      this.endYear = this.timelineState.endYear;
       
       console.log('[Timeline] Initialized with TimelineManager');
     },

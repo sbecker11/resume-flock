@@ -68,12 +68,17 @@ class AimPoint extends BaseComponent {
         return this._aimPointElement;
     }
 
-    getAimPoint() {
+    getAimPointPosition() {
         if (!this._aimPointElement) return { x: 0, y: 0 };
         return {
             x: parseFloat(this._aimPointElement.style.left || 0), 
             y: parseFloat(this._aimPointElement.style.top || 0) 
         };
+    }
+
+    // Backward compatibility
+    getAimPoint() {
+        return this.getAimPointPosition();
     }
 
     setAimPoint(position, caller = '') {
@@ -158,6 +163,11 @@ export function setAimPoint(position, caller = '') {
     return aimPoint.setAimPoint(position, caller);
 }
 
+export function getAimPointPosition() {
+    return aimPoint.getAimPointPosition();
+}
+
+// Backward compatibility
 export function getAimPoint() {
     return aimPoint.getAimPoint();
 }

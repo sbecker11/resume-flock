@@ -166,30 +166,13 @@ export default {
   methods: {
     getComponentDependencies() {
       return [
-        'SceneContainer', // Ensure DOM is ready before using viewport
-        'useColorPalette',
-        'useViewport',
-        'useBullsEye',
-        'useAimPoint',
-        'useFocalPoint',
-        'useResizeHandle',
-        'useLayoutToggle',
-        'useTimeline',
-        'useStateManager',
-        'useBadgeManager',
-        'useCardsController',
-        'useResumeListController',
-        'useSceneContainer',
-        'useScenePlane',
-        'useSceneViewer',
-        'useResumeViewer',
-        'useViewport',
+        'SceneContainer', // Ensure DOM is ready before using viewport and composables
       ];
     },
 
-    async initializeWithDependencies() {
+    async initialize(dependencies) {
       // SceneContainer dependency ensures DOM is ready, now safe to initialize viewport
-      console.log('[AppContent] DOM ready, initializing viewport...');
+      console.log('[AppContent] DOM ready, initializing viewport with dependencies:', Object.keys(dependencies));
       
       // Get viewport instance from setup and initialize it now that DOM is ready
       const viewport = this.getViewportInstance();
@@ -208,8 +191,8 @@ export default {
     },
     
     getViewportInstance() {
-      // Access viewport instance created in setup()
-      return this._viewportInstance;
+      // Access viewport instance returned from setup()
+      return this.viewport;
     }
   },
 
@@ -234,7 +217,7 @@ export default {
         
         // PHASE 2: Force layout recalculation and viewport update (CRITICAL FIRST STEP)
         const sceneContainerElement = document.getElementById('scene-container');
-        if (sceneContainerElement && viewPort.isInitialized()) {
+        if (sceneContainerElement && viewPort) {
           // Force layout recalculation
           void sceneContainerElement.offsetHeight;
           
@@ -467,7 +450,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         // LayoutToggle is a Vue composable, not a component - initialize directly  
         layoutToggle = useLayoutToggle();
         
-        // Viewport initialization moved to initializeWithDependencies() after DOM is ready
+        // Viewport initialization moved to initialize() after DOM is ready
         // await viewPort.initialize(); // Legacy viewPort still needs initialization
         
         // Timeline is now managed by TimelineManager IM component - no manual initialization needed
@@ -581,7 +564,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         // Add handler for scene refresh events
         window.addEventListener('scene-refresh-needed', (event) => {
           // Trigger viewport update to ensure everything is properly positioned
-          if (viewPort && viewPort.isInitialized()) {
+          if (viewPort) {
             viewPort.updateViewPort();
           }
         });
@@ -637,7 +620,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       // Force reactivity by accessing the trigger
       viewportBorderTrigger.value;
       
-      if (!viewPort || !viewPort.isInitialized()) {
+      if (!viewPort) {
         return { display: 'none' };
       }
 
@@ -987,13 +970,13 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         // Force scene update started
         
         // Force viewport recalculation
-        if (viewPort && viewPort.isInitialized()) {
+        if (viewPort) {
           viewPort.updateViewPort();
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         
         // Force bullsEye recentering with viewport awareness
-        if (bullsEye && bullsEye.isInitialized()) {
+        if (bullsEye) {
           bullsEye.recenterBullsEye();
           await new Promise(resolve => setTimeout(resolve, 100));
           

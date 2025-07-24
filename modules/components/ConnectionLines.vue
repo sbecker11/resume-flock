@@ -64,10 +64,11 @@ export default {
   mixins: [BaseVueComponentMixin],
   methods: {
     getComponentDependencies() {
-      return ['badgeManager', 'eventBus'];
+      return ['BadgeManager'];
     },
-    async initializeWithDependencies() {
-      console.log('ConnectionLines: Initialized with dependencies');
+    async initialize(dependencies) {
+      console.log('ConnectionLines: Initialized with dependencies:', Object.keys(dependencies));
+      this.badgeManager = dependencies.BadgeManager;
     },
     cleanupDependencies() {
       console.log('ConnectionLines: Cleaning up dependencies');

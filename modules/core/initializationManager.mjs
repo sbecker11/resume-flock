@@ -393,6 +393,19 @@ class InitializationManager {
     
     console.log(`[INIT] canInitialize(${componentName}) - dependencies: [${Array.from(component.dependencies).join(', ')}]`);
     
+    // Early validation: check if all declared dependencies are registered
+    const undefinedDependencies = [];
+    for (const depName of component.dependencies) {
+      if (!this.components.has(depName)) {
+        undefinedDependencies.push(depName);
+      }
+    }
+    
+    if (undefinedDependencies.length > 0) {
+      console.error(`[INIT] ${componentName} has undefined dependencies: [${undefinedDependencies.join(', ')}]. Available components: [${Array.from(this.components.keys()).join(', ')}]`);
+      return false;
+    }
+    
     // Wait for all dependency Promises to resolve
     const dependencyPromises = Array.from(component.dependencies).map(depName => {
       const depPromise = this.initializationPromises.get(depName);
@@ -479,19 +492,49 @@ class InitializationManager {
     }
 
     const dependenciesMap = {};
+    const missingDependencies = [];
+    const unreadyDependencies = [];
     
+    // Validate all dependencies before building the map
     for (const dependencyName of component.dependencies) {
+      // Check if dependency was ever registered
+      if (!this.components.has(dependencyName)) {
+        missingDependencies.push(dependencyName);
+        continue;
+      }
+      
       const dependencyInstance = this.componentRegistry.get(dependencyName);
       
       if (!dependencyInstance) {
-        throw new Error(`[INIT] Dependency '${dependencyName}' for component '${componentName}' not found in registry`);
+        missingDependencies.push(`${dependencyName} (not in registry)`);
+        continue;
       }
       
       if (!this.readyComponents.has(dependencyName)) {
-        throw new Error(`[INIT] Dependency '${dependencyName}' for component '${componentName}' not ready yet`);
+        const depComponent = this.components.get(dependencyName);
+        unreadyDependencies.push(`${dependencyName} (status: ${depComponent?.status || 'unknown'})`);
+        continue;
       }
       
       dependenciesMap[dependencyName] = dependencyInstance;
+    }
+    
+    // Report all validation errors at once
+    if (missingDependencies.length > 0 || unreadyDependencies.length > 0) {
+      let errorMsg = `[INIT] Cannot initialize '${componentName}' - dependency validation failed:\n`;
+      
+      if (missingDependencies.length > 0) {
+        errorMsg += `  Missing dependencies: [${missingDependencies.join(', ')}]\n`;
+      }
+      
+      if (unreadyDependencies.length > 0) {
+        errorMsg += `  Unready dependencies: [${unreadyDependencies.join(', ')}]\n`;
+      }
+      
+      const availableComponents = Array.from(this.componentRegistry.keys());
+      errorMsg += `  Available components: [${availableComponents.join(', ')}]`;
+      
+      throw new Error(errorMsg);
     }
     
     console.log(`[INIT] Built dependencies map for ${componentName}:`, Object.keys(dependenciesMap));

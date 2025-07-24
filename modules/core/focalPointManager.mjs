@@ -1,7 +1,5 @@
 import { BaseComponent } from './abstracts/BaseComponent.mjs';
 import * as mathUtils from '../utils/mathUtils.mjs';
-import * as viewPort from './viewPortModule.mjs';
-import * as bullsEyeModule from './bullsEye.mjs';
 
 // --- Constants ---
 const EASE_FACTOR = 0.05;
@@ -30,23 +28,35 @@ class FocalPointManager extends BaseComponent {
     // --- Private Methods ---
 
     updateBullsEyePosition() {
-        // Use the centralized bullsEye module to handle positioning
-        if (bullsEyeModule.isInitialized()) {
-            bullsEyeModule.recenterBullsEye();
-            const position = bullsEyeModule.getBullsEye();
-            this.bullsEyePosition.x = position.x;
-            this.bullsEyePosition.y = position.y;
+        // Dependencies are guaranteed to be available by IM - no isInitialized checks needed
+        if (this.bullsEye) {
+            this.bullsEye.recenter(); // Correct method name is recenter(), not recenterBullsEye()
+            const bullsEyeElement = this.bullsEye.getBullsEyeElement();
+            if (bullsEyeElement) {
+                const rect = bullsEyeElement.getBoundingClientRect();
+                this.bullsEyePosition.x = rect.left + rect.width / 2;
+                this.bullsEyePosition.y = rect.top + rect.height / 2;
+            } else {
+                // Fallback to viewport center
+                this.bullsEyePosition.x = window.innerWidth / 2;
+                this.bullsEyePosition.y = window.innerHeight / 2;
+            }
         } else {
-            // Fallback to viewport center
+            // Fallback to viewport center (should not happen with proper IM usage)
             this.bullsEyePosition.x = window.innerWidth / 2;
             this.bullsEyePosition.y = window.innerHeight / 2;
         }
         
-        // Also recenter the aimPoint element directly to bullsEye position
-        const aimPointElement = document.getElementById('aim-point');
-        if (aimPointElement) {
-            aimPointElement.style.left = `${this.bullsEyePosition.x}px`;
-            aimPointElement.style.top = `${this.bullsEyePosition.y}px`;
+        // Use dependency injection to access aimPoint
+        if (this.aimPoint && this.aimPoint.updatePosition) {
+            this.aimPoint.updatePosition(this.bullsEyePosition.x, this.bullsEyePosition.y);
+        } else {
+            // Fallback to direct DOM manipulation
+            const aimPointElement = document.getElementById('aim-point');
+            if (aimPointElement) {
+                aimPointElement.style.left = `${this.bullsEyePosition.x}px`;
+                aimPointElement.style.top = `${this.bullsEyePosition.y}px`;
+            }
         }
     }
 
@@ -133,12 +143,16 @@ class FocalPointManager extends BaseComponent {
     // --- Public API ---
 
     getDependencies() {
-        return []; // FocalPointManager is a fundamental component with no IM dependencies
+        return ['BullsEye', 'AimPoint']; // FocalPointManager needs BullsEye and AimPoint for positioning
     }
 
     async initialize(dependencies = {}) {
         // BaseComponent manages isInitialized automatically
         window.CONSOLE_LOG_IGNORE("FocalPointManager: Starting initialization");
+        
+        // Store dependencies for reactive access
+        this.bullsEye = dependencies.BullsEye;
+        this.aimPoint = dependencies.AimPoint;
         
         // Set up event listeners with bound methods
         this.boundHandleMouseMove = this.handleMouseMove.bind(this);
@@ -185,10 +199,8 @@ class FocalPointManager extends BaseComponent {
             }
         });
 
-        // Initialize bullsEye module if not already initialized
-        if (!bullsEyeModule.isInitialized()) {
-            bullsEyeModule.initialize();
-        }
+        // BullsEye is guaranteed to be initialized via dependency injection
+        // No manual initialization needed
         
         // Initialize to locked state at center
         this.updateBullsEyePosition();
@@ -222,15 +234,19 @@ class FocalPointManager extends BaseComponent {
             window.removeEventListener('focalModeChange', this.boundHandleFocalModeChange);
         }
         
-        // Clean up bullsEye module
-        bullsEyeModule.cleanup();
+        // BullsEye cleanup is handled by IM framework - no manual cleanup needed
         
         // BaseComponent handles isInitialized automatically
     }
 
-    getPosition() {
-        window.CONSOLE_LOG_IGNORE('getPosition called, returning:', this.focalPoint.current);
+    getFocalPointPosition() {
+        window.CONSOLE_LOG_IGNORE('getFocalPointPosition called, returning:', this.focalPoint.current);
         return this.focalPoint.current;
+    }
+
+    // Backward compatibility
+    getPosition() {
+        return this.getFocalPointPosition();
     }
 
     getMode() {
@@ -276,6 +292,11 @@ export function isInitialized() {
     return focalPointManager.isInitialized;
 }
 
+export function getFocalPointPosition() {
+    return focalPointManager.getFocalPointPosition();
+}
+
+// Backward compatibility
 export function getPosition() {
     return focalPointManager.getPosition();
 }

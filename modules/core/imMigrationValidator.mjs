@@ -29,7 +29,8 @@ export class IMMigrationValidator extends ComponentScanner {
                 missingInitializeSignature: [],
                 notExtendingBaseComponent: [],
                 notRegisteredWithIM: [],
-                missingDependencyDeclaration: []
+                missingDependencyDeclaration: [],
+                usingDeprecatedInitializeWithDependencies: []
             },
             complianceStats: {
                 fullyMigrated: 0,
@@ -115,6 +116,7 @@ export class IMMigrationValidator extends ComponentScanner {
                 declaresDependencies: false,
                 usesServiceLocator: false,
                 usesDependencyInjection: false,
+                usesDeprecatedInitializeWithDependencies: false,
                 migrationLevel: 'not-migrated' // 'fully-migrated', 'partially-migrated', 'not-migrated'
             },
             violations: [],
@@ -143,11 +145,14 @@ export class IMMigrationValidator extends ComponentScanner {
         // Check for dependency injection usage
         analysis.imCompliance.usesDependencyInjection = this._checkDependencyInjectionUsage(content);
 
+        // Check for deprecated initializeWithDependencies method
+        analysis.imCompliance.usesDeprecatedInitializeWithDependencies = this._checkDeprecatedInitializeWithDependencies(content);
+
         // Determine migration level
         analysis.imCompliance.migrationLevel = this._determineMigrationLevel(analysis.imCompliance);
 
         // Generate violations and recommendations
-        this._generateIMViolations(analysis);
+        this._generateIMViolations(analysis, content);
 
         return analysis;
     }
@@ -233,6 +238,20 @@ export class IMMigrationValidator extends ComponentScanner {
     }
 
     /**
+     * Check for deprecated initializeWithDependencies method
+     */
+    _checkDeprecatedInitializeWithDependencies(content) {
+        const deprecatedPatterns = [
+            /async\s+initializeWithDependencies\s*\(/,  // async initializeWithDependencies()
+            /initializeWithDependencies\s*\(/,          // initializeWithDependencies()
+            /initializeWithDependencies\s*:\s*async/,   // Vue component methods: { initializeWithDependencies: async
+            /initializeWithDependencies\s*\(\s*\)\s*\{/ // initializeWithDependencies() { ... }
+        ];
+        
+        return deprecatedPatterns.some(pattern => pattern.test(content));
+    }
+
+    /**
      * Determine migration level based on compliance checks
      */
     _determineMigrationLevel(compliance) {
@@ -263,7 +282,7 @@ export class IMMigrationValidator extends ComponentScanner {
     /**
      * Generate violations and recommendations for component
      */
-    _generateIMViolations(analysis) {
+    _generateIMViolations(analysis, content) {
         const { imCompliance } = analysis;
         
         if (!imCompliance.extendsBaseComponent) {
@@ -295,6 +314,17 @@ export class IMMigrationValidator extends ComponentScanner {
             analysis.violations.push('Component declares dependencies but does not use dependency injection');
             analysis.recommendations.push('Access dependencies via parameter: this.manager = dependencies.ManagerName');
         }
+
+        if (imCompliance.usesDeprecatedInitializeWithDependencies) {
+            analysis.violations.push('Component uses deprecated initializeWithDependencies() method');
+            analysis.recommendations.push('Replace initializeWithDependencies() with initialize(dependencies) method for reactive dependency injection');
+        }
+
+        // Check for manual dependency.isInitialized checks (anti-pattern)
+        if (/\w+\.isInitialized\(\)|\.isInitialized\s*&&|\.isInitialized\s*\?/.test(content)) {
+            analysis.violations.push('Component manually checks dependency.isInitialized - IM framework guarantees dependencies are ready');
+            analysis.recommendations.push('Remove dependency.isInitialized checks - IM ensures dependencies are initialized before calling initialize(dependencies)');
+        }
     }
 
     /**
@@ -325,6 +355,10 @@ export class IMMigrationValidator extends ComponentScanner {
 
         if (!imCompliance.declaresDependencies) {
             issues.missingDependencyDeclaration.push(analysis);
+        }
+
+        if (imCompliance.usesDeprecatedInitializeWithDependencies) {
+            issues.usingDeprecatedInitializeWithDependencies.push(analysis);
         }
     }
 
@@ -475,6 +509,17 @@ export class IMMigrationValidator extends ComponentScanner {
             });
         }
 
+        // Medium priority: Using deprecated initializeWithDependencies method
+        if (issues.usingDeprecatedInitializeWithDependencies.length > 0) {
+            recommendations.push({
+                priority: 'MEDIUM',
+                issue: 'Components using deprecated initializeWithDependencies method',
+                count: issues.usingDeprecatedInitializeWithDependencies.length,
+                components: issues.usingDeprecatedInitializeWithDependencies.map(c => c.name),
+                action: 'Replace initializeWithDependencies() with initialize(dependencies) for reactive dependency injection'
+            });
+        }
+
         return recommendations;
     }
 
@@ -527,6 +572,9 @@ ${this._formatComponentList(migrationIssues.notUsingDependencyInjection)}
 
 ### Components With Incorrect Initialize Signature (⚠️ Medium Priority)
 ${this._formatComponentList(migrationIssues.missingInitializeSignature)}
+
+### Components Using Deprecated initializeWithDependencies() Method (⚠️ Medium Priority)
+${this._formatComponentList(migrationIssues.usingDeprecatedInitializeWithDependencies)}
 
 ## Migration Examples
 
@@ -596,6 +644,10 @@ Run \`enforceIMCompliance()\` to fail the application until all components are m
             
             migrationIssues.notUsingDependencyInjection.forEach(comp => {
                 violations.push(`  - ${comp.name} (${comp.file}): Not using dependency injection`);
+            });
+
+            migrationIssues.usingDeprecatedInitializeWithDependencies.forEach(comp => {
+                violations.push(`  - ${comp.name} (${comp.file}): Using deprecated initializeWithDependencies() method`);
             });
 
             throw new Error(`❌ FATAL: Found ${nonCompliantCount} components not migrated to IM dependency injection:

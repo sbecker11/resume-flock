@@ -25,8 +25,12 @@ class BizDetailsDivModule extends BaseComponent {
         super('BizDetailsDivModule');
     }
 
-    async initialize({ JobsDataManager }) {
-        this.jobsDataManager = JobsDataManager;
+    getDependencies() {
+        return ['JobsDataManager']; // Wait for JobsDataManager to be ready
+    }
+
+    async initialize(dependencies = {}) {
+        this.jobsDataManager = dependencies.JobsDataManager;
         console.log('[BizDetailsDivModule] Initialized with JobsDataManager');
     }
 
@@ -132,7 +136,7 @@ class BizDetailsDivModule extends BaseComponent {
         // console.log("DEBUG: getValidatedSceneZ: bizCardDiv null");
         return null;
     }
-    const originalBizCardDiv = getOriginalBizCardDiv(bizCardDiv); 
+    const originalBizCardDiv = this.getOriginalBizCardDiv(bizCardDiv); 
     if (!originalBizCardDiv) {
         // console.log("DEBUG: getValidatedSceneZ: originalBizCardDiv not found for bizCardDiv.id:", bizCardDiv.id);
         return null;
@@ -193,7 +197,7 @@ class BizDetailsDivModule extends BaseComponent {
         employer: job.employer,
         role: job.role,
         dates: formatDateRange(job.start, job.end),
-        sceneZ: getValidatedSceneZ(bizCardDiv),
+        sceneZ: this.getValidatedSceneZ(bizCardDiv),
         descriptions: descriptions,
         colorIndex: colorIndex,
         jobSkills: jobSkills,
@@ -311,12 +315,12 @@ class BizDetailsDivModule extends BaseComponent {
         console.log("DEBUG: getBizCardDivSceneZ: bizCardDiv not found for jobNumber:", jobNumber);
         return null;
     }
-    const originalBizCardDiv = getOriginalBizCardDiv(bizCardDiv);
+    const originalBizCardDiv = this.getOriginalBizCardDiv(bizCardDiv);
     if (!originalBizCardDiv) {
         // Note: Could not find original bizCardDiv for scene Z calculation
         return null;
     }
-    return getValidatedSceneZ(originalBizCardDiv);
+    return this.getValidatedSceneZ(originalBizCardDiv);
 }
 
 /**
@@ -328,7 +332,7 @@ class BizDetailsDivModule extends BaseComponent {
     createBizCardSubContextString(bizCardDiv) {
     try {
         const jobNumber = getValidatedJobNumber(bizCardDiv);
-        let sceneZ = getValidatedSceneZ(bizCardDiv);
+        let sceneZ = this.getValidatedSceneZ(bizCardDiv);
         if ( !sceneZ ) {
             console.log("DEBUG: createBizCardSubContextString: sceneZ is splat");
             sceneZ = 'splat';
@@ -422,3 +426,16 @@ class BizDetailsDivModule extends BaseComponent {
 
 // Create and export singleton instance
 export const bizDetailsDivModule = new BizDetailsDivModule();
+
+// Backward compatibility exports
+export function createBizCardDetailsDiv(bizCardDiv) {
+    return bizDetailsDivModule.createBizCardDetailsDiv(bizCardDiv);
+}
+
+export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
+    return bizDetailsDivModule.createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv);
+}
+
+export function createBadgesInfo(bizCardDivClone) {
+    return bizDetailsDivModule.createBadgesInfo(bizCardDivClone);
+}

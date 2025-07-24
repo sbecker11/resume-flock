@@ -119,10 +119,12 @@ export default {
   mixins: [BaseVueComponentMixin],
   methods: {
     getComponentDependencies() {
-      return ['selectionManager'];
+      return ['SelectionManager'];
     },
-    async initializeWithDependencies() {
-      console.log("ResumeContainer initialized with dependencies");
+    async initialize(dependencies) {
+      console.log("ResumeContainer initialized with dependencies:", Object.keys(dependencies));
+      // Using the imported selectionManager instead of dependency injection
+      // since it's already available from the import
     },
     cleanupDependencies() {
       console.log("ResumeContainer cleanup dependencies");

@@ -28,8 +28,7 @@ class CoordinateManager extends BaseComponent {
      * @param {Object} layoutInfo - Layout information
      */
     updateAllSystems(layoutInfo) {
-        if (!this.isInitialized) return;
-
+        // BaseComponent guarantees this is only called when initialized
         window.CONSOLE_LOG_IGNORE('[COORDS] Updating all coordinate systems:', layoutInfo);
         
         // Update each registered system
@@ -100,10 +99,27 @@ class CoordinateManager extends BaseComponent {
             status[name] = {
                 registered: true,
                 hasUpdateMethod: !!system.updateCoordinates,
-                isInitialized: system.isInitialized ? system.isInitialized() : 'unknown'
+                // Don't check isInitialized - systems are guaranteed ready when registered
+                systemType: system.constructor.name || 'unknown'
             };
         }
         return status;
+    }
+
+    // Required IM framework methods
+    getDependencies() {
+        return []; // CoordinateManager is a fundamental utility with no IM dependencies
+    }
+
+    async initialize(dependencies = {}) {
+        window.CONSOLE_LOG_IGNORE('[CoordinateManager] Initialized');
+        // Ready to register coordinate systems
+    }
+
+    destroy() {
+        this.coordinateSystems.clear();
+        this.listeners.clear();
+        window.CONSOLE_LOG_IGNORE('[CoordinateManager] Destroyed');
     }
 }
 

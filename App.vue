@@ -42,7 +42,7 @@ export default {
       return [];
     },
     
-    async initializeWithDependencies() {
+    async initialize(dependencies) {
       // App.vue doesn't need initialization - it just loads modules
       // The actual component initialization happens in AppContent.vue
       console.log('[App] Root component ready - modules imported for IM registration');

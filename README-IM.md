@@ -4,6 +4,30 @@
 
 The Initialization Manager (IM) is a sophisticated **dependency management system** that orchestrates the startup sequence of JavaScript modules and Vue.js components in the resume-flock project. It provides a declarative way to manage component dependencies, prevents circular dependencies, and ensures proper initialization order without tight coupling between components.
 
+### 🎯 **Latest Enhancement: Vue Component Reactive Dependency Injection**
+
+The IM framework now provides **reactive dependency injection** for Vue components through an enhanced `BaseVueComponentMixin`. This eliminates manual service locator calls and null checks, providing the same robust dependency management as regular components.
+
+**Key Benefits:**
+- ✅ **No null checks required** - Dependencies are guaranteed to be available
+- ✅ **Automatic IM registration** - Vue components register seamlessly with the IM
+- ✅ **Consistent pattern** - Same clean `initialize(dependencies)` pattern as regular components
+- ✅ **Reactive by design** - Immediate access to dependency state and methods
+
+```javascript
+// Vue components now use clean dependency injection
+async initialize(dependencies) {
+  // Dependencies guaranteed by IM - no null checks needed!
+  this.badgeManager = dependencies.BadgeManager;
+  this.selectionManager = dependencies.SelectionManager;
+  
+  // Immediate reactive setup
+  this.badgeMode = this.badgeManager.getMode();
+}
+```
+
+This creates **perfect architectural symmetry** - whether you're writing a regular class component or a Vue component, the dependency injection pattern is identical.
+
 ## Core Concepts
 
 ### Dependent Components (DC)
@@ -738,6 +762,212 @@ export default {
 </script>
 ```
 
+## Vue Component Reactive Dependency Injection
+
+The IM framework now provides **reactive dependency injection** for Vue components through an enhanced `BaseVueComponentMixin`. This eliminates manual service locator calls and null checks, providing the same robust dependency management as regular components.
+
+### Enhanced BaseVueComponentMixin Pattern
+
+Vue components now use proper dependency injection with guaranteed-available dependencies:
+
+```javascript
+// BadgeToggle.vue
+export default {
+  name: 'BadgeToggle',
+  mixins: [BaseVueComponentMixin],
+  
+  methods: {
+    // Declare dependencies for IM to resolve
+    getComponentDependencies() {
+      return ['BadgeManager', 'SelectionManager'];
+    },
+    
+    // Dependencies are guaranteed to be available - no null checks needed!
+    async initialize(dependencies) {
+      // Clean, reactive dependency access
+      this.badgeManager = dependencies.BadgeManager;
+      this.selectionManager = dependencies.SelectionManager;
+      
+      // Set up reactive data immediately
+      this.badgeMode = this.badgeManager.getMode();
+      this.selectedJobNumber = this.selectionManager.getSelectedJobNumber();
+      
+      // Set up event listeners
+      this.badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged);
+      this.selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged);
+    },
+    
+    // Component logic remains reactive and clean
+    handleBadgeModeChanged(event) {
+      this.badgeMode = event.detail.mode; // Reactive updates
+    }
+  }
+}
+```
+
+### Key Benefits of Reactive Dependency Injection
+
+#### ✅ **No Null Checks Required**
+```javascript
+// OLD PATTERN (manual service locator)
+async initializeWithDependencies() {
+  this.badgeManager = initializationManager.getComponent('BadgeManager');
+  
+  // Required null check - component might not be ready
+  if (!this.badgeManager) {
+    throw new Error('BadgeManager not available');
+  }
+}
+
+// NEW PATTERN (reactive dependency injection)
+async initialize(dependencies) {
+  // Dependencies guaranteed to be available by IM
+  this.badgeManager = dependencies.BadgeManager; // Never null!
+}
+```
+
+#### ✅ **Automatic IM Registration**
+```javascript
+// BaseVueComponentMixin automatically handles registration
+export const BaseVueComponentMixin = {
+  created() {
+    this._componentName = this.$options.name || 'UnnamedVueComponent';
+    
+    // Validates component implements initialize(dependencies)
+    if (!this.initialize) {
+      throw new Error(`Vue component must implement initialize(dependencies)`);
+    }
+    
+    // Registers with IM automatically
+    this._registerVueComponent();
+  },
+  
+  async mounted() {
+    // Waits for IM to complete dependency resolution
+    await initializationManager.waitForComponent(this._componentName);
+  }
+}
+```
+
+#### ✅ **Consistent Pattern with Regular Components**
+```javascript
+// Regular Component
+class CardsController extends BaseComponent {
+  async initialize(dependencies) {
+    this.badgeManager = dependencies.BadgeManager;
+  }
+}
+
+// Vue Component - Same pattern!
+export default {
+  async initialize(dependencies) {
+    this.badgeManager = dependencies.BadgeManager;
+  }
+}
+```
+
+### Vue Component Lifecycle Integration
+
+The enhanced mixin seamlessly integrates Vue's lifecycle with IM dependency management:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Vue Component Lifecycle                  │
+├─────────────────────────────────────────────────────────────┤
+│ 1. created()                                                │
+│    ├── Validate initialize() method exists                 │
+│    ├── Extract dependencies via getComponentDependencies() │
+│    └── Register with IM automatically                      │
+│                                                             │
+│ 2. IM Dependency Resolution (asynchronous)                 │
+│    ├── Wait for declared dependencies to initialize        │
+│    ├── Build dependencies map with actual instances        │
+│    └── Call initialize(dependencies) when ready            │
+│                                                             │
+│ 3. mounted()                                               │
+│    ├── Wait for IM initialization to complete              │
+│    └── Component is ready with guaranteed dependencies     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Migration from Service Locator Pattern
+
+**Before (Service Locator with Null Checks):**
+```javascript
+// OLD - Manual service locator with error-prone null checks
+methods: {
+  getComponentDependencies() {
+    return ['BadgeManager', 'SelectionManager'];
+  },
+  
+  async initializeWithDependencies() {
+    // Manual service locator calls
+    this.badgeManager = initializationManager.getComponent('BadgeManager');
+    this.selectionManager = initializationManager.getComponent('SelectionManager');
+    
+    // Required null checks
+    if (!this.badgeManager || !this.selectionManager) {
+      throw new Error('Dependencies not available');
+    }
+    
+    // Setup code...
+  }
+}
+```
+
+**After (Reactive Dependency Injection):**
+```javascript
+// NEW - Clean dependency injection with guaranteed availability
+methods: {
+  getComponentDependencies() {
+    return ['BadgeManager', 'SelectionManager'];
+  },
+  
+  async initialize(dependencies) {
+    // Dependencies guaranteed by IM - no null checks needed!
+    this.badgeManager = dependencies.BadgeManager;
+    this.selectionManager = dependencies.SelectionManager;
+    
+    // Immediate reactive setup
+    this.badgeMode = this.badgeManager.getMode();
+    this.selectedJobNumber = this.selectionManager.getSelectedJobNumber();
+  }
+}
+```
+
+### Error Handling and Validation
+
+The enhanced BaseVueComponentMixin provides comprehensive validation:
+
+```javascript
+// Automatic validation during created() lifecycle
+if (!this.initialize) {
+  throw new Error(`❌ FATAL: Vue component ${this._componentName} MUST implement initialize(dependencies) method.
+  
+  Example:
+  methods: {
+    getComponentDependencies() {
+      return ['BadgeManager', 'SelectionManager']; // Declare dependencies
+    },
+    async initialize(dependencies) {
+      // Dependencies are guaranteed to be available and ready
+      this.badgeManager = dependencies.BadgeManager;
+      this.selectionManager = dependencies.SelectionManager;
+      this.setupEventListeners();
+      this.createElements();
+    }
+  }
+  
+  Component will NOT work until this is fixed.`);
+}
+```
+
+The IM's enhanced dependency validation ensures:
+- All declared dependencies exist before `initialize()` is called
+- Dependencies are fully initialized and ready
+- Clear error messages if dependencies fail or are missing
+- Proper initialization order based on dependency graph
+
 ## Architectural Patterns & Method Signatures
 
 ### Component Type Differences
@@ -863,6 +1093,151 @@ getComponentDependencies() {
     return ['SceneContainer'];  // ✅ Ensures DOM is ready
 }
 ```
+
+## Singleton Access Patterns
+
+The IM framework enforces strict singleton management where **only the IM framework creates component instances**, and other code accesses these singletons through well-defined patterns.
+
+### Component Instantiation Control
+
+#### ✅ Correct Pattern - IM Controls Instantiation
+```javascript
+// ✅ CORRECT - IM framework creates and manages singletons
+class MyComponent extends BaseComponent {
+    constructor() {
+        super('MyComponent');
+        // BaseComponent automatically registers with IM
+        // IM controls when and how this gets instantiated
+    }
+}
+
+// ✅ IM framework creates the singleton
+export const myComponent = new MyComponent(); // Only one instance ever created
+```
+
+#### ❌ Anti-Pattern - Manual Instantiation
+```javascript
+// ❌ WRONG - Don't create new instances
+const badComponent = new MyComponent(); // Creates duplicate, breaks singleton pattern
+```
+
+### Singleton Method Call Patterns
+
+#### 1. Within IM Components - Use Dependency Injection
+```javascript
+class MyComponent extends BaseComponent {
+    async initialize({ StateManager, SelectionManager }) {
+        // ✅ CORRECT - Store injected singleton references
+        this.stateManager = StateManager;
+        this.selectionManager = SelectionManager;
+    }
+    
+    someMethod() {
+        // ✅ CORRECT - Call methods on stored references
+        this.stateManager.updateState(data);
+        this.selectionManager.selectJobNumber(5);
+    }
+}
+```
+
+#### 2. Vue Components - Use Service Locator References
+```javascript
+// Vue component
+export default {
+    methods: {
+        async initializeWithDependencies() {
+            // ✅ CORRECT - Get singleton references via IM during initialization
+            this.badgeManager = initializationManager.getComponent('BadgeManager');
+            this.selectionManager = initializationManager.getComponent('SelectionManager');
+        },
+        
+        handleClick() {
+            // ✅ CORRECT - Call methods on stored references
+            this.badgeManager.toggleMode();
+            this.selectionManager.selectJobNumber(10);
+        }
+    }
+}
+```
+
+#### 3. Legacy/Utility Code - Direct Imports
+```javascript
+// ✅ ACCEPTABLE - Direct import of singleton instance for utility functions
+import { selectionManager } from '../core/selectionManager.mjs';
+import { badgeManager } from '../core/badgeManager.mjs';
+
+function utilityFunction() {
+    // ✅ OK - Call methods on imported singleton
+    selectionManager.selectJobNumber(3);
+    badgeManager.setMode('skills');
+}
+```
+
+#### 4. Event Handlers - Multiple Patterns
+```javascript
+// Pattern A: Use stored reference (preferred in IM components)
+class MyComponent extends BaseComponent {
+    handleEvent() {
+        this.selectionManager.selectJobNumber(jobNumber); // Uses injected reference
+    }
+}
+
+// Pattern B: Import singleton directly (utility functions)
+import { selectionManager } from '../core/selectionManager.mjs';
+document.addEventListener('click', () => {
+    selectionManager.clearSelection(); // Direct import usage
+});
+```
+
+### Performance and Best Practices
+
+#### ✅ Efficient Reference Management
+```javascript
+// ✅ CORRECT - Store reference once during initialization
+async initialize({ StateManager }) {
+    this.stateManager = StateManager; // Store singleton reference once
+}
+
+someMethod() {
+    this.stateManager.updateState(); // Use stored reference
+    this.stateManager.saveState();   // Reuse same reference efficiently
+}
+```
+
+#### ❌ Inefficient Service Locator Overuse
+```javascript
+// ❌ WRONG - Don't call service locator repeatedly for same component
+someMethod() {
+    initializationManager.getComponent('StateManager').updateState(); // Inefficient lookup
+    initializationManager.getComponent('StateManager').saveState();   // Gets same instance twice
+}
+```
+
+### Key Architectural Principles
+
+1. **Single Source of Truth**: IM controls all component lifecycles and instantiation
+2. **Store References During Initialization**: Get singleton references once, use many times
+3. **Proper Initialization Order**: IM ensures dependencies are ready before method calls
+4. **No Duplicate Instances**: Singleton pattern strictly enforced by IM framework
+5. **Dependency Tracking**: IM knows what depends on what for proper initialization
+6. **Consistent State**: All components share the same singleton instances
+
+### Access Pattern Summary
+
+| Context | Pattern | Example |
+|---------|---------|---------|
+| **IM Components** | Dependency injection | `this.stateManager = dependencies.StateManager` |
+| **Vue Components** | **Reactive dependency injection** | `this.manager = dependencies.Manager` |
+| **Utility Functions** | Direct import | `import { manager } from './manager.mjs'` |
+| **Event Handlers** | Stored reference or import | `this.manager.method()` or imported singleton |
+
+**Note:** Vue components now use the same clean dependency injection pattern as regular IM components, eliminating service locator calls and null checks.
+
+### Critical Rule
+> **Only the IM framework should call `new Component()`**  
+> **Everyone else accesses singletons via dependency injection, service locator, or direct imports**
+
+This ensures the IM framework maintains complete control over component instantiation, initialization order, and dependency resolution while providing efficient access patterns for different use cases.
 
 ## Error Handling
 

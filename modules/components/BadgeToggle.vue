@@ -1,6 +1,5 @@
 <script>
 import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
-import { initializationManager } from '@/modules/core/initializationManager.mjs';
 
 export default {
   name: 'BadgeToggle',
@@ -11,7 +10,10 @@ export default {
       badgeMode: 'no-badges',
       selectedJobNumber: null,
       isHovering: false,
-      hasJustClicked: false
+      hasJustClicked: false,
+      // IM dependency injection properties
+      badgeManager: null,
+      selectionManager: null
       // isInitialized removed - managed by BaseComponent
     };
   },
@@ -56,26 +58,25 @@ export default {
   
   methods: {
     getComponentDependencies() {
-      return ['badgeManager', 'selectionManager'];
+      return ['BadgeManager', 'SelectionManager'];
     },
     
-    async initializeWithDependencies() {
-      console.log('[BadgeToggle] initializing with dependencies');
+    async initialize(dependencies) {
+      console.log('[BadgeToggle] initializing with dependencies via IM:', Object.keys(dependencies));
       
-      // Get dependencies from service locator
-      this.badgeManager = initializationManager.getComponent('BadgeManager');
-      this.selectionManager = initializationManager.getComponent('SelectionManager');
+      // Dependencies are guaranteed to be available - no null checks needed!
+      this.badgeManager = dependencies.BadgeManager;
+      this.selectionManager = dependencies.SelectionManager;
       
-      // Set up event listeners first
+      // Set up event listeners
       this.badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged);
       this.selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged);
       this.selectionManager.addEventListener('selectionCleared', this.handleSelectionCleared);
       
-      // Then initialize with current values
+      // Initialize with current values
       await this.$nextTick();
       this.badgeMode = this.badgeManager.getMode();
       this.selectedJobNumber = this.selectionManager.getSelectedJobNumber();
-      // isInitialized is managed by BaseComponent automatically
       
       console.log(`[BadgeToggle] Initialized - badgeMode=${this.badgeMode}, selectedJobNumber=${this.selectedJobNumber}, disabled=${this.isDisabled}`);
     },

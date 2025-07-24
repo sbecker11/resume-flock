@@ -26,21 +26,30 @@ function clampToRange(val, min, max) {
 
 function handleViewportResize(bullsEyeInstance) {
     // 1. Recenter the bullsEye
-    if (bullsEyeInstance && bullsEyeInstance.isInitialized.value) {
-        bullsEyeInstance.recenterBullsEye();
+    // IM framework guarantees bullsEyeInstance is ready when this is called
+    if (bullsEyeInstance && bullsEyeInstance.recenterBullsEye) {
+        bullsEyeInstance.recenterBullsEye(); // Using composable's recenterBullsEye method
     }
     
     // 2. Update aimPoint position to bullsEye center
-    if (aimPoint.isInitialized()) {
-        const bullsEyeCenter = bullsEyeInstance ? bullsEyeInstance.getBullsEye() : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-        aimPoint.setAimPoint(bullsEyeCenter, 'viewportResize');
+    // IM framework guarantees aimPoint is ready when this is called
+    let bullsEyeCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    if (bullsEyeInstance && bullsEyeInstance.getBullsEyePosition) {
+        const bullsEyePosition = bullsEyeInstance.getBullsEyePosition();
+        if (bullsEyePosition) {
+            bullsEyeCenter = {
+                x: bullsEyePosition.x,
+                y: bullsEyePosition.y
+            };
+        }
     }
+    aimPoint.setAimPoint(bullsEyeCenter, 'viewportResize');
     
     // 3. Update focal point to aimPoint position
     const event = new CustomEvent('focal-point-update', { 
         detail: { 
             source: 'viewportResize',
-            position: bullsEyeInstance ? bullsEyeInstance.getBullsEye() : { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+            position: bullsEyeCenter
         } 
     });
     window.dispatchEvent(event);
@@ -262,7 +271,8 @@ export function useResizeHandle() {
         }
         updateLayoutFromPercentage(newPercentage);
         await nextTick();
-        if (_viewport && _viewport.isInitialized()) {
+        // IM framework guarantees _viewport is ready when this is called
+        if (_viewport) {
             _viewport.updateViewportProperties();
         }
     }
@@ -283,7 +293,8 @@ export function useResizeHandle() {
         }
         updateLayoutFromPercentage(newPercentage);
         await nextTick();
-        if (_viewport && _viewport.isInitialized()) {
+        // IM framework guarantees _viewport is ready when this is called
+        if (_viewport) {
             _viewport.updateViewportProperties();
         }
     }

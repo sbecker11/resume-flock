@@ -416,7 +416,7 @@ function generateFixInstructions(violation) {
                 <li><strong>Open file:</strong> <code class="code">${violation.file}</code></li>
                 <li><strong>Add import:</strong> <code class="code">import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';</code></li>
                 <li><strong>Add mixin:</strong> <code class="code">mixins: [BaseVueComponentMixin]</code></li>
-                <li><strong>Add initialize method:</strong> <code class="code">async initializeWithDependencies({ manager1, manager2, manager3 }) { /* setup */ }</code></li>
+                <li><strong>Add initialize method:</strong> <code class="code">async initialize(dependencies) { /* setup with dependencies.Manager1, dependencies.Manager2 */ }</code></li>
                 <li><strong>Add cleanup method:</strong> <code class="code">cleanupDependencies() { /* cleanup */ }</code></li>
             </ol>
         `;

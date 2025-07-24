@@ -37,6 +37,13 @@ import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mj
 export default {
   name: 'SkillBadges',
   mixins: [BaseVueComponentMixin],
+  data() {
+    return {
+      // IM dependency injection properties
+      selectionManager: null,
+      badgeManager: null
+    };
+  },
   created() {
     // SkillBadges component created
   },
@@ -499,11 +506,13 @@ export default {
   methods: {
     // Required by BaseVueComponentMixin
     getComponentDependencies() {
-      return ['selectionManager', 'badgeManager', 'DOM'];
+      return ['SelectionManager', 'BadgeManager'];
     },
     
-    async initializeWithDependencies() {
-      console.log('SkillBadges: Initializing with validated dependencies');
+    async initialize(dependencies) {
+      console.log('SkillBadges: Initializing with validated dependencies:', Object.keys(dependencies));
+      this.selectionManager = dependencies.SelectionManager;
+      this.badgeManager = dependencies.BadgeManager;
       // Initialization logic moved to setup() function
     },
     

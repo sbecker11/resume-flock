@@ -431,17 +431,21 @@ This is MANDATORY for proper dependency management.`);
 export const BaseVueComponentMixin = {
     created() {
         this._componentName = this.$options.name || 'UnnamedVueComponent';
-        // console.log(`🔍 [${this._componentName}] Vue component created - checking dependencies...`);
+        console.log(`🔍 [${this._componentName}] Vue component created - registering with IM...`);
         
-        // Check if component has defined initialization with destructured dependencies
-        if (!this.initializeWithDependencies) {
-            throw new Error(`❌ FATAL: Vue component ${this._componentName} MUST implement initializeWithDependencies() method.
+        // Check if component has defined initialization method
+        if (!this.initialize) {
+            throw new Error(`❌ FATAL: Vue component ${this._componentName} MUST implement initialize(dependencies) method.
             
             Example:
             methods: {
-                async initializeWithDependencies({ selectionManager, badgeManager }) {
-                    this.selectionManager = selectionManager;
-                    this.badgeManager = badgeManager;
+                getComponentDependencies() {
+                    return ['BadgeManager', 'SelectionManager']; // Declare dependencies
+                },
+                async initialize(dependencies) {
+                    // Dependencies are guaranteed to be available and ready
+                    this.badgeManager = dependencies.BadgeManager;
+                    this.selectionManager = dependencies.SelectionManager;
                     this.setupEventListeners();
                     this.createElements();
                 }
@@ -449,14 +453,16 @@ export const BaseVueComponentMixin = {
             
             Component will NOT work until this is fixed.`);
         }
+        
+        // Register with InitializationManager for proper dependency management
+        this._registerVueComponent();
     },
 
     async mounted() {
+        // Wait for IM to initialize this component with its dependencies
         try {
-            // Initialize with dependencies - specific dependency resolution handled by the component
-            await this.initializeWithDependencies();
-            // console.log(`✅ [${this._componentName}] Vue component initialization complete`);
-
+            await initializationManager.waitForComponent(this._componentName);
+            console.log(`✅ [${this._componentName}] Vue component initialization complete via IM`);
         } catch (error) {
             console.error(`❌ [${this._componentName}] Vue component initialization failed:`, error);
             throw error;
@@ -466,6 +472,38 @@ export const BaseVueComponentMixin = {
     beforeUnmount() {
         if (this.cleanupDependencies) {
             this.cleanupDependencies();
+        }
+    },
+
+    methods: {
+        /**
+         * Register Vue component with InitializationManager
+         * @private
+         */
+        _registerVueComponent() {
+            // Get dependencies from component
+            const dependencies = this.getComponentDependencies ? this.getComponentDependencies() : [];
+            
+            // Create wrapped initialization function for IM
+            const wrappedInit = async (dependenciesMap = {}) => {
+                console.log(`🔍 [${this._componentName}] Vue component initializing with dependencies:`, Object.keys(dependenciesMap));
+                
+                // Call the component's initialize method with dependency injection
+                await this.initialize(dependenciesMap);
+                
+                console.log(`✅ [${this._componentName}] Vue component initialized`);
+                return this;
+            };
+            
+            // Register with IM synchronously
+            initializationManager.registerSync(
+                this._componentName,
+                wrappedInit,
+                dependencies,
+                { type: 'vue-component' }
+            );
+            
+            console.log(`🔍 [${this._componentName}] Vue component registered with IM. Dependencies: [${dependencies.join(', ')}]`);
         }
     }
 };

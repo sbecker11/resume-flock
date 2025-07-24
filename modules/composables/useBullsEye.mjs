@@ -1,4 +1,4 @@
-import { ref, computed, onMounted, onUnmounted, watchEffect } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watchEffect, getCurrentInstance } from 'vue';
 import * as bullsEyeModule from '../core/bullsEye.mjs';
 import { useLayoutToggle } from './useLayoutToggle.mjs';
 
@@ -123,10 +123,15 @@ function handleMouseMove(event) {
 
 // --- Composable ---
 export function useBullsEye() {
-  // Register cleanup on component unmount
-  onUnmounted(() => {
-    cleanup();
-  });
+  // Check if we're inside a Vue component instance
+  const instance = getCurrentInstance();
+  
+  // Register cleanup on component unmount (only if inside a Vue component)
+  if (instance) {
+    onUnmounted(() => {
+      cleanup();
+    });
+  }
 
   // Function to update bullsEye to scene container center
   function updateToSceneCenter() {
@@ -157,13 +162,30 @@ export function useBullsEye() {
   let isComponentReady = false;
   
   // Wait for Vue to mount and the IM-managed BullsEye component to be ready
-  onMounted(() => {
-    // The bullsEyeModule has its own IM dependency management
-    // Just wait for it to be initialized through normal IM flow
+  // Only use onMounted if we're inside a Vue component
+  if (instance) {
+    onMounted(() => {
+      // The bullsEyeModule has its own IM dependency management
+      // Just wait for it to be initialized through normal IM flow
+      const checkBullsEyeReady = () => {
+        if (bullsEyeModule.isInitialized()) {
+          isComponentReady = true;
+          console.log('[BullsEye] Composable is now ready - BullsEye component initialized');
+          updateToSceneCenter();
+        } else {
+          // Check again in a short while
+          setTimeout(checkBullsEyeReady, 50);
+        }
+      };
+      
+      checkBullsEyeReady();
+    });
+  } else {
+    // If not in a Vue component, set up immediately
     const checkBullsEyeReady = () => {
       if (bullsEyeModule.isInitialized()) {
         isComponentReady = true;
-        console.log('[BullsEye] Composable is now ready - BullsEye component initialized');
+        console.log('[BullsEye] Composable is now ready - BullsEye component initialized (non-Vue context)');
         updateToSceneCenter();
       } else {
         // Check again in a short while
@@ -172,7 +194,7 @@ export function useBullsEye() {
     };
     
     checkBullsEyeReady();
-  });
+  }
   
   watchEffect(() => {
     if (!isComponentActive || !isComponentReady) return;
@@ -352,12 +374,21 @@ export function useBullsEye() {
   // Mode management
   const mode = computed(() => _mode);
 
-  function getBullsEye() {
+  function getBullsEyePosition() {
     if (_mode === MODES.LOCKED) {
       return bullsEyeModule.getBullsEye();
     } else {
       return bullsEyeState.value;
     }
+  }
+
+  function getBullsEyeElement() {
+    return bullsEyeModule.getBullsEyeElement();
+  }
+
+  // Backward compatibility
+  function getBullsEye() {
+    return getBullsEyePosition();
   }
 
   function setMode(newMode) {
@@ -455,7 +486,9 @@ export function useBullsEye() {
     setMode,
     cycleMode,
     isInitialized,
-    getBullsEye,
+    getBullsEye, // backward compatibility
+    getBullsEyePosition,
+    getBullsEyeElement,
     recenterBullsEye
   };
 } 

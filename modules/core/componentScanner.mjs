@@ -162,10 +162,11 @@ export class ComponentScanner {
 
         // Check for manager imports/usage
         const managerPatterns = [
-            { name: 'selectionManager', pattern: /(?:import.*selectionManager|selectionManager\\.)/g },
-            { name: 'badgeManager', pattern: /(?:import.*badgeManager|badgeManager\\.)/g },
-            { name: 'initializationManager', pattern: /(?:import.*initializationManager|initializationManager\\.)/g },
-            { name: 'eventBus', pattern: /(?:import.*eventBus|eventBus\\.)/g }
+            // Only detect actual usage, not side-effect imports
+            { name: 'selectionManager', pattern: /selectionManager\./g },
+            { name: 'badgeManager', pattern: /badgeManager\./g },
+            { name: 'initializationManager', pattern: /initializationManager\./g },
+            { name: 'eventBus', pattern: /eventBus\./g }
         ];
 
         managerPatterns.forEach(({ name, pattern }) => {
@@ -190,8 +191,10 @@ export class ComponentScanner {
         }
 
         if (analysis.componentType === 'vue' && analysis.usesManagers.length > 0) {
-            if (!content.includes('initializeWithDependencies')) {
-                analysis.violations.push('Vue component missing initializeWithDependencies() method');
+            // Check for initialize method with dependencies parameter (flexible spacing)
+            const hasInitializeMethod = /(?:async\s+)?initialize\s*\(\s*dependencies\s*\)/.test(content);
+            if (!hasInitializeMethod) {
+                analysis.violations.push('Vue component missing initialize(dependencies) method');
             }
         }
 
@@ -219,6 +222,11 @@ export class ComponentScanner {
         // Check for getIsInitialized method (deprecated pattern)
         if (content.includes('getIsInitialized')) {
             analysis.violations.push('getIsInitialized() method is deprecated - use component.isInitialized property instead');
+        }
+
+        // Check for manual isInitialized checks on dependencies (IM guarantees readiness)
+        if (/\w+\.isInitialized\(\)|\.isInitialized\s*&&|\.isInitialized\s*\?/.test(content)) {
+            analysis.violations.push('Components should not check dependency.isInitialized - IM framework guarantees dependencies are ready');
         }
 
         return analysis;
@@ -278,6 +286,9 @@ export class ComponentScanner {
         }
         if (violation.includes('getIsInitialized')) {
             return 'Replace getIsInitialized() method with component.isInitialized property access';
+        }
+        if (violation.includes('dependency.isInitialized')) {
+            return 'Remove dependency.isInitialized checks - IM framework guarantees dependencies are ready when initialize() is called';
         }
         return 'Follow dependency management guidelines';
     }
