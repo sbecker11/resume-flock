@@ -29,52 +29,86 @@ const isRightDisabled = computed(() => {
 
 // Step button click handlers with debug logging
 function handleStepLeft(event) {
-  console.log('[ResizeHandle] Step left clicked - DECREASE scene percentage');
+  console.log('[ResizeHandle] Step left clicked');
   console.log('[ResizeHandle] Orientation:', orientation.value);
   console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
   console.log('[ResizeHandle] Step count:', stepCount.value);
   console.log('[ResizeHandle] IsLeftDisabled:', isLeftDisabled.value);
   event.stopPropagation();
   
-  // Left button decreases scene percentage (collapseLeft decreases percentage)
-  console.log('[ResizeHandle] Calling collapseLeft to decrease scene percentage');
-  collapseLeft();
+  // In scene-left: left button decreases scene percentage
+  // In scene-right: left button increases scene percentage (mirrored behavior)
+  if (orientation.value === 'scene-right') {
+    console.log('[ResizeHandle] Scene-right: Calling collapseRight to increase scene percentage');
+    collapseRight();
+  } else {
+    console.log('[ResizeHandle] Scene-left: Calling collapseLeft to decrease scene percentage');
+    collapseLeft();
+  }
 }
 
 function handleStepRight(event) {
-  console.log('[ResizeHandle] Step right clicked - INCREASE scene percentage');
+  console.log('[ResizeHandle] Step right clicked');
   console.log('[ResizeHandle] Orientation:', orientation.value);
   console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
   console.log('[ResizeHandle] Step count:', stepCount.value);
   console.log('[ResizeHandle] IsRightDisabled:', isRightDisabled.value);
   event.stopPropagation();
   
-  // Right button increases scene percentage (collapseRight increases percentage)
-  console.log('[ResizeHandle] Calling collapseRight to increase scene percentage');
-  collapseRight();
+  // In scene-left: right button increases scene percentage
+  // In scene-right: right button decreases scene percentage (mirrored behavior)
+  if (orientation.value === 'scene-right') {
+    console.log('[ResizeHandle] Scene-right: Calling collapseLeft to decrease scene percentage');
+    collapseLeft();
+  } else {
+    console.log('[ResizeHandle] Scene-left: Calling collapseRight to increase scene percentage');
+    collapseRight();
+  }
 }
 
 // Step buttons for resize handle movement
 const stepLeftButton = computed(() => {
-  // Left button moves handle left (right side grows, left side shrinks)
-  return {
-    id: 'step-left',
-    action: handleStepLeft,
-    disabled: isRightDisabled.value, // Disabled when right side is collapsed
-    title: 'Move Handle Left (Right Side Grows)',
-    icon: '‹'
-  };
+  if (orientation.value === 'scene-right') {
+    // In scene-right: left button increases scene size (points away from scene)
+    return {
+      id: 'step-left',
+      action: handleStepLeft,
+      disabled: isLeftDisabled.value, // Disabled when scene is collapsed
+      title: 'Increase Scene Size (Point Away From Scene)',
+      icon: '‹'
+    };
+  } else {
+    // In scene-left: left button decreases scene size (points away from scene)
+    return {
+      id: 'step-left',
+      action: handleStepLeft,
+      disabled: isRightDisabled.value, // Disabled when resume is collapsed
+      title: 'Decrease Scene Size (Point Away From Scene)',
+      icon: '‹'
+    };
+  }
 });
 
 const stepRightButton = computed(() => {
-  // Right button moves handle right (left side grows, right side shrinks)  
-  return {
-    id: 'step-right',
-    action: handleStepRight,
-    disabled: isLeftDisabled.value, // Disabled when left side is collapsed
-    title: 'Move Handle Right (Left Side Grows)',
-    icon: '›'
-  };
+  if (orientation.value === 'scene-right') {
+    // In scene-right: right button decreases scene size (points away from resume)
+    return {
+      id: 'step-right',
+      action: handleStepRight,
+      disabled: isRightDisabled.value, // Disabled when resume is collapsed
+      title: 'Decrease Scene Size (Point Away From Resume)',
+      icon: '›'
+    };
+  } else {
+    // In scene-left: right button increases scene size (points away from resume)
+    return {
+      id: 'step-right',
+      action: handleStepRight,
+      disabled: isLeftDisabled.value, // Disabled when scene is collapsed
+      title: 'Increase Scene Size (Point Away From Resume)',
+      icon: '›'
+    };
+  }
 });
 
 const { 
@@ -193,10 +227,15 @@ function handleLayoutToggle(event) {
   toggleOrientation();
   window.CONSOLE_LOG_IGNORE('AFTER toggle:', orientation.value);
 }
+
+function handleResizeHandleClick(event) {
+  // Prevent resize handle clicks from propagating to parent containers
+  event.stopPropagation();
+}
 </script>
 
 <template>
-    <div id="resize-handle" class="resize-handle" @mousedown="startDrag">
+    <div id="resize-handle" class="resize-handle" @mousedown="startDrag" @click="handleResizeHandleClick">
         <div class="button-container">
             <button :id="stepLeftButton.id" class="toggle-circle" @click.stop="stepLeftButton.action" :disabled="stepLeftButton.disabled" :title="stepLeftButton.title">{{ stepLeftButton.icon }}</button>
             <button id="tri-state-toggle" 

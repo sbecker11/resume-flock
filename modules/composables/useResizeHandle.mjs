@@ -31,6 +31,12 @@ export class ResizeHandleManager extends BaseComponent {
     // Initialize state from AppState
     this.initializeState();
     
+    // Listen for app state loaded event to update from saved state
+    window.addEventListener('app-state-loaded', () => {
+      console.log('[ResizeHandleManager] App state loaded, re-initializing from saved state');
+      this.initializeState();
+    });
+    
     // Add debounced window resize listener
     window.addEventListener('resize', this.debouncedResizeHandler.bind(this));
     
@@ -39,17 +45,27 @@ export class ResizeHandleManager extends BaseComponent {
   }
   
   setupDragHandlers() {
+    // Get layout orientation
+    const { orientation } = useLayoutToggle();
+    
     // Mouse move handler for dragging
     const handleMouseMove = (event) => {
       if (this.isDragging.value) {
         const windowWidth = window.innerWidth;
-        const newSceneWidth = Math.max(0, Math.min(windowWidth, event.clientX)); // Allow full 0% to 100% range
+        
+        // For scene-right layout, mirror the mouse position horizontally
+        let effectiveClientX = event.clientX;
+        if (orientation.value === 'scene-right') {
+          effectiveClientX = windowWidth - event.clientX;
+        }
+        
+        const newSceneWidth = Math.max(0, Math.min(windowWidth, effectiveClientX)); // Allow full 0% to 100% range
         const newPercentage = (newSceneWidth / windowWidth) * 100;
         
         this.uiPercentage.value = newPercentage;
         this.updateLayout(newPercentage);
         
-        console.log(`[ResizeHandleManager] Dragging - scene width: ${newSceneWidth}px, percentage: ${newPercentage.toFixed(1)}%`);
+        console.log(`[ResizeHandleManager] Dragging (${orientation.value}) - mouse X: ${event.clientX}, effective X: ${effectiveClientX}, scene width: ${newSceneWidth}px, percentage: ${newPercentage.toFixed(1)}%`);
       }
     };
     

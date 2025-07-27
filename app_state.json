@@ -1,14 +1,13 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-27T04:24:25.812Z",
+  "lastUpdated": "2025-07-27T17:04:11.756Z",
   "layout": {
-    "panelSizePercentage": 50,
     "orientation": "scene-left",
-    "scenePercentage": 65.49019607843137,
-    "resumePercentage": 34.509803921568626
+    "scenePercentage": 49.14965986394558,
+    "resumePercentage": 50.85034013605442
   },
   "resizeHandle": {
-    "stepCount": 5
+    "stepCount": 4
   },
   "focalPoint": {
     "mode": "locked"
@@ -47,8 +46,8 @@
       }
     }
   },
-  "selectedJobNumber": 1,
-  "lastVisitedJobNumber": 1,
+  "selectedJobNumber": 10,
+  "lastVisitedJobNumber": 10,
   "resume": {
     "sortRule": {
       "field": "startDate",

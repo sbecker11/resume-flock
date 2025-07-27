@@ -13,8 +13,9 @@ function getDefaultState() {
         version: "1.2", // Updated for constants system
         lastUpdated: new Date().toISOString(),
         layout: {
-            panelSizePercentage: 50, // Default to a 50/50 split
-            orientation: 'scene-left' // Default to scene on left, resume on right
+            orientation: 'scene-left', // Default to scene on left, resume on right
+            scenePercentage: 50, // Scene takes 50% of window width
+            resumePercentage: 50 // Resume takes 50% of window width
         },
         resizeHandle: {
             stepCount: 4

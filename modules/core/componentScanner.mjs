@@ -77,7 +77,7 @@ export class ComponentScanner {
     _isComponentFile(filename) {
         const extensions = ['.vue', '.mjs', '.js', '.ts'];
         const componentPatterns = ['Component', 'Controller', 'Manager', 'Service'];
-        const excludePatterns = ['BaseComponent', 'Abstract']; // Exclude abstract base classes
+        const excludePatterns = ['BaseComponent', 'Abstract', 'CardsController']; // Exclude abstract base classes and browser-only components
         
         const hasExtension = extensions.some(ext => filename.endsWith(ext));
         const hasPattern = componentPatterns.some(pattern => filename.includes(pattern));

@@ -264,6 +264,120 @@ if (mode === MODES.DRAGGING) {
 
 ---
 
+## Session Update (2025-07-27) - ResizeHandle Mirroring & State Loading Fixes
+
+### Major Achievements This Session
+
+#### 1. Fixed Resize Handle Horizontal Mirroring for Layout Orientations
+- **Problem**: When switching from scene-left to scene-right layout, mouse motions and collapse buttons weren't mirrored horizontally
+- **Issue**: Dragging the resize handle right would actually move it left in scene-right layout
+- **Solution**: Implemented proper horizontal mirroring in `useResizeHandle.mjs` and `ResizeHandle.vue`
+
+**Key Changes:**
+- **Mouse Drag Handler** (`useResizeHandle.mjs:48-56`): Added layout orientation detection and coordinate mirroring
+  ```javascript
+  // For scene-right layout, mirror the mouse position horizontally
+  let effectiveClientX = event.clientX;
+  if (orientation.value === 'scene-right') {
+    effectiveClientX = windowWidth - event.clientX;
+  }
+  ```
+- **Button Click Logic** (`ResizeHandle.vue:31-66`): Reversed button behaviors for scene-right layout
+  - Scene-left: Left button decreases scene, Right button increases scene
+  - Scene-right: Left button increases scene, Right button decreases scene (mirrored)
+- **Button Tooltips**: Updated to describe behavior as "pointing away from" respective containers
+
+#### 2. Fixed App State Loading for Globals Section
+- **Problem**: Layout orientation, scene percentages, and resize handle settings weren't being loaded from `app_state.json`
+- **Root Cause**: ResizeHandleManager was trying to read AppState before it was loaded from server
+- **Solution**: Added `app-state-loaded` event listener to re-initialize state when available
+
+**Key Changes:**
+- **Added Event Listener** (`useResizeHandle.mjs:35-38`): ResizeHandleManager now listens for state loading
+- **Removed Obsolete Fields**: Cleaned up deprecated `panelSizePercentage` from default state and `app_state.json`
+- **Proper State Structure**: Now uses `scenePercentage` and `resumePercentage` as intended
+
+#### 3. Fixed Server-Side Compatibility
+- **Problem**: Node.js server scanner caused "window is not defined" errors when analyzing CardsController.mjs
+- **Solution**: Added CardsController to component scanner exclude patterns
+- **Result**: Clean server startup without browser-compatibility errors
+
+#### 4. Added Click Event Prevention
+- **Enhancement**: ResizeHandle now prevents click event propagation to parent containers
+- **Implementation**: Added `@click="handleResizeHandleClick"` with `event.stopPropagation()`
+
+### Current System State After Session
+- **✅ Horizontal Mirroring**: Resize handle behaves intuitively in both scene-left and scene-right layouts
+- **✅ State Persistence**: Layout orientation, percentages, and step count properly loaded from saved state
+- **✅ Clean Architecture**: No server-side compatibility issues or event propagation problems
+- **✅ User Experience**: Consistent and predictable resize handle behavior regardless of layout orientation
+
+### Files Modified This Session
+- `modules/composables/useResizeHandle.mjs`: Added horizontal mirroring and state loading event listener
+- `modules/components/ResizeHandle.vue`: Implemented mirrored button behaviors and click prevention
+- `modules/core/stateManager.mjs`: Removed obsolete panelSizePercentage, updated default state structure
+- `modules/core/componentScanner.mjs`: Added CardsController to exclude patterns
+- `app_state.json`: Removed deprecated panelSizePercentage field
+
+---
+
+## Session Update (2025-07-27) - Card Selection Clone Slide-Into-View Fix
+
+### Major Achievement This Session
+
+#### Fixed Broken Card Clone Slide-Into-View Functionality
+- **Problem**: When selecting a cDiv, the clone was created but the slide-into-view functionality was scrolling to the wrong position
+- **Symptom**: Clicking job 10 would scroll job 6 into view instead of the selected job 10 clone
+- **Root Cause**: Coordinate system mismatch between scene coordinates and scroll container coordinates
+
+### Technical Deep Dive
+
+#### The Clone Selection Process (Working Correctly)
+1. **Card Selection**: User clicks on cDiv (e.g., job 10)
+2. **Clone Creation**: `_selectBizCardDiv()` creates deep clone with filters removed
+3. **Positioning**: Clone positioned at scene center (straddling x-origin) with same y-coordinate
+4. **Z-Index**: Clone uses dedicated selected card z-index level
+5. **Slide Into View**: `scrollBizCardDivIntoView()` called to show header fields
+
+#### The Slide-Into-View Bug (Fixed)
+**Problem**: The scroll calculation was mixing coordinate systems:
+- `data-sceneTop` attribute used **scene coordinates** (absolute position within scene)
+- `container.scrollTo()` expected **scroll coordinates** (relative to container's scrollable content)
+- Scene transformations and container offsets created position mismatch
+
+**Solution**: Unified coordinate system in `selectionManager.mjs:197-209`
+```javascript
+// Always use container-relative positioning for consistent scrolling
+const containerRect = container.getBoundingClientRect();
+const elementRect = element.getBoundingClientRect();
+let elementTop = elementRect.top - containerRect.top + container.scrollTop;
+```
+
+#### Header Field Targeting
+- **Simplified Selector**: Changed from complex multi-field selector to `.biz-details-employer`
+- **Reasoning**: Employer name is the topmost, most stable header field
+- **Avoided**: Experimental `.biz-details-z-value` field that undergoes frequent changes
+
+### Debugging Process
+- **Added Debug Logging**: Tracked clone creation, element identification, and position calculations
+- **Verified Clone Data**: Confirmed correct clone (job 10) was found with proper positioning attributes
+- **Position Analysis**: Discovered scroll target calculation was correct but using wrong coordinate system
+- **Coordinate Conversion**: Fixed by using viewport-relative positioning instead of scene coordinates
+
+### Key Files Modified
+- `modules/core/selectionManager.mjs`: Fixed coordinate system mismatch in scroll positioning
+- `modules/scene/CardsController.mjs`: Simplified header selector and added debug logging
+
+### Result
+- **✅ Accurate Scrolling**: Selecting any job now correctly scrolls that job's clone into view
+- **✅ Header Visibility**: Clone slides so employer header is visible at top of viewport
+- **✅ Consistent Behavior**: Works reliably across all jobs regardless of their scene position
+- **✅ Stable Targeting**: Uses stable header fields, avoiding experimental elements
+
+**Session Complete**: Card selection clone slide-into-view functionality now working perfectly, ensuring selected cards smoothly animate into proper viewing position with headers visible.
+
+---
+
 ## Session Update (2025-07-27) - Badge System Removal & IM Architecture Cleanup
 
 ### Major Achievements This Session

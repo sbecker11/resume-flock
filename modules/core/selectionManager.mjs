@@ -194,25 +194,31 @@ class SelectionManager extends BaseComponent {
             return false;
         }
 
-        // Get element position
-        let elementTop;
-        if (element.getAttribute && element.getAttribute('data-sceneTop')) {
-            // For cDivs with scene positioning
-            elementTop = parseFloat(element.getAttribute('data-sceneTop'));
-        } else {
-            // For rDivs or other elements, use getBoundingClientRect
-            const containerRect = container.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            elementTop = elementRect.top - containerRect.top + container.scrollTop;
-        }
+        // Get element position - always use container-relative positioning for consistent scrolling
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        let elementTop = elementRect.top - containerRect.top + container.scrollTop;
+        
+        console.log(`[DEBUG] SelectionManager.smoothScrollElementIntoView: ${caller} - Position calculation:`, {
+            elementId: element.id || 'unknown',
+            containerTop: containerRect.top,
+            elementRectTop: elementRect.top,
+            containerScrollTop: container.scrollTop,
+            calculatedElementTop: elementTop,
+            dataSceneTop: element.getAttribute('data-sceneTop')
+        });
 
         // Find header offset within the element
         let headerOffset = 0;
         const headerElement = element.querySelector(headerSelector);
         if (headerElement) {
+            // Calculate the vertical offset of the header from the top of the element
             const elementRect = element.getBoundingClientRect();
             const headerRect = headerElement.getBoundingClientRect();
             headerOffset = headerRect.top - elementRect.top;
+            console.log(`[DEBUG] SelectionManager.smoothScrollElementIntoView: ${caller} - Header found with offset: ${headerOffset}px`);
+        } else {
+            console.log(`[DEBUG] SelectionManager.smoothScrollElementIntoView: ${caller} - No header found with selector: ${headerSelector}`);
         }
 
         // Calculate optimal scroll position

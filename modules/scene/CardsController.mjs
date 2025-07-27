@@ -1078,6 +1078,7 @@ class CardsController extends BaseComponent {
             
             // Scroll to the clone (existing or newly created)
             if (clone) {
+                console.log(`[DEBUG] FOUND CLONE FOR JOB ${selectedJobNumber}:`, clone.id, 'SceneTop:', clone.getAttribute('data-sceneTop'));
                 this.scrollBizCardDivIntoView(clone, `CardsController.handleSelectionChanged from ${caller}`);
             }
             
@@ -1236,8 +1237,11 @@ class CardsController extends BaseComponent {
         const sceneContent = this.scenecontentElement;
         if (!sceneContent) throw new Error(`CardsController.scrollBizCardDivIntoView: ${caller} scene-content not available via template ref`);
     
+        console.log(`[DEBUG] SCROLL TARGET ELEMENT - ${caller}:`, bizCardDiv.id, 'Job:', bizCardDiv.getAttribute('data-job-number'), 'SceneTop:', bizCardDiv.getAttribute('data-sceneTop'));
+    
         // Use centralized smooth scrolling with header positioning
-        const headerSelector = '.biz-details-employer, .biz-details-role, .biz-details-dates, .biz-details-z-value, .biz-details-start-date, .biz-details-end-date';
+        // Target the first header element (employer) which should be at the top
+        const headerSelector = '.biz-details-employer';
         this.selectionManager.smoothScrollElementIntoView(bizCardDiv, sceneContent, headerSelector, `CardsController.${caller}`);
     }
 
@@ -1606,3 +1610,4 @@ export const createBizResumeDetailsDivId = (jobNumber) => `biz-resume-details-di
 export const createBizResumeDetailsDivClass = () => 'biz-resume-details-div';
 export const createBizCardDetailsDivId = (jobNumber) => `biz-card-details-div-${jobNumber}`;
 export const createBizCardDetailsDivClass = () => 'biz-card-details-div';
+
