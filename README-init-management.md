@@ -3865,6 +3865,148 @@ profiler.start();
 setTimeout(() => profiler.generateReport(), 5000);
 ```
 
+## Architectural Exemptions
+
+### Overview
+
+While the IM framework enforces strict architectural patterns to ensure clean dependency management, there are legitimate cases where components need to bypass these restrictions. The framework provides **override mechanisms** that allow components to explicitly opt out of certain validation rules while maintaining clear documentation of these architectural exceptions.
+
+### Available Exemptions
+
+#### 1. Direct Reference Exemption: `directReferencesAllowed()`
+
+**Purpose**: Allows components to use direct service locator access (`initializationManager.getComponent()`) or direct component references (`this.someManager`) when architectural constraints require it.
+
+**When to Use**:
+- Main orchestrator components that coordinate multiple systems
+- Framework integration layers
+- Legacy compatibility bridges
+- Testing/debugging utilities
+
+**Implementation**:
+```javascript
+class AppOrchestrator extends BaseComponent {
+  directReferencesAllowed() {
+    return true; // Explicitly allow direct references
+  }
+  
+  async setupComponents() {
+    // This would normally be flagged as a violation
+    const sceneContainer = initializationManager.getComponent('SceneContainer');
+    const viewportManager = initializationManager.getComponent('ViewportManager');
+    
+    // Coordinate component setup
+    await sceneContainer.setupDom();
+    await viewportManager.setupDom();
+  }
+}
+```
+
+#### 2. Async Coordination Exemption: `asyncAllowed()`
+
+**Purpose**: Allows components to use async patterns in their `initialize()` method or implement manual dependency waiting when complex initialization logic requires it.
+
+**When to Use**:
+- Components requiring complex async initialization sequences
+- Integration with external async systems
+- Components needing manual timing control
+
+**Implementation**:
+```javascript
+class ComplexIntegration extends BaseComponent {
+  asyncAllowed() {
+    return true; // Explicitly allow async patterns
+  }
+  
+  async initialize(dependencies) {
+    // Complex async initialization that can't be handled by standard IM patterns
+    await this.connectToExternalSystem();
+    await this.performComplexSetup();
+  }
+}
+```
+
+### Exemption Detection
+
+The violations checker automatically detects these override methods:
+
+```javascript
+// Detection patterns in componentScanner.mjs
+const directReferencesAllowed = /directReferencesAllowed\s*\(\s*\)\s*\{\s*return\s+true/m.test(content);
+const asyncAllowed = /asyncAllowed\s*\(\s*\)\s*\{\s*return\s+true/m.test(content);
+```
+
+When an exemption is detected:
+- ✅ **Violation checks are skipped** for that component
+- 📝 **Clear logging** indicates the exemption is active
+- 🚫 **No violations reported** for the exempted patterns
+
+### Best Practices for Exemptions
+
+#### 1. Document the Reason
+Always include comments explaining why the exemption is necessary:
+
+```javascript
+class SpecialOrchestrator extends BaseComponent {
+  directReferencesAllowed() {
+    return true; // Required for coordinating setupDom() calls across multiple components
+  }
+  
+  // Main coordination logic that requires direct access
+  async coordinateSystemSetup() {
+    // Detailed comment explaining why direct access is needed
+  }
+}
+```
+
+#### 2. Minimize Exemption Scope
+Use exemptions sparingly and only for the specific functionality that requires it:
+
+```javascript
+// ✅ Good - exemption used only where needed
+class MixedComponent extends BaseComponent {
+  directReferencesAllowed() {
+    return true; // Only for template ref injection coordination
+  }
+  
+  initialize(dependencies) {
+    // Standard IM pattern for most functionality
+    this.selectionManager = dependencies.SelectionManager;
+    this.stateManager = dependencies.StateManager;
+  }
+  
+  coordinateTemplateRefs() {
+    // Direct access only for coordination logic
+    const aimPointManager = initializationManager.getComponent('AimPointManager');
+  }
+}
+```
+
+#### 3. Regular Review
+Exempt components should be regularly reviewed to see if architectural changes can eliminate the need for exemptions.
+
+### Violation Checker Integration
+
+The violations checker provides clear guidance when exemptions are available:
+
+```
+🚨 Violation: Direct service locator access violates IM architecture
+🔧 Fix: Remove initializationManager.getComponent() calls - add required 
+       components to imports and use references from initialize(dependencies) 
+       method. For legitimate exceptions, override directReferencesAllowed() 
+       { return true; }
+```
+
+### Monitoring Exemptions
+
+Components using exemptions are logged during startup:
+```
+[ComponentScanner] AppContent.vue explicitly allows direct references via 
+                  directReferencesAllowed() - skipping violation checks
+```
+
+This provides visibility into which components are using architectural exceptions and helps with long-term architectural planning.
+
 ## Conclusion
 
 The Initialization Manager framework provides a robust foundation for managing complex application startup sequences. By enforcing implementation standards, preventing circular dependencies, and providing a service locator pattern, it enables scalable and maintainable architecture.

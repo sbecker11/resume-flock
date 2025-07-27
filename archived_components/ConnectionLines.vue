@@ -57,35 +57,10 @@ import { badgeManager } from '@/modules/core/badgeManager.mjs';
 import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { eventBus } from '@/modules/utils/eventBus.mjs';
 import { AppState } from '@/modules/core/stateManager.mjs';
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
-import { initializationManager } from '@/modules/core/initializationManager.mjs';
+// Removed from IM chain - ConnectionLines is now independent
 
 export default {
   name: 'ConnectionLines',
-  mixins: [BaseVueComponentMixin],
-  methods: {
-    getComponentDependencies() {
-      console.log('[ConnectionLines] getComponentDependencies() called');
-      return ['BadgeManager', 'SceneContainer', 'StateManager'];
-    },
-    initialize(dependencies) {
-      console.log('ConnectionLines: Initialized with dependencies:', Object.keys(dependencies));
-      console.log('ConnectionLines: SceneContainer dependency:', dependencies.SceneContainer);
-      this.badgeManager = dependencies.BadgeManager;
-      this.sceneContainer = dependencies.SceneContainer;
-      this.stateManager = dependencies.StateManager;
-      // StateManager dependency ensures AppState is ready before component initialization
-      // Bridge to composition API - store dependency for later use
-      this._sceneContainerDependency = dependencies.SceneContainer;
-      
-      // Note: Service registry approach is used instead of direct bridge
-      
-      if (!dependencies.SceneContainer) {
-        console.error('ConnectionLines: SceneContainer dependency is null/undefined!');
-      } else {
-        console.log('ConnectionLines: SceneContainer dependency successfully set!');
-      }
-    },
 
     /**
      * Template ref injection for app-container element

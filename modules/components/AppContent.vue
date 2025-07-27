@@ -8,14 +8,11 @@
       @click="handleSceneContainerClick"
       :class="{ 'container-first': firstContainer === 'scene-container', 'container-second': secondContainer === 'scene-container' }"
     >
-      <div id="scene-content">
+      <div id="scene-content" ref="sceneContentRef">
         <div id="scene-plane-top-gradient"></div>
         <div id="scene-plane-btm-gradient"></div>
         <div id="scene-plane" ref="scenePlaneRef">
           <Timeline :alignment="timelineAlignment" />
-          <!-- <SankeyConnections /> -->
-          <SkillBadges />
-          <ConnectionLines />
         </div>
       </div>
       <div id="scene-viewer-label">
@@ -124,9 +121,10 @@ import { initializeState, saveState } from '@/modules/core/stateManager.mjs';
 import * as keyDown from '@/modules/core/keyDownModule.mjs';
 import { sceneContainer } from '@/modules/scene/sceneContainerModule.mjs';
 // IM-managed: ViewportManager
-import { cardsController } from '@/modules/scene/CardsController.mjs';
+import '@/modules/scene/CardsController.mjs'; // Import to trigger IM registration
 // Removed old aimPoint.mjs - now using useAimPoint composable
 import '@/modules/core/bullsEye.mjs'; // Import to trigger BullsEye instance creation
+import '@/modules/core/viewportCore.mjs'; // Import to trigger ViewportCore registration
 import * as resizeHandle from '@/modules/resize/resizeHandler.mjs';
 import { resumeListController } from '@/modules/resume/ResumeListController.mjs';
 import { initializationManager } from '@/modules/core/initializationManager.mjs';
@@ -135,22 +133,16 @@ import { colorPaletteManager } from '@/modules/core/colorPaletteManager.mjs'; //
 import { timelineManager } from '@/modules/core/timelineManager.mjs'; // Import to trigger registration
 import { vueDomManager } from '@/modules/core/vueDomManager.mjs'; // Import to trigger registration
 import * as scenePlane from '@/modules/scene/scenePlaneModule.mjs';
-import * as parallax from '@/modules/core/parallaxModule.mjs';
+import '@/modules/core/parallaxModule.mjs'; // Import to trigger IM registration
 import debugPanel from '@/modules/core/debugPanel.mjs';
 import * as autoScroll from '@/modules/animation/autoScrollModule.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
-import { badgeManager } from '@/modules/core/badgeManager.mjs';
-import '@/modules/core/badgeManager.mjs'; // Import to trigger BadgeManager instance creation
 import { AppState } from '@/modules/core/stateManager.mjs';
 
 
 import Timeline from '@/modules/components/Timeline.vue';
 import ResizeHandle from '@/modules/components/ResizeHandle.vue';
 import ResumeContainer from '@/modules/components/ResumeContainer.vue';
-import SkillBadges from '@/modules/components/SkillBadges.vue';
-import SankeyConnections from '@/modules/components/SankeyConnections.vue';
-import BadgeToggle from '@/modules/components/BadgeToggle.vue';
-import ConnectionLines from '@/modules/components/ConnectionLines.vue';
 
 
 export default {
@@ -159,10 +151,6 @@ export default {
     Timeline,
     ResizeHandle,
     ResumeContainer,
-    SkillBadges,
-    SankeyConnections,
-    ConnectionLines,
-    BadgeToggle,
   },
   mixins: [BaseVueComponentMixin],
 
@@ -183,17 +171,21 @@ export default {
     getComponentDependencies() {
       return [
         'SceneContainer', // Ensure DOM is ready before using viewport and composables
-        'ViewportManager',
+        'ViewportCore', // Core viewport DOM operations
+        'ViewportManager', // Vue reactive wrapper for viewport
+        'BullsEye', // Core BullsEye component (has setupDom method)
         'BullsEyeManager', 
         'AimPointManager',
         'FocalPointManager',
-        'ResizeHandleManager'
+        'ResizeHandleManager',
+        'ParallaxModule',
+        'CardsController'
       ];
     },
 
     initialize(dependencies) {
       // Validate all required dependencies are present
-      const requiredDeps = ['SceneContainer', 'ViewportManager', 'BullsEyeManager', 'AimPointManager', 'FocalPointManager', 'ResizeHandleManager'];
+      const requiredDeps = ['SceneContainer', 'ViewportCore', 'ViewportManager', 'BullsEye', 'BullsEyeManager', 'AimPointManager', 'FocalPointManager', 'ResizeHandleManager', 'ParallaxModule', 'CardsController'];
       for (const dep of requiredDeps) {
         if (!dependencies[dep]) {
           throw new Error(`[AppContent] Missing required dependency: ${dep}`);
@@ -202,11 +194,15 @@ export default {
       
       // Store IM-managed dependencies
       this.sceneContainer = dependencies.SceneContainer;
-      this.viewportManager = dependencies.ViewportManager;
+      this.viewportCore = dependencies.ViewportCore; // Core viewport DOM operations
+      this.viewportManager = dependencies.ViewportManager; // Vue reactive wrapper
+      this.bullsEye = dependencies.BullsEye; // Core BullsEye component
       this.bullsEyeManager = dependencies.BullsEyeManager;
       this.aimPointManager = dependencies.AimPointManager; 
       this.focalPointManager = dependencies.FocalPointManager;
       this.resizeHandleManager = dependencies.ResizeHandleManager;
+      this.parallaxModule = dependencies.ParallaxModule; // IM-injected dependency
+      this.cardsController = dependencies.CardsController; // IM-injected dependency
       
       // Also set the data references for computed properties
       this.imDependencies.viewportManager = dependencies.ViewportManager;
@@ -273,21 +269,23 @@ export default {
 
     /**
      * Setup logic for scene-content element
-     * Called when element becomes available
+     * Called when element becomes available via template ref
      */
     _setupSceneContent() {
-      // Add any element-specific setup logic here
-      // This replaces the immediate DOM access from initialize()
+      // DOM setup is handled by the main setupDom() method for IM compliance
+      // This method exists for template ref injection pattern
+      console.log('[AppContent.vue] scene-content element available via template ref');
     },
 
     /**
      * Setup logic for scene-plane element
-     * Called when element becomes available
+     * Called when element becomes available via template ref
      */
     _setupScenePlane() {
-      // Add any element-specific setup logic here
-      // This replaces the immediate DOM access from initialize()
-    }
+      // DOM setup is handled by the main setupDom() method for IM compliance
+      // This method exists for template ref injection pattern
+      console.log('[AppContent.vue] scene-plane element available via template ref');
+    },
   },
 
   async setup() {
@@ -366,7 +364,7 @@ export default {
         window.removeEventListener('scene-width-changed', handleSceneWidthChanged);
       }
       if (handleBadgeModeChanged) {
-        badgeManager.removeEventListener('badgeModeChanged', handleBadgeModeChanged);
+        window.removeEventListener('badge-mode-changed', handleBadgeModeChanged);
       }
       if (debugInterval) {
         clearInterval(debugInterval);
@@ -419,6 +417,12 @@ export default {
     // Separate async function to avoid lifecycle hook issues
     const initializeAsync = async () => {
       try {
+        // Get component instance to access IM dependencies
+        const instance = getCurrentInstance();
+        if (!instance) {
+          throw new Error('[AppContent] Cannot access component instance');
+        }
+        
         // Starting component initialization
         
         // Server-side dependency enforcement check
@@ -559,36 +563,40 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         console.log('[AppContent] Application initialization complete:', initStatus);
         
         // Now that Vue DOM is ready, setup DOM access for components that need it
-        const sceneContainer = initializationManager.getComponent('SceneContainer');
-        if (sceneContainer && sceneContainer.setupDom) {
-            await sceneContainer.setupDom();
+        // Access IM-injected dependencies from component instance
+        if (instance.proxy.sceneContainer && instance.proxy.sceneContainer.setupDom) {
+            await instance.proxy.sceneContainer.setupDom();
             console.log('[AppContent] SceneContainer DOM setup complete');
         }
         
-        // Setup BullsEye DOM after SceneContainer is ready
-        const bullsEye = initializationManager.getComponent('BullsEye');
-        if (bullsEye && bullsEye.setupDom) {
-            await bullsEye.setupDom();
+        // Setup ViewportCore DOM after SceneContainer is ready
+        if (instance.proxy.viewportCore && instance.proxy.viewportCore.setupDom) {
+            await instance.proxy.viewportCore.setupDom();
+            console.log('[AppContent] ViewportCore DOM setup complete');
+        }
+        
+        // Setup BullsEye DOM after ViewportManager is ready (BullsEye depends on viewport properties)
+        if (instance.proxy.bullsEye && instance.proxy.bullsEye.setupDom) {
+            await instance.proxy.bullsEye.setupDom();
             console.log('[AppContent] BullsEye DOM setup complete');
         }
         
-        // Setup ViewportManager DOM after SceneContainer is ready
-        const viewportManager = initializationManager.getComponent('ViewportManager');
-        if (viewportManager && viewportManager.setupDom) {
-            await viewportManager.setupDom();
-            console.log('[AppContent] ViewportManager DOM setup complete');
-        }
-        
         // Setup ParallaxModule DOM before CardsController (ParallaxModule needs to be ready for transforms)
-        const parallaxModule = initializationManager.getComponent('ParallaxModule');
-        if (parallaxModule && parallaxModule.setupDom) {
-            await parallaxModule.setupDom();
+        if (instance.proxy.parallaxModule && instance.proxy.parallaxModule.setupDom) {
+            await instance.proxy.parallaxModule.setupDom();
             console.log('[AppContent] ParallaxModule DOM setup complete');
         }
         
         // Setup CardsController DOM after ParallaxModule is ready
-        const cardsController = initializationManager.getComponent('CardsController');
+        // Use IM-injected dependency from component instance
+        const cardsController = instance.proxy.cardsController;
         if (cardsController) {
+            // Inject template ref for scene-content element
+            if (sceneContentRef.value && cardsController.setSceneContentElement) {
+                cardsController.setSceneContentElement(sceneContentRef.value);
+                console.log('[AppContent] CardsController scene-content template ref injected');
+            }
+            
             // Inject template ref for scene-plane element
             if (scenePlaneRef.value && cardsController.setScenePlaneElement) {
                 cardsController.setScenePlaneElement(scenePlaneRef.value);
@@ -603,15 +611,11 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         
         // Initialize coordination systems after BaseComponents are ready
         // ResizeHandleManager is now initialized by IM system - no manual initialization needed
-        // Use the singleton directly to ensure we're applying layout to the same instance
-        // that the reactive composable references
-        if (window.initializationManager) {
-          const resizeHandleManager = window.initializationManager.getComponent('ResizeHandleManager');
-          if (resizeHandleManager && resizeHandleManager.applyInitialLayout) {
-            resizeHandleManager.applyInitialLayout();
+        // Use IM-injected dependency from component instance
+        if (instance.proxy.resizeHandleManager && instance.proxy.resizeHandleManager.applyInitialLayout) {
+            instance.proxy.resizeHandleManager.applyInitialLayout();
             console.log('[AppContent] Applied initial layout via IM');
           }
-        }
         
         // Initialize scene systems
         autoScroll.initialize();
@@ -621,31 +625,26 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         
         // Provide template refs to IM-managed components
         setTimeout(() => {
-          // Get components directly from IM system
-          const aimPointManager = window.initializationManager?.getComponent('AimPointManager');
-          const focalPointManager = window.initializationManager?.getComponent('FocalPointManager');
+          // Use IM-injected dependencies from component instance
+          console.log('[AppContent] Template ref injection - AimPointManager:', !!instance.proxy.aimPointManager);
+          console.log('[AppContent] Template ref injection - FocalPointManager:', !!instance.proxy.focalPointManager);
           
-          console.log('[AppContent] Template ref injection - AimPointManager:', !!aimPointManager);
-          console.log('[AppContent] Template ref injection - FocalPointManager:', !!focalPointManager);
-          
-          if (aimPointRef.value && aimPointManager) {
+          if (aimPointRef.value && instance.proxy.aimPointManager) {
             console.log('[AppContent] Injecting aim point template ref');
-            aimPointManager.setAimPointElement(aimPointRef.value);
+            instance.proxy.aimPointManager.setAimPointElement(aimPointRef.value);
           } else {
             console.warn('[AppContent] Cannot inject aim point template ref - missing element or manager');
           }
           
-          if (focalPointRef.value && focalPointManager) {
+          if (focalPointRef.value && instance.proxy.focalPointManager) {
             console.log('[AppContent] Injecting focal point template ref');
-            focalPointManager.setFocalPointElement(focalPointRef.value);
+            instance.proxy.focalPointManager.setFocalPointElement(focalPointRef.value);
           } else {
             console.warn('[AppContent] Cannot inject focal point template ref - missing element or manager');
           }
         }, 100);
         
-        // Dispatch events for Vue components that need to know IM components are ready
-        window.dispatchEvent(new CustomEvent('skill-badges-init-ready'));
-        window.dispatchEvent(new CustomEvent('connection-lines-init-ready'));
+        // Note: SkillBadges and ConnectionLines archived - events no longer needed
         
         // Manual initialization of coordination systems after BaseComponents are ready
         // (These are not BaseComponents, just coordination logic)
@@ -1167,9 +1166,10 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
         }
         
         // Force bullsEye recentering with viewport awareness
-        const bullsEye = initializationManager.getComponent('BullsEye');
-        if (bullsEye) {
-          bullsEye.recenter();
+        // Use IM-injected dependency from component instance (need to get instance in this scope)
+        const currentInstance = getCurrentInstance();
+        if (currentInstance && currentInstance.proxy.bullsEyeManager) {
+          currentInstance.proxy.bullsEyeManager.recenter();
           await new Promise(resolve => setTimeout(resolve, 100));
           
           // Force another recenter to ensure proper positioning after viewport changes
@@ -1210,6 +1210,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
     
     // Template refs for DOM elements created by this component
     const sceneContainerRef = ref(null);
+    const sceneContentRef = ref(null);
     const scenePlaneRef = ref(null);
     const aimPointRef = ref(null);
     const bullsEyeRef = ref(null);
@@ -1247,6 +1248,7 @@ ${result.violations ? result.violations.map(v => `• ${v.name} (${v.file}): ${v
       
       // Template refs
       sceneContainerRef,
+      sceneContentRef,
       scenePlaneRef,
       aimPointRef,
       bullsEyeRef,

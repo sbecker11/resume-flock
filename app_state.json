@@ -1,14 +1,14 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-27T00:01:04.590Z",
+  "lastUpdated": "2025-07-27T04:24:25.812Z",
   "layout": {
     "panelSizePercentage": 50,
     "orientation": "scene-left",
-    "scenePercentage": 97.55799755799755,
-    "resumePercentage": 2.442002442002442
+    "scenePercentage": 65.49019607843137,
+    "resumePercentage": 34.509803921568626
   },
   "resizeHandle": {
-    "stepCount": 1
+    "stepCount": 5
   },
   "focalPoint": {
     "mode": "locked"
@@ -47,7 +47,7 @@
       }
     }
   },
-  "selectedJobNumber": null,
+  "selectedJobNumber": 1,
   "lastVisitedJobNumber": 1,
   "resume": {
     "sortRule": {
@@ -424,5 +424,5 @@
       }
     }
   },
-  "colorPalette": "purpley.json"
+  "colorPalette": "snow_springtime.json"
 }

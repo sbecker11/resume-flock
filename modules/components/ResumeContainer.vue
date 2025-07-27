@@ -118,7 +118,7 @@ export default {
   mixins: [BaseVueComponentMixin],
   methods: {
     getComponentDependencies() {
-      return ['SelectionManager'];
+      return ['ResizeHandleManager']; // ResumeContainer depends on ResizeHandle like SceneContainer
     },
     initialize(dependencies) {
       window.CONSOLE_LOG_IGNORE("ResumeContainer initialized with dependencies:", Object.keys(dependencies));

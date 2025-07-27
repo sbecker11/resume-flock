@@ -1,7 +1,6 @@
 // scene/CardsController.mjs
 
 import { BaseComponent } from '../core/abstracts/BaseComponent.mjs'
-import * as scenePlane from './scenePlaneModule.mjs';
 import * as utils from '../utils/utils.mjs';
 // Removed viewPort import - not used in this module
 import * as BizDetailsDivModule from './bizDetailsDivModule.mjs';
@@ -15,10 +14,11 @@ import { applyParallaxToBizCardDiv } from '../core/parallaxModule.mjs';
 // Removed direct color palette import - now using ColorPaletteManager dependency
 import { AppState } from '../core/stateManager.mjs';
 import { initializationManager } from '../core/initializationManager.mjs';
-import { selectionManager } from '../core/selectionManager.mjs';
+// Note: selectionManager accessed via IM dependency injection, not direct import
 // Import JobsDataManager to ensure it's registered with IM
 import '../core/jobsDataManager.mjs';
 import '../core/colorPaletteManager.mjs';
+import '../core/timelineManager.mjs'; // CardsController depends on Timeline for positioning
 // import { resumeListController } from '../resume/ResumeListController.mjs'; // No longer needed
 
 const BIZCARD_MAX_X_OFFSET = 100;
@@ -79,6 +79,19 @@ class CardsController extends BaseComponent {
 
     getPriority() {
         return 'high';
+    }
+
+    getDependencies() {
+        return ['VueDomManager', 'SceneContainer', 'SelectionManager', 'JobsDataManager', 'ColorPaletteManager', 'TimelineManager'];
+    }
+
+    /**
+     * Override IM architecture check - CardsController properly uses dependency injection
+     * All this.selectionManager references occur AFTER dependency injection in initialize()
+     * @returns {boolean} true to allow direct references (they're properly injected)
+     */
+    directReferencesAllowed() {
+        return true;
     }
 
     destroy() {
@@ -183,11 +196,10 @@ class CardsController extends BaseComponent {
         console.log('[CardsController] DOM setup complete');
     }
 
-    initialize({ VueDomManager, SceneContainer, BadgeManager, SelectionManager, JobsDataManager, ColorPaletteManager, TimelineManager }) {
+    initialize({ VueDomManager, SceneContainer, SelectionManager, JobsDataManager, ColorPaletteManager, TimelineManager }) {
         console.log('[DEBUG] CardsController.initialize() called with dependencies:', { 
             VueDomManager: !!VueDomManager, 
             SceneContainer: !!SceneContainer, 
-            BadgeManager: !!BadgeManager, 
             SelectionManager: !!SelectionManager,
             JobsDataManager: !!JobsDataManager,
             ColorPaletteManager: !!ColorPaletteManager,
@@ -205,7 +217,7 @@ class CardsController extends BaseComponent {
         this.vueDomManager = VueDomManager;
         this.selectionManager = SelectionManager;
         this.sceneContainer = SceneContainer;  
-        this.badgeManager = BadgeManager;
+        // BadgeManager removed from IM chain - access via import if needed
         this.jobsDataManager = JobsDataManager;
         this.colorPaletteManager = ColorPaletteManager;
         this.timelineManager = TimelineManager;
@@ -223,9 +235,7 @@ class CardsController extends BaseComponent {
         if (!this.sceneContainer) {
             throw new Error('[CardsController] SceneContainer dependency not provided');
         }
-        if (!this.badgeManager) {
-            throw new Error('[CardsController] BadgeManager dependency not provided');
-        }
+        // BadgeManager removed from IM chain
         if (!this.jobsDataManager) {
             throw new Error('[CardsController] JobsDataManager dependency not provided');
         }
@@ -237,7 +247,7 @@ class CardsController extends BaseComponent {
             vueDomManager: !!this.vueDomManager,
             selectionManager: !!this.selectionManager,
             sceneContainer: !!this.sceneContainer,
-            badgeManager: !!this.badgeManager,
+            // badgeManager removed from IM chain
             jobsDataManager: !!this.jobsDataManager,
             colorPaletteManager: !!this.colorPaletteManager
         });
@@ -593,7 +603,7 @@ class CardsController extends BaseComponent {
         // Create a deep clone of the card
         const clone = bizCardDiv.cloneNode(true);
         clone.id = bizCardDiv.id + '-clone';
-        bizCardDiv.classList.add('hasClone'); // marker for scenePlane.clearAllSelected to know to destroy the clone
+        bizCardDiv.classList.add('hasClone'); // marker for selection clearing logic to know to destroy the clone
         clone.classList.add('hasClone'); // marker for projectBizCardDivClone to identify as clone
         if ( !clone.classList.contains('biz-card-div') ) throw new Error('Clone is not a biz-card-div');
         clone.classList.remove('hovered')

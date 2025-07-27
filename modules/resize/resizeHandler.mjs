@@ -28,24 +28,16 @@ class ResizeHandler extends BaseComponent {
     }
 
     getDependencies() {
-        return ['SceneContainer', 'BullsEye']; // Wait for containers to be ready
+        return []; // No dependencies - base component
     }
 
     getPriority() {
-        return 'low'; // Initialize after other components are ready
+        return 'high'; // High priority - foundation component that others depend on
     }
 
     async initialize(dependencies = {}) {
         window.CONSOLE_LOG_IGNORE('[ResizeHandler] Initializing resize handling...');
         
-        // Get dependencies from service locator
-        this.sceneContainer = initializationManager.getComponent('SceneContainer');
-        this.bullsEye = initializationManager.getComponent('BullsEye');
-        
-        if (!this.sceneContainer || !this.bullsEye) {
-            throw new Error('[ResizeHandler] Required dependencies not available');
-        }
-
         // Create debounced resize handler
         this._debouncedResize = debounce(this._handleResize.bind(this), 100);
         
@@ -59,12 +51,7 @@ class ResizeHandler extends BaseComponent {
     _handleResize() {
         window.CONSOLE_LOG_IGNORE('[ResizeHandler] Resize event triggered');
 
-        // Recenter BullsEye when window resizes
-        if (this.bullsEye && this.bullsEye.isReady()) {
-            this.bullsEye.recenter();
-        }
-
-        // Dispatch custom event for other components
+        // Dispatch custom event for other components to handle resize
         window.dispatchEvent(new CustomEvent('viewport-resize', {
             detail: { source: 'ResizeHandler' }
         }));
@@ -76,8 +63,6 @@ class ResizeHandler extends BaseComponent {
             this._isListening = false;
         }
         this._debouncedResize = null;
-        this.sceneContainer = null;
-        this.bullsEye = null;
     }
 
     // Public API

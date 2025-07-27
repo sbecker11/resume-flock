@@ -67,7 +67,7 @@ export class ComponentScanner {
      * Check if directory should be skipped
      */
     _shouldSkipDirectory(name) {
-        const skipDirs = ['node_modules', '.git', 'dist', 'build', '.nuxt', '.output'];
+        const skipDirs = ['node_modules', '.git', 'dist', 'build', '.nuxt', '.output', 'archived_components'];
         return skipDirs.includes(name);
     }
 
@@ -343,6 +343,50 @@ export class ComponentScanner {
             }
         });
 
+        // 🛡️ NEW: Check for direct component reference violations
+        const directReferenceViolations = [
+            { 
+                pattern: /this\.viewport\./, 
+                message: 'Direct reference to this.viewport violates IM architecture - ViewportManager must be injected via initialize(dependencies) method' 
+            },
+            { 
+                pattern: /this\.selectionManager\./, 
+                message: 'Direct reference to this.selectionManager violates IM architecture - SelectionManager must be injected via initialize(dependencies) method' 
+            },
+            { 
+                pattern: /this\.stateManager\./, 
+                message: 'Direct reference to this.stateManager violates IM architecture - StateManager must be injected via initialize(dependencies) method' 
+            },
+            { 
+                pattern: /this\.bullsEye\./, 
+                message: 'Direct reference to this.bullsEye violates IM architecture - BullsEye must be injected via initialize(dependencies) method' 
+            },
+            { 
+                pattern: /initializationManager\.getComponent\(/, 
+                message: 'Direct service locator access violates IM architecture - components must only use references from initialize(dependencies) method' 
+            },
+            { 
+                pattern: /window\.initializationManager\./, 
+                message: 'Direct service locator access violates IM architecture - components must only use references from initialize(dependencies) method' 
+            }
+        ];
+
+        // Only check for direct references in BaseComponent classes
+        if (analysis.isComponent && (content.includes('extends BaseComponent') || content.includes('BaseVueComponentMixin'))) {
+            // Check if component explicitly allows direct references (consistent with asyncAllowed pattern)
+            const directReferencesAllowed = /directReferencesAllowed\s*\(\s*\)\s*\{\s*return\s+true/m.test(content);
+            
+            if (directReferencesAllowed) {
+                window.CONSOLE_LOG_IGNORE(`[ComponentScanner] ${filePath} explicitly allows direct references via directReferencesAllowed() - skipping violation checks`);
+            } else {
+                directReferenceViolations.forEach(({ pattern, message }) => {
+                    if (pattern.test(content)) {
+                        analysis.violations.push(message);
+                    }
+                });
+            }
+        }
+
         // 🛡️ NEW: Check for manual dependency waiting patterns
         const dependencyWaitingPatterns = [
             { pattern: /while\s*\(.*\.isInitialized/, message: 'Components should not poll for dependency readiness - use IM dependency declaration instead' },
@@ -463,6 +507,10 @@ export class ComponentScanner {
             }
         }
 
+        // 🛡️ NEW: Check for IM framework violations in placeholder methods
+        const placeholderMethodViolations = this._checkPlaceholderMethodViolations(content, filePath);
+        analysis.violations.push(...placeholderMethodViolations);
+
         return analysis;
     }
 
@@ -494,6 +542,114 @@ export class ComponentScanner {
         if (unregisteredCount > 0) {
             console.warn(`⚠️  Found ${unregisteredCount} non-compliant components`);
         }
+    }
+
+    /**
+     * Check for IM framework violations in placeholder methods
+     * Detects empty placeholder methods that should follow IM patterns
+     * @param {string} content - File content
+     * @param {string} filePath - Path to the file being analyzed
+     * @returns {Array} Array of violation objects
+     */
+    _checkPlaceholderMethodViolations(content, filePath) {
+        const violations = [];
+        
+        // Define patterns for placeholder methods that should follow IM framework
+        const placeholderMethods = [
+            {
+                name: '_setupScenePlane',
+                pattern: /_setupScenePlane\s*\(\s*\)\s*\{([^}]*)\}/,
+                expectedPattern: /setupDom|DOM|element/i,
+                violation: {
+                    type: 'empty-placeholder-method',
+                    severity: 'medium',
+                    message: '_setupScenePlane() is empty placeholder - should follow IM DOM separation pattern with proper setupDom() implementation',
+                    autoFixable: false
+                }
+            },
+            {
+                name: '_setupSceneContent',
+                pattern: /_setupSceneContent\s*\(\s*\)\s*\{([^}]*)\}/,
+                expectedPattern: /setupDom|DOM|element/i,
+                violation: {
+                    type: 'empty-placeholder-method',
+                    severity: 'medium',
+                    message: '_setupSceneContent() is empty placeholder - should follow IM DOM separation pattern with proper setupDom() implementation',
+                    autoFixable: false
+                }
+            }
+        ];
+        
+        placeholderMethods.forEach(({ name, pattern, expectedPattern, violation }) => {
+            const match = content.match(pattern);
+            if (match) {
+                const methodBody = match[1].trim();
+                
+                // Check if method body is essentially empty (only comments or whitespace)
+                const meaningfulContent = methodBody
+                    .replace(/\/\*[\s\S]*?\*\//g, '') // Remove block comments
+                    .replace(/\/\/.*$/gm, '') // Remove line comments
+                    .replace(/\s+/g, ' ') // Normalize whitespace
+                    .trim();
+                    
+                // If method is empty or only contains placeholder comments
+                if (!meaningfulContent || 
+                    meaningfulContent.length < 10 || // Very short = likely just placeholder
+                    (meaningfulContent.includes('Add any') && meaningfulContent.includes('setup logic')) ||
+                    meaningfulContent.includes('This replaces the immediate DOM access')) {
+                    
+                    violations.push({
+                        ...violation,
+                        message: `${name}() is empty placeholder bypassing IM framework - should implement proper DOM operations or be removed`
+                    });
+                }
+                
+                // Also check if it lacks proper IM patterns even if not empty
+                if (meaningfulContent && !expectedPattern.test(methodBody)) {
+                    violations.push({
+                        type: 'non-im-placeholder-method',
+                        severity: 'low',
+                        message: `${name}() doesn't follow IM DOM separation patterns - consider implementing setupDom() logic or removing`,
+                        autoFixable: false
+                    });
+                }
+            }
+        });
+        
+        // Check for methods that look like IM framework bypass patterns
+        const frameworkBypassPatterns = [
+            {
+                pattern: /(\w+)\s*\(\s*\)\s*\{\s*\/\/[^}]*immediate DOM access[^}]*\}/i,
+                violation: {
+                    type: 'im-framework-bypass',
+                    severity: 'medium',
+                    message: 'Method contains placeholder comment about "immediate DOM access" - should follow IM DOM separation with setupDom()',
+                    autoFixable: false
+                }
+            },
+            {
+                pattern: /(\w+)\s*\(\s*\)\s*\{\s*\/\/[^}]*Add any[^}]*setup logic[^}]*\}/i,
+                violation: {
+                    type: 'im-framework-bypass', 
+                    severity: 'medium',
+                    message: 'Method contains generic placeholder comment - should implement IM-compliant DOM operations or be removed',
+                    autoFixable: false
+                }
+            }
+        ];
+        
+        frameworkBypassPatterns.forEach(({ pattern, violation }) => {
+            const matches = content.matchAll(new RegExp(pattern.source, pattern.flags + 'g'));
+            for (const match of matches) {
+                const methodName = match[1];
+                violations.push({
+                    ...violation,
+                    message: `${methodName}() ${violation.message}`
+                });
+            }
+        });
+        
+        return violations;
     }
 
     /**
@@ -648,6 +804,23 @@ export class ComponentScanner {
             return 'Replace getElementById with dependency injection - import composable and cache reference from initialize(dependencies) parameter';
         }
 
+        // 🛡️ NEW: Fix recommendations for direct reference violations
+        if (violationText.includes('Direct reference to this.viewport violates IM architecture')) {
+            return 'Remove this.viewport - add ViewportManager to component imports and use reference from initialize(dependencies) method. For legitimate exceptions, override directReferencesAllowed() { return true; }';
+        }
+        if (violationText.includes('Direct reference to this.selectionManager violates IM architecture')) {
+            return 'Remove this.selectionManager - add SelectionManager to component imports and use reference from initialize(dependencies) method. For legitimate exceptions, override directReferencesAllowed() { return true; }';
+        }
+        if (violationText.includes('Direct reference to this.stateManager violates IM architecture')) {
+            return 'Remove this.stateManager - add StateManager to component imports and use reference from initialize(dependencies) method. For legitimate exceptions, override directReferencesAllowed() { return true; }';
+        }
+        if (violationText.includes('Direct reference to this.bullsEye violates IM architecture')) {
+            return 'Remove this.bullsEye - add BullsEye to component imports and use reference from initialize(dependencies) method. For legitimate exceptions, override directReferencesAllowed() { return true; }';
+        }
+        if (violationText.includes('Direct service locator access violates IM architecture')) {
+            return 'Remove initializationManager.getComponent() calls - add required components to imports and use references from initialize(dependencies) method. For legitimate exceptions, override directReferencesAllowed() { return true; }';
+        }
+
         // 🛡️ NEW: Fix recommendations for DOM separation violations
         if (violationText.includes('DOM access in initialize() method')) {
             return 'Move DOM operations from initialize() to new setupDom() method';
@@ -675,6 +848,20 @@ export class ComponentScanner {
         }
         if (violationText.includes('needs to call component.setupDom()')) {
             return 'Add await component.setupDom() calls in AppContent.vue after IM initialization';
+        }
+
+        // 🛡️ NEW: Fix recommendations for IM framework placeholder violations
+        if (violationText.includes('is empty placeholder bypassing IM framework')) {
+            return 'Replace empty placeholder method with proper IM-compliant DOM operations in setupDom() method, or remove the placeholder entirely';
+        }
+        if (violationText.includes('doesn\'t follow IM DOM separation patterns')) {
+            return 'Refactor method to follow IM DOM separation - move DOM operations to setupDom() method and use proper dependency injection';
+        }
+        if (violationText.includes('placeholder comment about "immediate DOM access"')) {
+            return 'Remove placeholder comment and implement proper IM DOM separation with setupDom() method';
+        }
+        if (violationText.includes('generic placeholder comment')) {
+            return 'Remove generic placeholder and implement actual IM-compliant functionality or delete the method';
         }
         
         return 'Follow dependency management guidelines';

@@ -3,7 +3,7 @@ import { BaseComponent } from '@/modules/core/abstracts/BaseComponent.mjs';
 import { useLayoutToggle } from './useLayoutToggle.mjs';
 
 // --- Constants ---
-export const MODES = {
+export const FOCALPOINT_MODES = {
   LOCKED: 'locked',
   FOLLOWING: 'following',
   DRAGGING: 'dragging'
@@ -14,9 +14,10 @@ export class BullsEyeManager extends BaseComponent {
   constructor() {
     super('BullsEyeManager');
     this.bullsEyeCore = null;
-    this.mode = MODES.LOCKED;
+    this.focalPointMode = FOCALPOINT_MODES.LOCKED;
     this.mousePosition = { x: 0, y: 0 };
     this.updateTimeout = null;
+    this.isProperlyInitialized = false; // Track actual positioning status
     
     // Reactive state
     this.bullsEyeState = ref({
@@ -32,11 +33,24 @@ export class BullsEyeManager extends BaseComponent {
   initialize(dependencies) {
     this.bullsEyeCore = dependencies.BullsEye;
     
-    // Initial position update
-    this.updateBullsEyePosition();
+    // Listen for bulls-eye-moved events from core (fired after setupDom positioning)
+    window.addEventListener('bulls-eye-moved', (event) => {
+      const { position } = event.detail;
+      this.bullsEyeState.value.x = position.x;
+      this.bullsEyeState.value.y = position.y;
+      
+      // Mark as properly initialized once we receive the first position update
+      if (!this.isProperlyInitialized) {
+        this.isProperlyInitialized = true;
+        console.log('[BullsEyeManager] Now properly initialized with position from bulls-eye-moved event:', position);
+      }
+    });
     
     // Set up event listeners for mouse tracking
     this.setupEventListeners();
+    
+    // Note: Initial position update removed - will be set via bulls-eye-moved event after setupDom()
+    console.log('[BullsEyeManager] Initialized - waiting for bulls-eye-moved event for position');
   }
 
   updateBullsEyePosition() {
@@ -44,8 +58,20 @@ export class BullsEyeManager extends BaseComponent {
       const bullsEyeElement = this.bullsEyeCore.getBullsEyeElement();
       if (bullsEyeElement) {
         const rect = bullsEyeElement.getBoundingClientRect();
-        this.bullsEyeState.value.x = rect.left + rect.width / 2;
-        this.bullsEyeState.value.y = rect.top + rect.height / 2;
+        const newX = rect.left + rect.width / 2;
+        const newY = rect.top + rect.height / 2;
+        
+        // Only update if we have valid coordinates (not 0,0 from unready DOM)
+        if (newX > 0 && newY > 0) {
+          this.bullsEyeState.value.x = newX;
+          this.bullsEyeState.value.y = newY;
+          
+          // Mark as properly initialized once we have a valid position
+          if (!this.isProperlyInitialized) {
+            this.isProperlyInitialized = true;
+            console.log('[BullsEyeManager] Now properly initialized with position:', { x: newX, y: newY });
+          }
+        }
       }
     }
   }
@@ -77,12 +103,16 @@ export class BullsEyeManager extends BaseComponent {
     window.CONSOLE_LOG_IGNORE('[BullsEyeManager] No event listeners needed - bulls-eye position is fixed at viewport center');
   }
 
-  setMode(newMode) {
-    this.mode = newMode;
+  setFocalPointMode(newFocalPointMode) {
+    this.focalPointMode = newFocalPointMode;
   }
 
-  getMode() {
-    return this.mode;
+  getFocalPointMode() {
+    return this.focalPointMode;
+  }
+
+  isReady() {
+    return this.isProperlyInitialized && this.bullsEyeCore && this.bullsEyeCore.isReady();
   }
 
   destroy() {
@@ -90,6 +120,7 @@ export class BullsEyeManager extends BaseComponent {
       clearTimeout(this.updateTimeout);
     }
     this.bullsEyeCore = null;
+    this.isProperlyInitialized = false;
   }
 }
 
@@ -109,11 +140,12 @@ export function useBullsEye() {
   const instance = getCurrentInstance();
   
   // Register cleanup on component unmount (only if inside a Vue component)
-  if (instance) {
-    onUnmounted(() => {
-      cleanup();
-    });
-  }
+  // TEMPORARILY DISABLED - causing Vue subTree error
+  // if (instance) {
+  //   onUnmounted(() => {
+  //     cleanup();
+  //   });
+  // }
 
   // Watch for layout changes and update bulls-eye reactively
   const layoutToggle = useLayoutToggle();
@@ -137,10 +169,10 @@ export function useBullsEye() {
     x: bullsEyeManager.bullsEyeState.value.x, 
     y: bullsEyeManager.bullsEyeState.value.y 
   }));
-  const mode = computed(() => bullsEyeManager.getMode());
-  const isLocked = computed(() => bullsEyeManager.getMode() === MODES.LOCKED);
-  const isFollowing = computed(() => bullsEyeManager.getMode() === MODES.FOLLOWING);
-  const isDragging = computed(() => bullsEyeManager.getMode() === MODES.DRAGGING);
+  const focalPointMode = computed(() => bullsEyeManager.getFocalPointMode());
+  const isLocked = computed(() => bullsEyeManager.getFocalPointMode() === FOCALPOINT_MODES.LOCKED);
+  const isFollowing = computed(() => bullsEyeManager.getFocalPointMode() === FOCALPOINT_MODES.FOLLOWING);
+  const isDragging = computed(() => bullsEyeManager.getFocalPointMode() === FOCALPOINT_MODES.DRAGGING);
 
   // Wrapper functions that delegate to the IM-managed instance
   function setBullsEye(x, y, source = 'composable') {
@@ -150,8 +182,8 @@ export function useBullsEye() {
     return bullsEyeManager.updateBullsEyePosition();
   }
 
-  function setMode(newMode) {
-    return bullsEyeManager.setMode(newMode);
+  function setFocalPointMode(newFocalPointMode) {
+    return bullsEyeManager.setFocalPointMode(newFocalPointMode);
   }
 
   function updatePosition() {
@@ -170,14 +202,14 @@ export function useBullsEye() {
     x,
     y,
     position,
-    mode,
+    focalPointMode,
     isLocked,
     isFollowing,
     isDragging,
     
     // Methods
     setBullsEye,
-    setMode,
+    setFocalPointMode,
     updatePosition,
     cleanup
   };

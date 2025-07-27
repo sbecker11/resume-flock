@@ -2,19 +2,16 @@ import { ref, computed, onMounted, onUnmounted, watchEffect, getCurrentInstance 
 import { useLayoutToggle } from './useLayoutToggle.mjs';
 import { BaseComponent } from '@/modules/core/abstracts/BaseComponent.mjs';
 
-// --- Constants ---
-const VIEWPORT_PADDING = 100;
-
 // --- Viewport Manager Component (IM-managed) ---
+// Vue reactive wrapper around ViewportCore
 export class ViewportManager extends BaseComponent {
   constructor() {
     super('ViewportManager');
-    this.sceneContainer = null;
-    this.resizeObserver = null;
+    this.viewportCore = null;
     
-    // Reactive state
+    // Reactive state - wraps ViewportCore data
     this.viewportState = ref({
-      padding: VIEWPORT_PADDING,
+      padding: 100,
       top: 0,
       left: 0,
       right: 0,
@@ -27,77 +24,65 @@ export class ViewportManager extends BaseComponent {
   }
 
   getDependencies() {
-    return ['SceneContainer'];
+    return ['ViewportCore']; // Depends on ViewportCore for DOM operations
   }
 
   initialize(dependencies) {
-    this.sceneContainer = dependencies.SceneContainer;
-    console.log('[ViewportManager] Initialized with SceneContainer dependency - DOM operations moved to setupDom()');
+    this.viewportCore = dependencies.ViewportCore;
+    
+    // Initial sync from core data
+    this.syncFromCore();
+    
+    // Listen for viewport updates from core
+    window.addEventListener('viewport-resize', (event) => {
+      this.syncFromCore();
+    });
+    
+    console.log('[ViewportManager] Initialized with ViewportCore dependency - reactive wrapper ready');
   }
 
   /**
-   * DOM setup phase - called after Vue DOM is ready
-   * Moved DOM operations from initialize() for proper DOM separation
+   * Sync reactive state from ViewportCore data
+   * Called when ViewportCore updates its calculations
    */
-  async setupDom() {
-    console.log('[ViewportManager] DOM setup phase - setting up viewport calculations...');
+  syncFromCore() {
+    if (!this.viewportCore) return;
     
-    // Initial calculation (DOM operations moved from initialize)
-    this.updateViewportProperties();
-
-    // Listen for window resize (DOM operations moved from initialize)
-    window.addEventListener('resize', () => this.updateViewportProperties());
-
-    // Add ResizeObserver for scene container (DOM operations moved from initialize)
-    if (typeof ResizeObserver !== 'undefined') {
-      this.resizeObserver = new ResizeObserver(() => {
-        window.CONSOLE_LOG_IGNORE('Scene container resized, updating viewport...');
-        this.updateViewportProperties();
-      });
-      this.resizeObserver.observe(this.sceneContainer.getSceneContainer());
-    }
+    const coreProperties = this.viewportCore.getViewportProperties();
     
-    console.log('[ViewportManager] DOM setup complete');
-  }
-
-  updateViewportProperties() {
-    if (!this.sceneContainer) return;
-
-    const sceneElement = this.sceneContainer.getSceneContainer();
-    const sceneContainerRect = sceneElement.getBoundingClientRect();
-    const sceneWidth = sceneElement.offsetWidth;
-    const viewPortWidth = sceneWidth;
-    const viewPortLeft = 0;
-    const viewPortHeight = sceneContainerRect.height;
-    const viewPortTop = sceneContainerRect.top;
-
-    const newCenterX = sceneContainerRect.left + sceneContainerRect.width / 2;
-    const newCenterY = sceneContainerRect.top + sceneContainerRect.height / 2;
-    
-    window.CONSOLE_LOG_IGNORE('updateViewportProperties: viewPortWidth:', viewPortWidth, 'viewPortHeight:', viewPortHeight, 'centerX:', newCenterX, 'centerY:', newCenterY);
-    
+    // Update reactive state with core data
     this.viewportState.value = {
-      padding: VIEWPORT_PADDING,
-      top: viewPortTop - VIEWPORT_PADDING,
-      left: viewPortLeft - VIEWPORT_PADDING,
-      right: viewPortWidth + 2 * VIEWPORT_PADDING,
-      bottom: viewPortHeight + 2 * VIEWPORT_PADDING,
-      centerX: newCenterX,
-      centerY: newCenterY,
-      width: viewPortWidth,
-      height: viewPortHeight
+      padding: coreProperties.padding,
+      top: coreProperties.top - coreProperties.padding,
+      left: coreProperties.left - coreProperties.padding,
+      right: coreProperties.width + 2 * coreProperties.padding,
+      bottom: coreProperties.height + 2 * coreProperties.padding,
+      centerX: coreProperties.centerX,
+      centerY: coreProperties.centerY,
+      width: coreProperties.width,
+      height: coreProperties.height
     };
 
-    // Dispatch viewport-changed event for backward compatibility
+    // Dispatch backward compatibility event
     const event = new CustomEvent('viewport-changed', {
       detail: {
         centerX: this.viewportState.value.centerX,
         centerY: this.viewportState.value.centerY,
-        width: viewPortWidth,
-        height: viewPortHeight
+        width: this.viewportState.value.width,
+        height: this.viewportState.value.height
       }
     });
     window.dispatchEvent(event);
+  }
+
+  /**
+   * Backward compatibility method - delegates to ViewportCore
+   * @deprecated Use ViewportCore.updateViewportProperties() directly for DOM operations
+   */
+  updateViewportProperties() {
+    if (this.viewportCore) {
+      this.viewportCore.updateViewportProperties();
+    }
   }
 
   setViewPortWidth(newWidth) {
@@ -111,7 +96,7 @@ export class ViewportManager extends BaseComponent {
     this.viewportState.value = {
       ...this.viewportState.value,
       width: newWidth,
-      right: newWidth + 2 * VIEWPORT_PADDING
+      right: newWidth + 2 * this.viewportState.value.padding
     };
 
     // Dispatch viewport-changed event
@@ -126,10 +111,20 @@ export class ViewportManager extends BaseComponent {
   }
 
   getVisualRect() {
-    if (!this.sceneContainer) {
+    // Delegate to ViewportCore for DOM operations
+    if (!this.viewportCore) {
       return { top: 0, left: 0, bottom: 0, right: 0, width: 0, height: 0 };
     }
-    return this.sceneContainer.getSceneContainer().getBoundingClientRect();
+    
+    const props = this.viewportCore.getViewportProperties();
+    return {
+      top: props.top,
+      left: props.left,
+      bottom: props.bottom, 
+      right: props.right,
+      width: props.width,
+      height: props.height
+    };
   }
 
   getViewPortOrigin() {
@@ -155,12 +150,11 @@ export class ViewportManager extends BaseComponent {
   }
 
   destroy() {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-      this.resizeObserver = null;
-    }
-    window.removeEventListener('resize', () => this.updateViewportProperties());
-    this.sceneContainer = null;
+    // Remove viewport update listener
+    window.removeEventListener('viewport-resize', (event) => {
+      this.syncFromCore();
+    });
+    this.viewportCore = null;
   }
 }
 
@@ -182,11 +176,12 @@ export function useViewport(label = 'unnamed') {
   const instance = getCurrentInstance();
   
   // Register cleanup on component unmount (only if inside a Vue component)
-  if (instance) {
-    onUnmounted(() => {
-      cleanup();
-    });
-  }
+  // TEMPORARILY DISABLED - causing Vue subTree error
+  // if (instance) {
+  //   onUnmounted(() => {
+  //     cleanup();
+  //   });
+  // }
 
   // Watch for layout changes and update viewport reactively
   const layoutToggle = useLayoutToggle();
@@ -196,10 +191,10 @@ export function useViewport(label = 'unnamed') {
     window.CONSOLE_LOG_IGNORE(`[${label}] Layout orientation changed to:`, orientation);
     
     // Trigger viewport recalculation after layout change
-    if (viewportManager.sceneContainer) {
+    if (viewportManager.viewportCore) {
       setTimeout(() => {
         // Wait for CSS transitions to complete before updating viewport properties
-        viewportManager.updateViewportProperties();
+        viewportManager.viewportCore.updateViewportProperties();
       }, 350); // Increased delay to match CSS transition duration
     }
   });
@@ -226,7 +221,7 @@ export function useViewport(label = 'unnamed') {
   }
 
   function isInitialized() {
-    return viewportManager.sceneContainer !== null;
+    return viewportManager.viewportCore !== null;
   }
 
   function setViewPortWidth(newWidth) {
@@ -234,7 +229,10 @@ export function useViewport(label = 'unnamed') {
   }
 
   function updateViewPort() {
-    return viewportManager.updateViewportProperties();
+    // Delegate to ViewportCore for actual DOM update
+    if (viewportManager.viewportCore) {
+      viewportManager.viewportCore.updateViewportProperties();
+    }
   }
 
   function getViewPortRect() {

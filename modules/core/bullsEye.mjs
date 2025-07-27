@@ -3,6 +3,7 @@
 
 import { BaseComponent } from './abstracts/BaseComponent.mjs';
 import { initializationManager } from './initializationManager.mjs';
+import { AppState } from './stateManager.mjs';
 
 /**
  * BullsEye - Manages the bulls-eye crosshair element positioning
@@ -15,7 +16,7 @@ class BullsEye extends BaseComponent {
     }
 
     getDependencies() {
-        return ['SceneContainer']; // Wait for SceneContainer to be ready
+        return ['ViewportCore']; // Wait for ViewportCore to be ready
     }
 
     getPriority() {
@@ -24,14 +25,22 @@ class BullsEye extends BaseComponent {
 
     initialize(dependencies = {}) {
         try {
-            // Get SceneContainer from service locator - functional reference only
-            const sceneContainer = initializationManager.getComponent('SceneContainer');
-            if (!sceneContainer) {
-                throw new Error('[BullsEye] SceneContainer not available from service locator');
-            }
-
-            // Store reference for later DOM access
-            this.sceneContainer = sceneContainer;
+            // Store ViewportCore dependency
+            this.viewportCore = dependencies.ViewportCore;
+            
+            // Get SceneContainer through ViewportCore
+            this.sceneContainer = this.viewportCore.sceneContainer;
+            
+            // Listen for viewport resize events
+            window.addEventListener('viewport-resize', () => {
+                if (this._bullsEyeElement && this.sceneContainer) {
+                    const sceneContainerElement = this.sceneContainer.getSceneContainer();
+                    if (sceneContainerElement) {
+                        this._centerBullsEye(sceneContainerElement);
+                    }
+                }
+            });
+            
             window.CONSOLE_LOG_IGNORE('[BullsEye] Functional initialization complete');
         } catch (error) {
             console.error('[BullsEye] Initialization failed:', error);
@@ -71,6 +80,31 @@ class BullsEye extends BaseComponent {
     }
 
     _centerBullsEye(sceneContainerElement) {
+        // Check if scene percentage is 0% - if so, hide all focal point elements
+        const scenePercentage = AppState?.layout?.scenePercentage || 0;
+        if (scenePercentage <= 0) {
+            console.log('[BullsEye] Scene percentage is 0% - hiding bullsEye, aimPoint, and focalPoint');
+            
+            // Hide bullsEye
+            if (this._bullsEyeElement) {
+                this._bullsEyeElement.style.visibility = 'hidden';
+            }
+            
+            // Hide aimPoint via AimPointManager
+            const aimPointManager = initializationManager?.getComponent('AimPointManager');
+            if (aimPointManager && aimPointManager.aimPointElement) {
+                aimPointManager.aimPointElement.style.visibility = 'hidden';
+            }
+            
+            // Hide focalPoint via FocalPointManager
+            const focalPointManager = initializationManager?.getComponent('FocalPointManager');
+            if (focalPointManager && focalPointManager.focalPointElement) {
+                focalPointManager.focalPointElement.style.visibility = 'hidden';
+            }
+            
+            return; // Early return to avoid geometry calculations
+        }
+        
         const sceneRect = sceneContainerElement.getBoundingClientRect();
         
         // 🛡️ CRITICAL: Fail fast on invalid geometry during development
@@ -99,6 +133,18 @@ class BullsEye extends BaseComponent {
         this._bullsEyeElement.style.top = `${centerY}px`;
         this._bullsEyeElement.style.transform = 'translate(-50%, -50%)';
         this._bullsEyeElement.style.zIndex = '1000';
+        this._bullsEyeElement.style.visibility = 'visible'; // Ensure visibility when scene is active
+        
+        // Show aimPoint and focalPoint when scene is active
+        const aimPointManager = initializationManager?.getComponent('AimPointManager');
+        if (aimPointManager && aimPointManager.aimPointElement) {
+            aimPointManager.aimPointElement.style.visibility = 'visible';
+        }
+        
+        const focalPointManager = initializationManager?.getComponent('FocalPointManager');
+        if (focalPointManager && focalPointManager.focalPointElement) {
+            focalPointManager.focalPointElement.style.visibility = 'visible';
+        }
         
         // window.CONSOLE_LOG_IGNORE('[BullsEye] Applied styles:', {
         //     position: this._bullsEyeElement.style.position,
@@ -129,6 +175,16 @@ class BullsEye extends BaseComponent {
             Math.pow(bullsEyeCenter.y - referenceCenter.y, 2)
         );
         console.log('[BullsEye] Distance from scene center:', distance.toFixed(2) + 'px');
+        
+        // Dispatch event for other components to listen to bullsEye position changes
+        const bullsEyeMovedEvent = new CustomEvent('bulls-eye-moved', {
+            detail: {
+                position: { x: centerX, y: centerY },
+                sceneRect: sceneRect
+            }
+        });
+        window.dispatchEvent(bullsEyeMovedEvent);
+        console.log('[BullsEye] Dispatched bulls-eye-moved event with position:', { x: centerX, y: centerY });
     }
 
     getPosition() {

@@ -12,9 +12,6 @@ const DEFAULT_WIDTH_PERCENT = 50;
 export class ResizeHandleManager extends BaseComponent {
   constructor() {
     super('ResizeHandleManager');
-    this.viewport = null;
-    this.bullsEyeManager = null;
-    this.aimPointManager = null;
     this._resizeTimeoutId = null;
     
     // Reactive state
@@ -25,13 +22,11 @@ export class ResizeHandleManager extends BaseComponent {
   }
 
   getDependencies() {
-    return ['ViewportManager', 'BullsEyeManager', 'AimPointManager'];
+    return []; // ResizeHandle is a foundation component - ViewportManager depends on it
   }
 
-  initialize(dependencies) {
-    this.viewport = dependencies.ViewportManager;
-    this.bullsEyeManager = dependencies.BullsEyeManager;
-    this.aimPointManager = dependencies.AimPointManager;
+  initialize(dependencies = {}) {
+    // ResizeHandle doesn't depend on ViewportManager - ViewportManager depends on ResizeHandle
     
     // Initialize state from AppState
     this.initializeState();
@@ -105,32 +100,13 @@ export class ResizeHandleManager extends BaseComponent {
   }
 
   handleViewportResize() {
-    // 1. Recenter the bullsEye
-    if (this.bullsEyeManager && this.bullsEyeManager.recenter) {
-        this.bullsEyeManager.recenter();
-    }
+    // With the new IM dependency chain, components should handle their own updates:
+    // - BullsEye listens for 'viewport-resize' events and recenters itself
+    // - AimPoint automatically syncs with BullsEye via bulls-eye-moved events  
+    // - FocalPoint automatically syncs with AimPoint via interval polling
+    // ResizeHandleManager should NOT directly manipulate these components
     
-    // 2. Update aimPoint position to bullsEye center
-    let bullsEyeCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    if (this.bullsEyeManager && this.bullsEyeManager.getBullsEyePosition) {
-        const bullsEyePosition = this.bullsEyeManager.getBullsEyePosition();
-        if (bullsEyePosition) {
-            bullsEyeCenter = {
-                x: bullsEyePosition.x,
-                y: bullsEyePosition.y
-            };
-        }
-    }
-    this.aimPointManager.setPosition(bullsEyeCenter.x, bullsEyeCenter.y, 'viewportResize');
-    
-    // 3. Update focal point to aimPoint position
-    const event = new CustomEvent('focal-point-update', { 
-        detail: { 
-            source: 'viewportResize',
-            position: bullsEyeCenter
-        } 
-    });
-    window.dispatchEvent(event);
+    console.log('[ResizeHandleManager] Viewport resize handled - letting IM dependency chain handle updates');
   }
 
   updateLayout(newUiPercentage, shouldSave = true, isStepOperation = false) {
@@ -150,7 +126,10 @@ export class ResizeHandleManager extends BaseComponent {
         let finalSceneWidth = Math.floor((actualPercentage / 100) * maxSceneWidth);
         
         console.log('[ResizeHandleManager] Actual percentage:', actualPercentage, 'Final scene width:', finalSceneWidth);
-        console.log('[ResizeHandleManager] OLD sceneWidthInPixels:', this.sceneWidthInPixels.value);
+        
+        // Capture old width BEFORE updating
+        const oldSceneWidth = this.sceneWidthInPixels.value;
+        console.log('[ResizeHandleManager] OLD sceneWidthInPixels:', oldSceneWidth);
         
         // Store the values
         this.sceneWidthInPixels.value = finalSceneWidth;
@@ -167,16 +146,23 @@ export class ResizeHandleManager extends BaseComponent {
         }
         // For step operations, uiPercentage is already set correctly, don't modify it
         
-        console.log('[ResizeHandleManager] NEW sceneWidthInPixels:', this.sceneWidthInPixels.value);
-        
-        if (this.viewport) {
-            console.log('[ResizeHandleManager] Calling viewport.setViewPortWidth with:', finalSceneWidth);
-            this.viewport.setViewPortWidth(finalSceneWidth);
-        } else {
-            console.log('[ResizeHandleManager] WARNING: No viewport available');
+        // Only dispatch event and save if scene width actually changed
+        if (finalSceneWidth !== oldSceneWidth) {
+            console.log('[ResizeHandleManager] Scene width changed:', oldSceneWidth, '->', finalSceneWidth);
+            
+            // Dispatch event so other components can react to resize handle changes
+            window.dispatchEvent(new CustomEvent('resize-handle-changed', {
+                detail: { sceneWidth: finalSceneWidth }
+            }));
+            
+            // Also dispatch scene-width-changed for AppContent CSS reactivity
+            window.dispatchEvent(new CustomEvent('scene-width-changed', {
+                detail: { width: finalSceneWidth }
+            }));
         }
+        // Skip logging when no change detected
         
-        if (AppState?.layout) {
+        if (AppState?.layout && (finalSceneWidth !== oldSceneWidth || shouldSave)) {
             if (isStepOperation) {
                 // For step operations, save the clean percentage values directly
                 console.log('[ResizeHandleManager] Step operation - saving clean percentages:', this.uiPercentage.value);
@@ -193,50 +179,12 @@ export class ResizeHandleManager extends BaseComponent {
                 AppState.layout.resumePercentage = trueResumePercentage;
             }
             
-            if (shouldSave) {
-                console.log('[ResizeHandleManager] Saving state');
+            if (shouldSave && finalSceneWidth !== oldSceneWidth) {
+                console.log('[ResizeHandleManager] Saving state for scene width change');
                 saveState(AppState);
             }
+            // Skip logging when no save needed
         }
-        
-        // Recenter bulls-eye when scene width changes - wait for DOM to update
-        console.log('[ResizeHandleManager] Scheduling bulls-eye recenter after DOM update');
-        
-        // Use requestAnimationFrame to wait for DOM to finish updating
-        requestAnimationFrame(() => {
-            console.log('[ResizeHandleManager] Executing bulls-eye recenter after DOM update');
-            
-            // Try the injected bulls-eye manager first
-            if (this.bullsEyeManager && this.bullsEyeManager.recenter) {
-                console.log('[ResizeHandleManager] Calling recenter() on injected manager');
-                this.bullsEyeManager.recenter();
-                console.log('[ResizeHandleManager] Recentered bulls-eye via injected manager');
-            } 
-            // Fallback: try direct access to core BullsEye component
-            else if (window.initializationManager) {
-                const coreBullsEye = window.initializationManager.getComponent('BullsEye');
-                console.log('[ResizeHandleManager] Trying core BullsEye component:', {
-                    hasCoreBullsEye: !!coreBullsEye,
-                    hasRecenterMethod: !!(coreBullsEye && coreBullsEye.recenter)
-                });
-                if (coreBullsEye && coreBullsEye.recenter) {
-                    console.log('[ResizeHandleManager] Calling recenter() on core component');
-                    coreBullsEye.recenter();
-                    console.log('[ResizeHandleManager] Recentered bulls-eye via core component');
-                } else {
-                    console.log('[ResizeHandleManager] WARNING: Core BullsEye recenter method not available');
-                }
-            } else {
-                console.log('[ResizeHandleManager] WARNING: No bulls-eye access available');
-            }
-        });
-        
-        const layoutEvent = new CustomEvent('layout-changed', { detail: { sceneWidth: finalSceneWidth } });
-        window.dispatchEvent(layoutEvent);
-        
-        const sceneWidthEvent = new CustomEvent('scene-width-changed', { detail: { width: finalSceneWidth } });
-        window.dispatchEvent(sceneWidthEvent);
-        console.log('[ResizeHandleManager] Dispatched layout-changed and scene-width-changed events');
         
         // Log completion - no logAndReset method exists
     } catch (error) {
@@ -283,7 +231,7 @@ export class ResizeHandleManager extends BaseComponent {
     this.uiPercentage.value = newPercentage;
     this.updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
     await nextTick();
-    this.viewport.updateViewportProperties();
+    // Note: ViewportManager should listen for resize events, not called directly
   }
 
   async collapseRight() {
@@ -312,7 +260,7 @@ export class ResizeHandleManager extends BaseComponent {
     this.uiPercentage.value = newPercentage;
     this.updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
     await nextTick();
-    this.viewport.updateViewportProperties();
+    // Note: ViewportManager should listen for resize events, not called directly
   }
 
   applyInitialLayout() {

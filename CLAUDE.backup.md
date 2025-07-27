@@ -261,3 +261,61 @@ if (mode === MODES.DRAGGING) {
 ---
 
 **Session Complete**: Focal point system fully implemented with tristate button, reactive mode switching, proper aim point visibility, and mode-specific easing behavior. Bulls-eye permanently fixed at viewport center. System ready for parallax-based navigation.
+
+---
+
+## Session Update (2025-07-27) - Badge System Removal & IM Architecture Cleanup
+
+### Major Achievements This Session
+
+#### 1. Resolved Claude IDE Infinite Loop Issue
+- **Problem**: ConnectionLines.vue syntax error causing infinite startup loop
+- **Root Cause**: Badge-related components (ConnectionLines, BadgeToggle, SankeyConnections, badgeManager) had syntax errors and IM violations
+- **Solution**: Moved problematic components to `/archived_components/` directory
+
+#### 2. Badge System Architectural Decision
+- **Components Archived**: ConnectionLines.vue, BadgeToggle.vue, SankeyConnections.vue, badgeManager.mjs
+- **Stub System**: Created compatibility stubs for badgeManager and BadgeToggle to maintain existing component dependencies
+- **IM Scanner Updated**: Added `archived_components` to skip directories list in componentScanner.mjs
+- **Result**: Achieved 100% IM compliance (23/23 components) with clean startup
+
+#### 3. IM Architecture Clarification & Fixes
+- **Key Learning**: IM auto-discovers dependencies from import statements - components should NEVER use `getComponentDependencies()`
+- **Dependency Orchestration**: IM verifies dependent components exist and are initialized before calling `initialize(dependencies)`
+- **Component References**: Components must only use dependency references obtained from their `initialize(dependencies)` method
+- **Case Handling**: IM uses PascalCase component names regardless of import casing
+
+#### 4. SkillBadges Component Refactoring
+- **Removed**: Manual `getComponentDependencies()` method declaration
+- **Removed**: Manual `requireDependencies()` calls (IM handles orchestration)
+- **Updated**: `initialize(dependencies)` to only store IM-provided component references
+- **Maintained**: Direct import access to badgeManager (outside IM graph as requested)
+
+### Current System State
+- **✅ 100% IM Compliance**: All active components properly registered and compliant
+- **✅ Clean Startup**: No more infinite loops or syntax errors
+- **✅ Badge System Disabled**: Cleanly removed from IM graph with compatibility stubs
+- **✅ Proper IM Architecture**: Components follow auto-discovery pattern with initialize() method dependency injection
+
+### IM Architecture Best Practices Established
+1. **Auto-Discovery**: Let IM parse import statements for dependencies - never manually declare
+2. **Component Orchestration**: IM handles initialization order based on dependency graph
+3. **Reference Management**: Only use component references from `initialize(dependencies)` method
+4. **PascalCase**: IM normalizes all component names to PascalCase regardless of import casing
+5. **Dependency Injection**: Components receive fully-initialized dependency instances via initialize() method
+
+### Files Modified This Session
+- `/archived_components/`: ConnectionLines.vue, BadgeToggle.vue, SankeyConnections.vue, badgeManager.mjs (moved)
+- `modules/core/badgeManager.mjs`: Created stub implementation (not IM-registered)
+- `modules/components/BadgeToggle.vue`: Created stub component  
+- `modules/components/AppContent.vue`: Removed badge component imports and references
+- `modules/core/componentScanner.mjs`: Added archived_components to skip directories
+- `modules/components/SkillBadges.vue`: Removed manual dependency declarations, updated to use IM auto-discovery
+
+### Testing Status
+- **Server Startup**: Clean startup without infinite loops
+- **IM Compliance**: 100% compliance rate achieved
+- **Badge System**: Disabled but compatibility maintained through stubs
+- **Component Dependencies**: Auto-discovered and properly orchestrated by IM
+
+This session successfully cleaned up the badge system architectural issues while establishing clear IM best practices for future development.

@@ -3,7 +3,7 @@ import { BaseComponent } from '@/modules/core/abstracts/BaseComponent.mjs';
 import { useBullsEye } from './useBullsEye.mjs';
 
 // --- Constants ---
-export const MODES = {
+export const FOCALPOINT_MODES = {
   LOCKED: 'locked',
   FOLLOWING: 'following',
   DRAGGING: 'dragging'
@@ -15,7 +15,7 @@ export class AimPointManager extends BaseComponent {
     super('AimPointManager');
     this.aimPointElement = null;
     this.bullsEyeManager = null;
-    this.modeState = ref(MODES.LOCKED); // Make mode reactive
+    this.focalPointModeState = ref(FOCALPOINT_MODES.LOCKED); // Make focalPointMode reactive
     this.mousePosition = { x: 0, y: 0 };
     this.lastLoggedPosition = { x: -1, y: -1 };
     
@@ -36,6 +36,14 @@ export class AimPointManager extends BaseComponent {
     // Set up event listeners for mouse tracking
     this.setupEventListeners();
     
+    // Listen for bulls-eye position updates
+    window.addEventListener('bulls-eye-moved', (event) => {
+      if (this.focalPointModeState.value === FOCALPOINT_MODES.LOCKED) {
+        const { position } = event.detail;
+        this.setPosition(position.x, position.y, 'bulls-eye-movement');
+      }
+    });
+    
     // Initial position sync with bulls-eye
     this.syncWithBullsEye();
   }
@@ -53,45 +61,41 @@ export class AimPointManager extends BaseComponent {
   }
   
   initializePosition() {
-    if (this.modeState.value === MODES.LOCKED) {
-      // Position at bulls-eye center
-      const initializationManager = window.initializationManager;
-      if (initializationManager) {
-        const bullsEye = initializationManager.getComponent('BullsEye');
-        if (bullsEye && bullsEye.getPosition) {
-          const bullsEyePos = bullsEye.getPosition();
-          this.aimPointState.value.x = bullsEyePos.x;
-          this.aimPointState.value.y = bullsEyePos.y;
-          console.log('[AimPointManager] Initialized at bulls-eye position:', bullsEyePos);
-          return;
-        }
-      }
-      
-      // Fallback: center of viewport
-      this.aimPointState.value.x = window.innerWidth / 2;
-      this.aimPointState.value.y = window.innerHeight / 2;
-      console.log('[AimPointManager] Initialized at viewport center');
-    } else if (this.modeState.value === MODES.FOLLOWING) {
+    if (this.focalPointModeState.value === FOCALPOINT_MODES.LOCKED) {
+      // Position at bulls-eye center - use BullsEyeManager dependency
+      const bullsEyePos = this.bullsEyeManager.bullsEyeState.value;
+      this.aimPointState.value.x = bullsEyePos.x;
+      this.aimPointState.value.y = bullsEyePos.y;
+      console.log('[AimPointManager] Initialized at bulls-eye position:', bullsEyePos);
+    } else if (this.focalPointModeState.value === FOCALPOINT_MODES.FOLLOWING) {
       // Position at current mouse position
       this.aimPointState.value.x = this.mousePosition.x || window.innerWidth / 2;
       this.aimPointState.value.y = this.mousePosition.y || window.innerHeight / 2;
       console.log('[AimPointManager] Initialized at mouse position:', this.mousePosition);
+    } else {
+      // Default case: center of viewport
+      this.aimPointState.value.x = window.innerWidth / 2;
+      this.aimPointState.value.y = window.innerHeight / 2;
+      console.log('[AimPointManager] Initialized at viewport center');
     }
   }
 
   syncWithBullsEye() {
-    if (this.bullsEyeManager && this.bullsEyeManager.bullsEyeState) {
-      // Sync position with bulls-eye
+    if (this.bullsEyeManager && this.bullsEyeManager.isReady && this.bullsEyeManager.isReady()) {
+      // Sync position with bulls-eye only if it's properly initialized
       const bullsEyePos = this.bullsEyeManager.bullsEyeState.value;
       this.aimPointState.value.x = bullsEyePos.x;
       this.aimPointState.value.y = bullsEyePos.y;
       this.updateAimPointPosition();
+      console.log('[AimPointManager] Synced with properly initialized bulls-eye position:', bullsEyePos);
+    } else {
+      console.log('[AimPointManager] BullsEyeManager not properly initialized yet - waiting for bulls-eye-moved event');
     }
   }
 
   updateAimPointPosition() {
     if (!this.aimPointElement) {
-      console.warn('[AimPointManager] Cannot update position - no element available');
+      // Silently return if element not ready yet - this is normal during initialization
       return;
     }
 
@@ -110,6 +114,12 @@ export class AimPointManager extends BaseComponent {
   }
 
   setPosition(x, y, source = 'external') {
+    // Guard against invalid positions that would cause flashing at 0,0
+    if (x <= 0 || y <= 0) {
+      console.warn(`[AimPointManager] Ignoring invalid position (${x}, ${y}) from ${source}`);
+      return;
+    }
+    
     this.aimPointState.value.x = x;
     this.aimPointState.value.y = y;
     this.updateAimPointPosition();
@@ -128,9 +138,9 @@ export class AimPointManager extends BaseComponent {
       this.mousePosition.x = event.clientX;
       this.mousePosition.y = event.clientY;
       
-      if (this.modeState.value === MODES.FOLLOWING) {
+      if (this.focalPointModeState.value === FOCALPOINT_MODES.FOLLOWING) {
         this.setPosition(event.clientX, event.clientY, 'mouse-follow');
-      } else if (this.modeState.value === MODES.DRAGGING) {
+      } else if (this.focalPointModeState.value === FOCALPOINT_MODES.DRAGGING) {
         // DRAGGING mode: aim point follows mouse for aggressive/immediate tracking
         this.setPosition(event.clientX, event.clientY, 'aggressive-tracking');
       }
@@ -138,8 +148,8 @@ export class AimPointManager extends BaseComponent {
 
     // Mouse down to start dragging
     const handleMouseDown = (event) => {
-      console.log(`[AimPointManager] Mouse down - mode: ${this.modeState.value}, isDragging: ${isDragging}`);
-      if (this.modeState.value === MODES.DRAGGING) {
+      console.log(`[AimPointManager] Mouse down - mode: ${this.focalPointModeState.value}, isDragging: ${isDragging}`);
+      if (this.focalPointModeState.value === FOCALPOINT_MODES.DRAGGING) {
         isDragging = true;
         console.log(`[AimPointManager] Starting drag at: (${event.clientX}, ${event.clientY})`);
         this.setPosition(event.clientX, event.clientY, 'drag-start');
@@ -164,66 +174,77 @@ export class AimPointManager extends BaseComponent {
       }
     };
 
+    // BullsEye movement tracking for locked mode
+    const handleBullsEyeMove = (event) => {
+      if (this.focalPointModeState.value === FOCALPOINT_MODES.LOCKED) {
+        const { position } = event.detail;
+        console.log('[AimPointManager] BullsEye moved, updating aim point position:', position);
+        this.setPosition(position.x, position.y, 'bulls-eye-follow');
+      }
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
     document.addEventListener('click', handleFocalPointButtonClick);
+    window.addEventListener('bulls-eye-moved', handleBullsEyeMove);
     
     // Store for cleanup
     this.handleMouseMove = handleMouseMove;
     this.handleMouseDown = handleMouseDown;
+    this.handleBullsEyeMove = handleBullsEyeMove;
     this.handleMouseUp = handleMouseUp;
     this.handleFocalPointButtonClick = handleFocalPointButtonClick;
   }
 
   // Tri-state focal point button functionality
   cycleFocalPointMode() {
-    const modes = [MODES.LOCKED, MODES.FOLLOWING, MODES.DRAGGING];
-    const currentIndex = modes.indexOf(this.modeState.value);
+    const modes = [FOCALPOINT_MODES.LOCKED, FOCALPOINT_MODES.FOLLOWING, FOCALPOINT_MODES.DRAGGING];
+    const currentIndex = modes.indexOf(this.focalPointModeState.value);
     const nextIndex = (currentIndex + 1) % modes.length;
     const newMode = modes[nextIndex];
     
-    this.setMode(newMode);
+    this.setFocalPointMode(newMode);
     
     // Update button visual state
     this.updateFocalPointButtonState(newMode);
     
-    // Notify bulls-eye of mode change
+    // Notify bulls-eye of focalPointMode change
     if (this.bullsEyeManager) {
-      this.bullsEyeManager.setMode(newMode);
+      this.bullsEyeManager.setFocalPointMode(newMode);
     }
     
     window.CONSOLE_LOG_IGNORE(`[AimPointManager] Focal point mode changed to: ${newMode}`);
   }
 
-  updateFocalPointButtonState(mode) {
+  updateFocalPointButtonState(focalPointMode) {
     const button = document.querySelector('[data-focal-point-button], .focal-point-button, #focal-point-button');
     if (button) {
       // Remove all mode classes
       button.classList.remove('locked', 'following', 'dragging');
-      // Add current mode class
-      button.classList.add(mode);
+      // Add current focalPointMode class
+      button.classList.add(focalPointMode);
       
-      // Update button text/icon based on mode
-      const modeTexts = {
-        [MODES.LOCKED]: '🔒',
-        [MODES.FOLLOWING]: '👁️',
-        [MODES.DRAGGING]: '✋'
+      // Update button text/icon based on focalPointMode
+      const focalPointModeTexts = {
+        [FOCALPOINT_MODES.LOCKED]: '🔒',
+        [FOCALPOINT_MODES.FOLLOWING]: '👁️',
+        [FOCALPOINT_MODES.DRAGGING]: '✋'
       };
       
       if (button.textContent !== undefined) {
-        button.textContent = modeTexts[mode] || '?';
+        button.textContent = focalPointModeTexts[focalPointMode] || '?';
       }
       
       // Update aria-label for accessibility
-      button.setAttribute('aria-label', `Focal point mode: ${mode}`);
+      button.setAttribute('aria-label', `Focal point mode: ${focalPointMode}`);
     }
   }
 
-  setMode(newMode, skipSync = false) {
-    console.log(`[AimPointManager] setMode called: ${this.modeState.value} -> ${newMode}`);
-    this.modeState.value = newMode;
-    this.updateFocalPointButtonState(newMode);
+  setFocalPointMode(newFocalPointMode, skipSync = false) {
+    console.log(`[AimPointManager] setFocalPointMode called: ${this.focalPointModeState.value} -> ${newFocalPointMode}`);
+    this.focalPointModeState.value = newFocalPointMode;
+    this.updateFocalPointButtonState(newFocalPointMode);
     
     // Update aim point position based on new mode
     if (this.aimPointElement) {
@@ -231,16 +252,23 @@ export class AimPointManager extends BaseComponent {
       this.updateAimPointPosition();
     }
     
-    // Dispatch mode change event for FocalPointManager to listen to
+    // Dispatch focalPointMode change event for FocalPointManager to listen to
     window.dispatchEvent(new CustomEvent('focal-point-mode-changed', { 
-      detail: { mode: newMode } 
+      detail: { focalPointMode: newFocalPointMode } 
     }));
     
-    console.log(`[AimPointManager] Mode successfully changed to: ${newMode}`);
+    console.log(`[AimPointManager] FocalPointMode successfully changed to: ${newFocalPointMode}`);
   }
 
-  getMode() {
-    return this.modeState.value;
+  getFocalPointMode() {
+    return this.focalPointModeState.value;
+  }
+
+  getPosition() {
+    return {
+      x: this.aimPointState.value.x,
+      y: this.aimPointState.value.y
+    };
   }
 
   destroy() {
@@ -255,6 +283,9 @@ export class AimPointManager extends BaseComponent {
     }
     if (this.handleFocalPointButtonClick) {
       document.removeEventListener('click', this.handleFocalPointButtonClick);
+    }
+    if (this.handleBullsEyeMove) {
+      window.removeEventListener('bulls-eye-moved', this.handleBullsEyeMove);
     }
     this.aimPointElement = null;
     this.bullsEyeManager = null;
@@ -277,11 +308,12 @@ export function useAimPoint() {
   const instance = getCurrentInstance();
   
   // Register cleanup on component unmount (only if inside a Vue component)
-  if (instance) {
-    onUnmounted(() => {
-      cleanup();
-    });
-  }
+  // TEMPORARILY DISABLED - causing Vue subTree error
+  // if (instance) {
+  //   onUnmounted(() => {
+  //     cleanup();
+  //   });
+  // }
 
   const bullsEye = useBullsEye();
 
@@ -292,18 +324,18 @@ export function useAimPoint() {
     x: aimPointManager.aimPointState.value.x, 
     y: aimPointManager.aimPointState.value.y 
   }));
-  const mode = computed(() => aimPointManager.modeState.value);
-  const isLocked = computed(() => aimPointManager.modeState.value === MODES.LOCKED);
-  const isFollowing = computed(() => aimPointManager.modeState.value === MODES.FOLLOWING);
-  const isDragging = computed(() => aimPointManager.modeState.value === MODES.DRAGGING);
+  const focalPointMode = computed(() => aimPointManager.focalPointModeState.value);
+  const isLocked = computed(() => aimPointManager.focalPointModeState.value === FOCALPOINT_MODES.LOCKED);
+  const isFollowing = computed(() => aimPointManager.focalPointModeState.value === FOCALPOINT_MODES.FOLLOWING);
+  const isDragging = computed(() => aimPointManager.focalPointModeState.value === FOCALPOINT_MODES.DRAGGING);
 
   // Wrapper functions that delegate to the IM-managed instance
   function setAimPoint(x, y, source = 'composable') {
     return aimPointManager.setPosition(x, y, source);
   }
 
-  function setMode(newMode) {
-    return aimPointManager.setMode(newMode);
+  function setFocalPointMode(newFocalPointMode) {
+    return aimPointManager.setFocalPointMode(newFocalPointMode);
   }
 
   function cycleFocalPointMode() {
@@ -331,14 +363,14 @@ export function useAimPoint() {
     x,
     y,
     position,
-    mode,
+    focalPointMode,
     isLocked,
     isFollowing,
     isDragging,
     
     // Methods
     setAimPoint,
-    setMode,
+    setFocalPointMode,
     cycleFocalPointMode,
     setAimPointElement, // For template ref injection
     updatePosition,

@@ -44,31 +44,13 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { sankey, sankeyLinkHorizontal } from 'd3-sankey';
 import { jobs as jobsData } from '@/static_content/jobs/jobs.mjs';
 import { useColorPalette } from '@/modules/composables/useColorPalette.mjs';
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
+// Removed from IM chain - SankeyConnections is now independent
 
 export default {
   name: 'SankeyConnections',
-  mixins: [BaseVueComponentMixin],
   
   methods: {
-    getComponentDependencies() {
-      return []; // SankeyConnections doesn't need dependencies currently
-    },
-    
-    initialize(dependencies) {
-      // SankeyConnections initialization handled in setup()
-      console.log('[SankeyConnections] IM initialized');
-    },
-
-    /**
-     * DOM setup phase - called after Vue DOM is ready
-     * DOM operations moved from initialize() for proper separation
-     */
-    async setupDom() {
-      // DOM operations are handled in the composition API setup()
-      // This method exists for IM compliance
-      console.log('[SankeyConnections.vue] DOM setup complete');
-    },
+    // Removed IM methods - SankeyConnections is now independent
 
     /**
      * Template ref injection for scene-content element

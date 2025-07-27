@@ -70,10 +70,6 @@ class ResumeListController extends BaseComponent {
     return 'ResumeListController';
   }
 
-  getDependencies() {
-    return ['CardsController', 'JobsDataManager', 'ColorPaletteManager'];
-  }
-
   destroy() {
     this.resumeContentDiv = null;
     this.infiniteScroller = null;
@@ -139,20 +135,22 @@ class ResumeListController extends BaseComponent {
 
     /**
      * Setup logic for resume-content-div-wrapper element
-     * Called when element becomes available
+     * Called when element becomes available via template ref
      */
     _setupResumeContentDivWrapper() {
-        // Add any element-specific setup logic here
-        // This replaces the immediate DOM access from initialize()
+        // DOM setup is handled by the main setupDom() method for IM compliance
+        // This method exists for template ref injection pattern
+        console.log('[ResumeListController] resume-content-div-wrapper element available via template ref');
     }
 
     /**
      * Setup logic for resume-content-div element
-     * Called when element becomes available
+     * Called when element becomes available via template ref
      */
     _setupResumeContentDiv() {
-        // Add any element-specific setup logic here
-        // This replaces the immediate DOM access from initialize()
+        // DOM setup is handled by the main setupDom() method for IM compliance
+        // This method exists for template ref injection pattern
+        console.log('[ResumeListController] resume-content-div element available via template ref');
     }
 
     /**

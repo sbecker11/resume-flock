@@ -11,13 +11,23 @@ class SceneContainer extends BaseComponent {
         this._sceneContainer = null;
     }
 
+    getDependencies() {
+        return ['ResizeHandleManager']; // SceneContainer depends on resize handle changes
+    }
+
     getPriority() {
         return 'high'; // High priority since many components depend on this
     }
 
-    async initialize({ VueDomManager }) {
-        // Get ViewportManager from IM service locator
-        this.viewportManager = initializationManager.getComponent('ViewportManager');
+    async initialize(dependencies = {}) {
+        this.resizeHandleManager = dependencies.ResizeHandleManager;
+        
+        // Listen for resize handle changes and notify ViewportManager
+        window.addEventListener('resize-handle-changed', (event) => {
+            // SceneContainer can react to resize handle changes if needed
+            console.log('[SceneContainer] Resize handle changed:', event.detail);
+        });
+        
         window.CONSOLE_LOG_IGNORE('[SceneContainer] Functional initialization complete');
     }
 
@@ -100,9 +110,10 @@ export function isInitialized() {
 
 // called from updateResumeContainer
 export function updateSceneContainer() {
-    // ViewportManager updates internal properties via IM dependency injection
-    if (sceneContainer.viewportManager) {
-        sceneContainer.viewportManager.updateViewportProperties();
+    // Get ViewportManager from IM service locator
+    const viewportManager = initializationManager.getComponent('ViewportManager');
+    if (viewportManager) {
+        viewportManager.updateViewportProperties();
     } else {
         console.warn('[SceneContainer] ViewportManager not available for updateSceneContainer');
     }

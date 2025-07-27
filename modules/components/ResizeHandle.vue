@@ -78,7 +78,7 @@ const stepRightButton = computed(() => {
 });
 
 const { 
-  mode: focalPointMode,
+  focalPointMode,
   cycleFocalPointMode
 } = useAimPoint();
 

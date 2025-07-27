@@ -379,9 +379,7 @@ export default {
         console.log('[SkillBadges] Initializing component...');
         
         try {
-          // Validate dependencies before proceeding
-          await requireDependencies(['selectionManager', 'badgeManager'], 'SkillBadges');
-          
+          // IM handles dependency orchestration - dependencies available in initialize() method
           createSkillBadges();
         
         // Set up event listeners
@@ -506,17 +504,13 @@ export default {
   },
   
   methods: {
-    // Required by BaseVueComponentMixin
-    getComponentDependencies() {
-      return ['SelectionManager', 'BadgeManager', 'StateManager'];
-    },
     
     initialize(dependencies) {
-      console.log('SkillBadges: Initializing with validated dependencies:', Object.keys(dependencies));
+      console.log('SkillBadges: Initializing with IM auto-discovered dependencies:', Object.keys(dependencies));
+      // Store references from initialize() method as required by IM architecture  
       this.selectionManager = dependencies.SelectionManager;
-      this.badgeManager = dependencies.BadgeManager;
       this.stateManager = dependencies.StateManager;
-      // StateManager dependency ensures AppState is ready before component initialization
+      // badgeManager accessed via direct import (not IM dependency)
     },
 
     /**
