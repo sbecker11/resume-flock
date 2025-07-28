@@ -1,29 +1,48 @@
-import { deepMerge } from '../utils/utils.mjs';
-import { BadgeMode } from './BadgeMode.mjs';
+/**
+ * Centralized AppState management using Vue composables
+ * Replaces the complex IM framework with simple, Vue-native patterns
+ * 
+ * Usage:
+ *   const { appState, isLoading, loadAppState } = useAppState()
+ *   await loadAppState() // Call once in App.vue onMounted
+ *   // appState.value is now available in all components
+ */
 
-const STORAGE_KEY = 'flockOfPostcards_appState';
+import { ref, readonly } from 'vue'
+import { deepMerge } from '../utils/utils.mjs'
+import { BadgeMode } from '../core/BadgeMode.mjs'
+
+// Singleton state - shared across all component instances
+const appState = ref(null)
+const isLoading = ref(false)
+const isLoaded = ref(false)
+const loadError = ref(null)
+
+// Single promise to prevent multiple simultaneous loads
+let loadPromise = null
 
 /**
- * Gets the default state for the application.
- * @returns {object} The default state object.
+ * Gets the default state - preserving existing user/system separation
  */
-export function getDefaultState() {
+function getDefaultState() {
     return {
-        version: "1.2", // Updated for constants system
+        version: "1.2",
         lastUpdated: new Date().toISOString(),
+        
+        // USER PREFERENCES - things users customize
         layout: {
-            orientation: 'scene-left', // Default to scene on left, resume on right
-            scenePercentage: 50, // Scene takes 50% of window width
-            resumePercentage: 50 // Resume takes 50% of window width
+            orientation: 'scene-left',
+            scenePercentage: 50,
+            resumePercentage: 50
         },
         resizeHandle: {
             stepCount: 4
         },
         focalPoint: {
-            mode: 'locked' // Default to locked mode
+            mode: 'locked'
         },
         badgeToggle: {
-            mode: BadgeMode.NONE // Default to no badges shown
+            mode: BadgeMode.NONE
         },
         badges: {
             height: '2.5em',
@@ -35,7 +54,7 @@ export function getDefaultState() {
             fontWeight: '500',
             transition: 'all 0.2s ease',
             spacing: {
-                vertical: 10, // Additional spacing between badges (used by BadgePositioner)
+                vertical: 10,
                 horizontal: 10
             },
             states: {
@@ -56,15 +75,15 @@ export function getDefaultState() {
                 }
             }
         },
-        selectedJobNumber: null, // No default selection - only use saved state
-        lastVisitedJobNumber: null, // Track the last job that was selected
+        selectedJobNumber: null,
+        lastVisitedJobNumber: null,
         resume: {
-            sortRule: { field: 'startDate', direction: 'asc' } // Default to oldest first
+            sortRule: { field: 'startDate', direction: 'asc' }
         },
         theme: {
-            colorPalette: '50_Dark_Grey_Monotone.json', // Default palette
-            brightnessFactorSelected: 2.0,  // Brightness factor for selected elements (scene cards)
-            brightnessFactorHovered: 1.75,   // Brightness factor for hovered elements (scene cards)
+            colorPalette: '50_Dark_Grey_Monotone.json',
+            brightnessFactorSelected: 2.0,
+            brightnessFactorHovered: 1.75,
             borderSettings: {
                 normal: {
                     padding: '8px',
@@ -109,12 +128,14 @@ export function getDefaultState() {
                 }
             }
         },
+        
+        // COLOR PALETTES - loaded dynamically
         color: {
             palettes: {}
         },
-        // NEW: Constants system for centralized configuration
+        
+        // SYSTEM CONSTANTS - rarely changed, technical settings
         constants: {
-            // Z-Index System
             zIndex: {
                 root: 0,
                 scene: 1,
@@ -130,7 +151,6 @@ export function getDefaultState() {
                 focalPoint: 100,
                 aimPoint: 101
             },
-            // Card Layout
             cards: {
                 meanWidth: 180,
                 minHeight: 180,
@@ -138,20 +158,17 @@ export function getDefaultState() {
                 maxWidthOffset: 30,
                 minZDiff: 2
             },
-            // Timeline Configuration
             timeline: {
                 pixelsPerYear: 200,
                 paddingTop: 0,
                 gradientLength: "50vh"
             },
-            // Resize Handle
             resizeHandle: {
                 width: 20,
                 shadowWidth: 8,
                 shadowBlur: 5,
                 defaultWidthPercent: 50
             },
-            // Animation & Timing
             animation: {
                 durations: {
                     fast: "0.2s",
@@ -167,7 +184,6 @@ export function getDefaultState() {
                     scrollZonePercentage: 0.20
                 }
             },
-            // Performance
             performance: {
                 thresholds: {
                     resizeTime: 16,
@@ -176,7 +192,6 @@ export function getDefaultState() {
                 },
                 debounceTimeout: 100
             },
-            // Typography
             typography: {
                 fontSizes: {
                     small: "10px",
@@ -188,7 +203,6 @@ export function getDefaultState() {
                 },
                 fontFamily: "'Inter', sans-serif"
             },
-            // Visual Effects
             visualEffects: {
                 parallax: {
                     xExaggerationFactor: 0.9,
@@ -206,154 +220,208 @@ export function getDefaultState() {
                 }
             }
         }
-    };
+    }
 }
 
 /**
  * Migrates old state versions to current version
- * @param {object} state The state to migrate
- * @returns {object} The migrated state
  */
 function migrateState(state) {
     if (!state.version) {
-        state.version = "1.0"; // Assume version 1.0 if no version present
+        state.version = "1.0"
     }
 
     // Migration from 1.0 to 1.1: Update marginTop values
     if (state.version === "1.0") {
-        window.CONSOLE_LOG_IGNORE('[MIGRATION] Migrating state from v1.0 to v1.1: Updating marginTop values');
+        console.log('[AppState] Migrating state from v1.0 to v1.1: Updating marginTop values')
         
-        // Ensure rDivBorderOverrideSettings exists
-        if (!state.theme) state.theme = {};
+        if (!state.theme) state.theme = {}
         if (!state.theme.rDivBorderOverrideSettings) {
             state.theme.rDivBorderOverrideSettings = {
                 normal: { padding: '15px', innerBorderWidth: '1px', marginTop: '11px' },
                 hovered: { padding: '14px', innerBorderWidth: '2px', marginTop: '11px' },
                 selected: { padding: '13px', innerBorderWidth: '3px', marginTop: '11px' }
-            };
+            }
         } else {
-            // Update existing marginTop values
             if (state.theme.rDivBorderOverrideSettings.normal) {
-                state.theme.rDivBorderOverrideSettings.normal.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.normal.marginTop = '11px'
             }
             if (state.theme.rDivBorderOverrideSettings.hovered) {
-                state.theme.rDivBorderOverrideSettings.hovered.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.hovered.marginTop = '11px'
             }
             if (state.theme.rDivBorderOverrideSettings.selected) {
-                state.theme.rDivBorderOverrideSettings.selected.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.selected.marginTop = '11px'
             }
         }
         
-        state.version = "1.1";
-        window.CONSOLE_LOG_IGNORE('[MIGRATION] Successfully migrated to v1.1');
+        state.version = "1.1"
+        console.log('[AppState] Successfully migrated to v1.1')
     }
 
-    // Migration from 1.1 to 1.2: Add constants system while preserving user preferences
+    // Migration from 1.1 to 1.2: Add constants system
     if (state.version === "1.1") {
-        window.CONSOLE_LOG_IGNORE('[MIGRATION] Migrating state from v1.1 to v1.2: Adding constants system');
+        console.log('[AppState] Migrating state from v1.1 to v1.2: Adding constants system')
         
-        // Preserve existing focal point mode (don't reset to locked)
-        // The user's saved preference should be maintained
-        
-        // Ensure resizeHandle has stepCount
         if (!state.resizeHandle) {
-            state.resizeHandle = {};
+            state.resizeHandle = {}
         }
         if (!state.resizeHandle.stepCount) {
-            state.resizeHandle.stepCount = 4;
+            state.resizeHandle.stepCount = 4
         }
         
-        // Ensure color section exists
         if (!state.color) {
-            state.color = { palettes: {} };
+            state.color = { palettes: {} }
         }
         
-        // Constants will be added via deepMerge with default state
-        
-        state.version = "1.2";
-        window.CONSOLE_LOG_IGNORE('[MIGRATION] Successfully migrated to v1.2 - preserved user preferences');
+        state.version = "1.2"
+        console.log('[AppState] Successfully migrated to v1.2 - preserved user preferences')
     }
 
-    return state;
+    return state
 }
 
 /**
- * Loads the application state from the server.
- * If no state is found, it returns the default state.
- * @returns {Promise<object>} A promise that resolves to the application state.
+ * Load application state from server
  */
-export async function loadState() {
+async function loadStateFromServer() {
     try {
-        const response = await fetch('/api/state');
+        const response = await fetch('/api/state')
         if (!response.ok) {
             if (response.status === 404) {
-                window.CONSOLE_LOG_IGNORE("No saved state found on server, using default state.");
+                console.log("No saved state found on server, using default state.")
             } else {
-                window.CONSOLE_LOG_IGNORE(`Failed to load state, server responded with status: ${response.status}`);
+                console.log(`Failed to load state, server responded with status: ${response.status}`)
             }
-            return getDefaultState();
+            return getDefaultState()
         }
-        const rawState = await response.json();
-        window.CONSOLE_LOG_IGNORE("Loaded raw state from server:", rawState);
+        
+        const rawState = await response.json()
+        console.log("Loaded raw state from server:", rawState)
         
         // Migrate the state to current version
-        const migratedState = migrateState(rawState);
+        const migratedState = migrateState(rawState)
         
-        // Merge the migrated state into default state to ensure all keys exist
-        // This way, saved values take precedence over defaults
-        const finalState = deepMerge(getDefaultState(), migratedState);
+        // Merge with defaults to ensure all keys exist
+        const finalState = deepMerge(getDefaultState(), migratedState)
         
-        window.CONSOLE_LOG_IGNORE("Final state after migration and merge:", finalState);
-        return finalState;
-    } catch (e) {
-        window.CONSOLE_LOG_IGNORE('Error fetching state from server, using default state.', e);
-        return getDefaultState();
+        console.log("Final state after migration and merge:", finalState)
+        return finalState
+        
+    } catch (error) {
+        console.log('Error fetching state from server, using default state.', error)
+        return getDefaultState()
     }
 }
 
 /**
- * Saves the provided state object to the server.
- * @param {object} state The application state to save.
+ * Save application state to server
  */
-export async function saveState(state) {
+async function saveStateToServer(state) {
     try {
-        state.lastUpdated = new Date().toISOString();
+        state.lastUpdated = new Date().toISOString()
         await fetch('/api/state', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(state),
-        });
-        window.CONSOLE_LOG_IGNORE("Saved state to server:", state); // This can be noisy
-    } catch (e) {
-        window.CONSOLE_LOG_IGNORE('Failed to save state to server.', e);
+        })
+        console.log("Saved state to server:", state)
+    } catch (error) {
+        console.log('Failed to save state to server.', error)
     }
 }
 
 /**
- * A global state object to hold the current application state.
- * This will be populated by initialization.
+ * Vue composable for centralized AppState management
+ * Call loadAppState() once in App.vue, then use appState anywhere
  */
-export let AppState = null;
-
-let initStatePromise = null;
-
-/**
- * Initializes the global AppState by loading it from the server.
- * This must be called before any other module tries to access AppState.
- * This function is now idempotent: it will only load state once.
- */
-export function initializeState() {
-    if (!initStatePromise) {
-        initStatePromise = loadState().then(state => {
-            AppState = state;
-            // Dispatch event to notify components that state is loaded
-            window.dispatchEvent(new CustomEvent('app-state-loaded', {
-                detail: { state: AppState }
-            }));
-            return state;
-        });
+export function useAppState() {
+    
+    /**
+     * Load AppState from server (idempotent - safe to call multiple times)
+     */
+    const loadAppState = async () => {
+        // Return existing promise if already loading
+        if (loadPromise) {
+            return loadPromise
+        }
+        
+        // Return existing state if already loaded
+        if (isLoaded.value && appState.value) {
+            return appState.value
+        }
+        
+        // Start loading
+        isLoading.value = true
+        loadError.value = null
+        
+        loadPromise = loadStateFromServer()
+            .then(state => {
+                appState.value = state
+                isLoaded.value = true
+                isLoading.value = false
+                
+                // Dispatch event for backward compatibility
+                window.dispatchEvent(new CustomEvent('app-state-loaded', {
+                    detail: { state: state }
+                }))
+                
+                console.log('[AppState] ✅ AppState loaded and available globally')
+                return state
+            })
+            .catch(error => {
+                isLoading.value = false
+                loadError.value = error
+                console.error('[AppState] ❌ Failed to load AppState:', error)
+                throw error
+            })
+            .finally(() => {
+                loadPromise = null
+            })
+        
+        return loadPromise
     }
-    return initStatePromise;
-} 
+    
+    /**
+     * Save current AppState to server
+     */
+    const saveAppState = async () => {
+        if (!appState.value) {
+            throw new Error('Cannot save AppState - not loaded yet')
+        }
+        
+        await saveStateToServer(appState.value)
+        return appState.value
+    }
+    
+    /**
+     * Update AppState and save to server
+     */
+    const updateAppState = async (updates) => {
+        if (!appState.value) {
+            throw new Error('Cannot update AppState - not loaded yet')
+        }
+        
+        // Deep merge updates
+        appState.value = deepMerge(appState.value, updates)
+        await saveAppState()
+        return appState.value
+    }
+    
+    return {
+        // Read-only reactive state
+        appState: readonly(appState),
+        isLoading: readonly(isLoading),
+        isLoaded: readonly(isLoaded),
+        loadError: readonly(loadError),
+        
+        // Actions
+        loadAppState,
+        saveAppState,
+        updateAppState
+    }
+}
+
+// Export for backward compatibility
+export { appState as AppState }

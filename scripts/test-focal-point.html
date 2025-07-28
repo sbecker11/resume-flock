@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Focal Point Debug Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .error { background: #ffeeee; color: red; }
+        .success { background: #eeffee; color: green; }
+    </style>
+</head>
+<body>
+    <h1>Focal Point Positioning Test</h1>
+    <div id="logs"></div>
+    
+    <script>
+        const logs = document.getElementById('logs');
+        
+        function addLog(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.textContent = `${new Date().toISOString()}: ${message}`;
+            logs.appendChild(div);
+            console.log(message);
+        }
+        
+        // Test the app in an iframe
+        const iframe = document.createElement('iframe');
+        iframe.src = 'http://localhost:5173';
+        iframe.style.width = '100px';
+        iframe.style.height = '100px';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        
+        iframe.onload = function() {
+            addLog('App loaded, checking console...');
+            
+            // Wait a bit for initialization
+            setTimeout(() => {
+                try {
+                    const iframeWindow = iframe.contentWindow;
+                    const iframeDocument = iframe.contentDocument;
+                    
+                    // Check if focal point element exists and its position
+                    const focalPoint = iframeDocument.getElementById('focal-point');
+                    if (focalPoint) {
+                        const style = window.getComputedStyle(focalPoint);
+                        const left = style.left;
+                        const top = style.top;
+                        
+                        if (left === '0px' && top === '0px') {
+                            addLog(`❌ Focal point at (0,0): left=${left}, top=${top}`, 'error');
+                        } else {
+                            addLog(`✅ Focal point positioned: left=${left}, top=${top}`, 'success');
+                        }
+                    } else {
+                        addLog('❌ Focal point element not found', 'error');
+                    }
+                    
+                    // Check bulls-eye position
+                    const bullsEye = iframeDocument.getElementById('bulls-eye');
+                    if (bullsEye) {
+                        const style = window.getComputedStyle(bullsEye);
+                        const left = style.left;
+                        const top = style.top;
+                        addLog(`Bulls-eye position: left=${left}, top=${top}`);
+                    }
+                    
+                } catch (e) {
+                    addLog(`Error accessing iframe: ${e.message}`, 'error');
+                }
+            }, 3000);
+        };
+        
+        addLog('Starting focal point test...');
+    </script>
+</body>
+</html>

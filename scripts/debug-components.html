@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Components</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .debug-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .debug-title { font-weight: bold; margin-bottom: 10px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Component Debug Test</h1>
+    
+    <div class="debug-section">
+        <div class="debug-title">Color Palette State:</div>
+        <div id="palette-debug"></div>
+    </div>
+    
+    <div class="debug-section">
+        <div class="debug-title">Resize Handle State:</div>
+        <div id="resize-debug"></div>
+    </div>
+    
+    <div class="debug-section">
+        <div class="debug-title">Console Output:</div>
+        <div id="console-output"></div>
+    </div>
+
+    <script>
+        // Override console.log to capture output
+        const consoleOutput = document.getElementById('console-output');
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const div = document.createElement('div');
+            div.textContent = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ');
+            consoleOutput.appendChild(div);
+        };
+
+        // Test palette API
+        async function testPalette() {
+            const paletteDebug = document.getElementById('palette-debug');
+            try {
+                const response = await fetch('/api/palette-manifest');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const manifest = await response.json();
+                paletteDebug.innerHTML = `<span class="success">✓ Palette manifest loaded: ${manifest.length} files</span><br>Files: ${manifest.join(', ')}`;
+                
+                // Test loading first palette
+                if (manifest.length > 0) {
+                    const paletteResponse = await fetch('./static_content/colorPalettes/' + manifest[0]);
+                    const paletteData = await paletteResponse.json();
+                    paletteDebug.innerHTML += `<br><span class="success">✓ First palette loaded: ${paletteData.name}</span>`;
+                }
+            } catch (error) {
+                paletteDebug.innerHTML = `<span class="error">✗ Palette error: ${error.message}</span>`;
+            }
+        }
+
+        // Test resize handle functionality
+        function testResizeHandle() {
+            const resizeDebug = document.getElementById('resize-debug');
+            
+            // Check if drag events work
+            const testDiv = document.createElement('div');
+            testDiv.style.cssText = 'width:100px; height:50px; background:#ccc; margin:10px 0; cursor:col-resize;';
+            testDiv.textContent = 'Test Drag Area';
+            
+            let isDragging = false;
+            testDiv.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                console.log('Drag started');
+                resizeDebug.innerHTML = '<span class="success">✓ Mousedown event working</span>';
+            });
+            
+            document.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    console.log('Dragging...');
+                }
+            });
+            
+            document.addEventListener('mouseup', (e) => {
+                if (isDragging) {
+                    isDragging = false;
+                    console.log('Drag ended');
+                    resizeDebug.innerHTML += '<br><span class="success">✓ Drag sequence completed</span>';
+                }
+            });
+            
+            resizeDebug.appendChild(testDiv);
+        }
+
+        // Run tests
+        window.addEventListener('load', () => {
+            testPalette();
+            testResizeHandle();
+        });
+    </script>
+</body>
+</html>

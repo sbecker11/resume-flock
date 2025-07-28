@@ -414,9 +414,17 @@ let elementTop = elementRect.top - containerRect.top + container.scrollTop;
 ### IM Architecture Best Practices Established
 1. **Auto-Discovery**: Let IM parse import statements for dependencies - never manually declare
 2. **Component Orchestration**: IM handles initialization order based on dependency graph
-3. **Reference Management**: Only use component references from `initialize(dependencies)` method
+3. **CRITICAL: Component Reference Rules**: 
+   - Import statements are ONLY for IM dependency discovery - NOT for actual component references
+   - Components MUST use ONLY the references provided via `initialize(dependencies)` parameter
+   - NEVER access imported components directly - always use IM-injected dependencies
 4. **PascalCase**: IM normalizes all component names to PascalCase regardless of import casing
 5. **Dependency Injection**: Components receive fully-initialized dependency instances via initialize() method
+6. **CRITICAL: Guaranteed Initialization**: IM calls a component's `initialize(dependencies)` only when ALL dependencies are not null and fully initialized - no synchronization or polling needed
+7. **CRITICAL: DOM vs IM Initialization**: There are TWO separate phases:
+   - **IM Initialization**: Component logic, dependencies, state setup (NO DOM access)
+   - **DOM Setup**: DOM element positioning via `setupDom()` (happens AFTER IM init)
+   - Components must NOT read position data during `initialize()` - wait for DOM setup events
 
 ### Files Modified This Session
 - `/archived_components/`: ConnectionLines.vue, BadgeToggle.vue, SankeyConnections.vue, badgeManager.mjs (moved)
@@ -433,3 +441,126 @@ let elementTop = elementRect.top - containerRect.top + container.scrollTop;
 - **Component Dependencies**: Auto-discovered and properly orchestrated by IM
 
 This session successfully cleaned up the badge system architectural issues while establishing clear IM best practices for future development.
+
+## Important Note About Console Logging
+
+**window.CONSOLE_LOG_IGNORE** is a noop function used to reduce the verbosity of console.log usage throughout the codebase. This allows for debug logging during development that can be easily disabled in production by setting `window.CONSOLE_LOG_IGNORE = () => {}`. 
+
+**Usage Guidelines:**
+- Use `window.CONSOLE_LOG_IGNORE()` for debug/verbose logging that should be suppressible
+- Use `console.log()` only where console output is absolutely needed and should always appear
+- This pattern provides centralized control over logging verbosity without requiring code changes
+
+---
+
+## Session Update (2025-07-28) - Timeline Positioning & Font Updates, Resize Handle State Fixes
+
+### Major Achievements This Session
+
+#### 1. Timeline YYYY Label Positioning Refinements
+- **Problem**: Complex timeline positioning issues between scene-left and scene-right orientations with inconsistent font positioning
+- **Solution**: Implemented precise pixel-based positioning for both YYYY and YYYY-MM labels to achieve exact alignment and prevent overlap
+
+**Final Timeline Configuration:**
+- **Scene-right (props.alignment === 'left')**:
+  - YYYY: positioned at 70px from left, left-aligned (`text-anchor="start"`)
+  - YYYY underline: from 56px to 180px (no overlap with YYYY-MM underlines)
+  - YYYY-MM: positioned at 18px from left, left-aligned with underlines from 18px to 56px
+  
+- **Scene-left (props.alignment === 'right')**:
+  - YYYY: positioned at 166px from left, right-aligned (`text-anchor="end"`), moved 1px up
+  - YYYY underline: from 50px to 166px, positioned 1px higher
+  - YYYY-MM: positioned at 50px from left, right-aligned with underlines from 10px to 50px
+
+**Key Positioning Fixes:**
+- Fixed underline overlap issue in scene-right by starting YYYY underline at endpoint of YYYY-MM underlines (56px)
+- Achieved consistent transparency across all underlines (0.4 opacity)
+- Eliminated visual double-opacity artifacts from overlapping lines
+- Fine-tuned YYYY position by 6px right and 1px up in scene-left for perfect alignment
+
+#### 2. BizCardDiv Font-Family Standardization
+- **Problem**: BizCardDiv elements still using "Arial, Helvetica, sans-serif" when user requested just "Arial, sans-serif"
+- **Challenge**: CSS variables and multiple CSS rules were overriding the font setting
+- **Solution**: Added `font-family: Arial, sans-serif !important;` directly to `.biz-card-div` rule to override all other font declarations
+- **Result**: Business cards now consistently use Arial font without Helvetica fallback, matching user's specification
+
+#### 3. App State Restoration System Fixes
+- **Critical Problem**: Resize handle state wasn't restoring correctly after hard refresh - stored 50/50 layout displayed as 100% resume
+- **Root Cause**: Complex conversion logic between "true percentages" vs "internal percentages" created mismatches between save and load operations
+- **Solution**: Simplified state management to use stored percentages directly without conversion calculations
+
+**State Management Improvements:**
+- **Unified Save Logic**: Both step operations and drag operations now save UI percentage directly to app_state.json
+- **Simplified Load Logic**: Restoration uses stored `scenePercentage` directly as UI percentage without complex window-width calculations  
+- **Consistent Behavior**: Percentages stored in app_state.json now exactly match what's displayed in the application
+- **Applied Initial Layout**: Added `updateLayout()` calls during initialization to properly set `sceneWidthInPixels` from loaded percentages
+
+#### 4. Resize Handle Button Disable Logic Enhancement
+- **Problem**: Step buttons weren't properly disabled based on layout orientation and current position
+- **Issue**: Buttons used generic collapse states instead of orientation-aware logic
+- **Solution**: Implemented orientation-aware button disable logic
+
+**Button Logic by Orientation:**
+- **Scene-right**: Left button (increases scene) disabled at ≥95%, Right button (decreases scene) disabled at ≤5%
+- **Scene-left**: Left button (decreases scene) disabled at ≤5%, Right button (increases scene) disabled at ≥95%
+- **Free Drag Mode**: Both buttons disabled when stepCount = 1 (infinity mode)
+
+### Technical Implementation Details
+
+#### Timeline Positioning Strategy
+The session established a fixed pixel positioning approach rather than percentage-based positioning to prevent elements from moving during window resizes:
+
+```javascript
+// Scene-left YYYY positioning 
+:x="props.alignment === 'left' ? 70 : '166px'"
+:text-anchor="props.alignment === 'left' ? 'start' : 'end'"
+:y="props.alignment === 'left' ? item.y - 28 : item.y - 29"
+```
+
+#### App State Restoration Architecture
+```javascript
+// Simplified restoration logic
+function initializeState() {
+  const storedScenePercentage = appState.value?.layout?.scenePercentage;
+  if (storedScenePercentage !== undefined) {
+    uiPercentage.value = storedScenePercentage; // Direct usage, no conversion
+  }
+}
+
+// Consistent save logic for both operations
+await updateAppState({
+  layout: {
+    scenePercentage: uiPercentage.value,
+    resumePercentage: 100 - uiPercentage.value
+  }
+});
+```
+
+#### Font Override Implementation
+```css
+.biz-card-div {
+  font-family: Arial, sans-serif !important; /* Override any other font-family rules */
+  /* ... other styles ... */
+}
+```
+
+### Current System State
+- **✅ Timeline Positioning**: Pixel-perfect alignment with no overlapping underlines in both orientations
+- **✅ Font Consistency**: All BizCardDiv elements use Arial font as requested
+- **✅ State Persistence**: App state restoration works correctly - stored percentages match displayed layout
+- **✅ Button Logic**: Resize handle buttons properly disabled based on orientation and position limits
+- **✅ Transparency Consistency**: All timeline underlines have matching opacity levels
+
+### Files Modified This Session
+- `modules/components/Timeline.vue`: Complete timeline positioning overhaul with precise pixel positioning
+- `modules/scene/scene.css`: Added `!important` font-family override for bizCardDiv elements
+- `modules/composables/useResizeHandle.mjs`: Simplified state restoration logic and added initialization layout calls
+- `modules/components/ResizeHandle.vue`: Implemented orientation-aware button disable logic
+
+### Key Lessons Learned
+1. **Fixed Positioning vs Percentages**: For UI elements that should stay in consistent positions relative to container edges, fixed pixel positioning is more reliable than percentage-based positioning
+2. **CSS Specificity**: When dealing with complex CSS inheritance and variable systems, `!important` declarations can be necessary to achieve deterministic styling
+3. **State Management Simplicity**: Complex conversion logic between different percentage systems creates maintenance burden and bugs - direct storage/retrieval is more reliable
+4. **User Experience**: Small positioning adjustments (1px, 6px) can significantly impact visual alignment and user perception of polish
+
+**Session Complete**: Timeline positioning perfected with pixel-precise alignment, font consistency achieved across business cards, app state restoration working reliably, and resize handle buttons behaving intuitively based on layout orientation.

@@ -1,5 +1,5 @@
 import { ref, onMounted, watch, computed, getCurrentInstance } from 'vue';
-import { AppState, saveState, initializeState } from '@/modules/core/stateManager.mjs';
+import { useAppState } from './useAppState.mjs';
 import * as colorUtils from '@/modules/utils/colorUtils.mjs';
 
 const PALETTE_DIR = './static_content/colorPalettes/';
@@ -10,7 +10,7 @@ const MANIFEST_ENDPOINT = '/api/palette-manifest';
 const colorPalettes = ref({});
 const orderedPaletteNames = ref([]);
 const filenameToNameMap = ref({});
-const isLoading = ref(true);
+const isLoading = ref(false);
 let resolveReady;
 export const readyPromise = new Promise((resolve) => { resolveReady = resolve; });
 // Initialize from the global state, but allow it to be updated locally
@@ -18,68 +18,105 @@ const currentPaletteFilename = ref(null);
 
 // --- The Composable Function ---
 export function useColorPalette() {
+    // Access centralized app state
+    const { appState, updateAppState } = useAppState();
 
     async function loadPalettes() {
-        if (!isLoading.value) return; // Don't reload if already loaded
+        if (isLoading.value) return; // Don't reload if already loading
+        isLoading.value = true;
         
         try {
-            // First, ensure the application state is loaded.
-            await initializeState();
+            // console.log('[ColorPalette] Starting palette loading...');
             
-            // Now it's safe to access AppState.
-            currentPaletteFilename.value = AppState.colorPalette;
-            window.CONSOLE_LOG_IGNORE(`[ColorPalette] Initialized currentPaletteFilename from AppState.colorPalette: ${AppState.colorPalette}`);
+            // AppState is already loaded by useAppState
+            if (!appState.value) {
+                console.error('[ColorPalette] AppState not loaded yet - useAppState should be called first');
+                console.error('[ColorPalette] appState.value:', appState.value);
+                throw new Error('AppState not loaded yet - useAppState should be called first');
+            }
+            
+            // console.log('[ColorPalette] AppState is loaded, theme:', appState.value.theme);
+            
+            // Now it's safe to access appState.
+            currentPaletteFilename.value = appState.value.theme.colorPalette;
+            // console.log(`[ColorPalette] Initialized currentPaletteFilename from appState.colorPalette: ${appState.value.theme.colorPalette}`);
 
             const response = await fetch(MANIFEST_ENDPOINT);
             if (!response.ok) throw new Error('Failed to fetch palette manifest');
             const manifestData = await response.json();
+            // console.log(`[ColorPalette] Loaded manifest with ${manifestData.length} palette files`);
 
             const tempLoadedColorPalettes = {};
             const tempFilenameToNameMap = {};
             const tempOrderedNames = [];
 
             for (const filename of manifestData) {
-                const filePath = PALETTE_DIR + filename;
-                const paletteResponse = await fetch(filePath);
-                const paletteData = await paletteResponse.json();
+                try {
+                    const filePath = PALETTE_DIR + filename;
+                    const paletteResponse = await fetch(filePath);
+                    if (!paletteResponse.ok) {
+                        // console.warn(`[ColorPalette] Failed to load palette file: ${filename}`);
+                        continue;
+                    }
+                    const paletteData = await paletteResponse.json();
 
-                if (paletteData && paletteData.name && Array.isArray(paletteData.colors)) {
-                    tempLoadedColorPalettes[paletteData.name] = paletteData.colors;
-                    tempFilenameToNameMap[filename] = paletteData.name;
-                    tempOrderedNames.push(paletteData.name);
+                    if (paletteData && paletteData.name && Array.isArray(paletteData.colors)) {
+                        tempLoadedColorPalettes[paletteData.name] = paletteData.colors;
+                        tempFilenameToNameMap[filename] = paletteData.name;
+                        tempOrderedNames.push(paletteData.name);
+                        // console.log(`[ColorPalette] Loaded palette: ${paletteData.name} (${filename})`);
+                    }
+                } catch (err) {
+                    // console.warn(`[ColorPalette] Error loading palette ${filename}:`, err);
                 }
             }
             
             colorPalettes.value = tempLoadedColorPalettes;
             filenameToNameMap.value = tempFilenameToNameMap;
             orderedPaletteNames.value = tempOrderedNames;
-            // Assign colorPalettes to AppState.color.palettes after loading
-            if (!AppState.color) AppState.color = {};
-            AppState.color.palettes = tempLoadedColorPalettes;
+            
+            // console.log(`[ColorPalette] Successfully loaded ${tempOrderedNames.length} palettes:`, tempOrderedNames);
+            // console.log(`[ColorPalette] Updated refs - orderedPaletteNames:`, orderedPaletteNames.value);
+            // console.log(`[ColorPalette] Updated refs - filenameToNameMap:`, filenameToNameMap.value);
+            
+            // Update appState with loaded palettes
+            await updateAppState({
+                color: {
+                    palettes: tempLoadedColorPalettes
+                }
+            });
+            
+            // IMPORTANT: Ensure colorPalette is set correctly in theme section
+            if (!appState.value.theme.colorPalette && Object.keys(tempFilenameToNameMap).length > 0) {
+                const firstFilename = Object.keys(tempFilenameToNameMap)[0];
+                await updateAppState({
+                    theme: {
+                        colorPalette: firstFilename
+                    }
+                });
+                // console.log(`[ColorPalette] Set theme.colorPalette to: ${firstFilename}`);
+            }
             
             if (!currentPaletteFilename.value && Object.keys(tempFilenameToNameMap).length > 0) {
                 currentPaletteFilename.value = Object.keys(tempFilenameToNameMap)[0];
+                // console.log(`[ColorPalette] Set default palette to: ${currentPaletteFilename.value}`);
             }
 
         } catch (error) {
-            window.CONSOLE_LOG_IGNORE("Failed to load color palettes:", error);
+            console.error("[ColorPalette] Failed to load color palettes:", error);
             // Handle error case, maybe set a default palette
         } finally {
             isLoading.value = false;
             if (resolveReady) resolveReady();
+            // console.log('[ColorPalette] Palette loading complete');
         }
     }
 
     // Check if we're inside a Vue component instance
     const instance = getCurrentInstance();
     
-    // Load palettes only once when the app starts (only if inside a Vue component)
-    if (instance) {
-        onMounted(loadPalettes);
-    } else {
-        // If called outside a component, load immediately
-        loadPalettes();
-    }
+    // Don't auto-load on component mount - wait for explicit loadPalettes call
+    // Palettes will be loaded manually from AppContent.vue after AppState is ready
 
     async function setCurrentPalette(filename) {
         // Wait for palettes to be loaded before proceeding
@@ -90,24 +127,29 @@ export function useColorPalette() {
         if (filename && filenameToNameMap.value[filename]) {
             const previousFilename = currentPaletteFilename.value;
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] setCurrentPalette called: ${previousFilename} → ${filename}`);
-            window.CONSOLE_LOG_IGNORE(`[ColorPalette] AppState.colorPalette: ${AppState.colorPalette}`);
+            window.CONSOLE_LOG_IGNORE(`[ColorPalette] appState.theme.colorPalette: ${appState.value?.theme?.colorPalette}`);
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] currentPaletteFilename.value: ${currentPaletteFilename.value}`);
             
-            // Check if AppState and reactive state are in sync
-            if (AppState.colorPalette !== currentPaletteFilename.value) {
-                console.warn(`[ColorPalette] State mismatch detected! AppState: ${AppState.colorPalette}, reactive: ${currentPaletteFilename.value}`);
+            // Check if appState and reactive state are in sync
+            if (appState.value?.theme?.colorPalette !== currentPaletteFilename.value) {
+                // console.warn(`[ColorPalette] State mismatch detected! appState: ${appState.value?.theme?.colorPalette}, reactive: ${currentPaletteFilename.value}`);
                 window.CONSOLE_LOG_IGNORE(`[ColorPalette] User selected ${filename}, proceeding with user choice`);
             }
             
             // Only proceed if actually changing to a different palette from what user selected
-            if (currentPaletteFilename.value === filename && AppState.colorPalette === filename) {
+            if (currentPaletteFilename.value === filename && appState.value?.theme?.colorPalette === filename) {
                 window.CONSOLE_LOG_IGNORE(`[ColorPalette] No change needed - already using ${filename}`);
                 return;
             }
             
             currentPaletteFilename.value = filename;
-            AppState.colorPalette = filename;
-            saveState(AppState);
+            
+            // Update appState with new palette selection
+            await updateAppState({
+                theme: {
+                    colorPalette: filename
+                }
+            });
             
             // Dispatch event for components that need to respond to palette changes
             const paletteName = filenameToNameMap.value[filename];
@@ -121,7 +163,7 @@ export function useColorPalette() {
             
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] Palette changed from ${previousFilename} to ${filename} (${paletteName}), event dispatched`);
         } else {
-            console.warn(`[ColorPalette] setCurrentPalette called with invalid filename: ${filename}`);
+            // console.warn(`[ColorPalette] setCurrentPalette called with invalid filename: ${filename}`);
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] Available palettes:`, Object.keys(filenameToNameMap.value));
         }
     }
@@ -137,13 +179,19 @@ export function useColorPalette() {
     
     // Function to update brightness factors
     async function updateBrightnessFactors(selectedFactor, hoveredFactor) {
+        const updates = {};
         if (selectedFactor !== undefined) {
-            AppState.theme.brightnessFactorSelected = selectedFactor;
+            updates.brightnessFactorSelected = selectedFactor;
         }
         if (hoveredFactor !== undefined) {
-            AppState.theme.brightnessFactorHovered = hoveredFactor;
+            updates.brightnessFactorHovered = hoveredFactor;
         }
-        saveState(AppState);
+        
+        if (Object.keys(updates).length > 0) {
+            await updateAppState({
+                theme: updates
+            });
+        }
         
         // Reapply palette to all elements to update their data attributes
         const elements = document.querySelectorAll('[data-color-index]');
@@ -170,8 +218,11 @@ export function useColorPalette() {
     // Function to update border settings
     async function updateBorderSettings(newBorderSettings) {
         if (newBorderSettings) {
-            AppState.theme.borderSettings = newBorderSettings;
-            saveState(AppState);
+            await updateAppState({
+                theme: {
+                    borderSettings: newBorderSettings
+                }
+            });
         }
         
         // Reapply palette to all elements to update their data attributes
@@ -220,10 +271,23 @@ export function useColorPalette() {
 export async function applyPaletteToElement(element) {
     if (!element) return;
 
+    // Access the centralized app state
+    const { appState } = useAppState();
+
     // Wait for palettes to be loaded before applying
     if (isLoading.value) {
         await readyPromise;
     }
+
+    // Ensure appState is available
+    if (!appState.value) {
+        console.warn('AppState not loaded, skipping palette application');
+        console.warn('[applyPaletteToElement] appState.value:', appState.value);
+        return;
+    }
+    
+    // console.log('[applyPaletteToElement] AppState available, checking palettes...');
+    // console.log('[applyPaletteToElement] appState.value.color:', appState.value.color);
 
     // Use a data-attribute for the palette color index, assuming it's set on the element
     const paletteColorIndexAttr = element.getAttribute('data-color-index');
@@ -247,16 +311,21 @@ export async function applyPaletteToElement(element) {
     }
 
     // If the palette is not found or is empty, throw an Error
-    const colorPalette = AppState.color.palettes[paletteName];
-    if (!colorPalette) throw new Error(`Color palette not found for name: ${paletteName}`);
+    const colorPalette = appState.value.color?.palettes?.[paletteName];
+    if (!colorPalette) {
+        console.error(`[applyPaletteToElement] Color palette not found for name: ${paletteName}`);
+        // console.error(`[applyPaletteToElement] Available palettes:`, Object.keys(appState.value.color?.palettes || {}));
+        // console.error(`[applyPaletteToElement] appState.value.color:`, appState.value.color);
+        throw new Error(`Color palette not found for name: ${paletteName}`);
+    }
 
     // Calculate base colors
     const backgroundColor = colorPalette[paletteColorIndex % colorPalette.length];
     const foregroundColor = colorUtils.getContrastingColor(backgroundColor);
 
     // Get brightness factors from global state
-    const brightnessFactorSelected = AppState.theme.brightnessFactorSelected || 2.0;
-    const brightnessFactorHovered = AppState.theme.brightnessFactorHovered || 1.5;
+    const brightnessFactorSelected = appState.value.theme?.brightnessFactorSelected || 2.0;
+    const brightnessFactorHovered = appState.value.theme?.brightnessFactorHovered || 1.5;
 
     // Calculate selected state colors (with brightness filter applied)
     const selectedBackgroundColor = colorUtils.adjustBrightness(backgroundColor, brightnessFactorSelected);
@@ -266,10 +335,10 @@ export async function applyPaletteToElement(element) {
     const hoveredBackgroundColor = colorUtils.adjustBrightness(backgroundColor, brightnessFactorHovered);
     const hoveredForegroundColor = colorUtils.getContrastingColor(hoveredBackgroundColor);
 
-    const borderRadius = AppState.theme?.borderRadius || '25px';
+    const borderRadius = appState.value.theme?.borderRadius || '25px';
 
-    // Get global border and padding settings from AppState (with defaults)
-    const borderSettings = AppState.theme?.borderSettings || {
+    // Get global border and padding settings from appState (with defaults)
+    const borderSettings = appState.value.theme?.borderSettings || {
         normal: {
             padding: '8px', // 8px padding + 2px border = 10px total, matching CSS expectations
             innerBorderWidth: '2px',
@@ -301,7 +370,7 @@ export async function applyPaletteToElement(element) {
 
     // apply resume div border override settings if the element is a resume div
     if ( element.classList.contains('biz-resume-div') ) {
-        const rDivBorderOverrideSettings = AppState.theme?.rDivBorderOverrideSettings;
+        const rDivBorderOverrideSettings = appState.value.theme?.rDivBorderOverrideSettings;
         if (rDivBorderOverrideSettings) {
             borderSettings.normal.padding = rDivBorderOverrideSettings.normal.padding;
             borderSettings.normal.innerBorderWidth = rDivBorderOverrideSettings.normal.innerBorderWidth;

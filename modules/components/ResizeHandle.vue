@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useAimPoint } from '@/modules/composables/useAimPoint.mjs';
-import { useResizeHandle, resizeHandleManager } from '@/modules/composables/useResizeHandle.mjs';
+import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useLayoutToggle } from '@/modules/composables/useLayoutToggle.mjs';
-import { AppState, saveState } from '@/modules/core/stateManager.mjs';
+import { useAppState } from '@/modules/composables/useAppState.mjs';
 import BadgeToggle from '@/modules/components/BadgeToggle.vue';
 
 // --- Composables ---
@@ -11,20 +11,48 @@ const {
   percentage: scenePercentage, 
   isLeftCollapsed, 
   isRightCollapsed, 
-  stepCount,
   startDrag, 
   collapseLeft, 
   collapseRight, 
   toggleStepping 
 } = useResizeHandle();
 
-// Computed properties for button states
+// Local reactive step count - simpler approach
+const stepCount = ref(1);
+
+const { orientation } = useLayoutToggle();
+const { updateAppState, appState } = useAppState();
+
+// Initialize step count from AppState
+onMounted(() => {
+  if (appState.value?.resizeHandle?.stepCount) {
+    stepCount.value = appState.value.resizeHandle.stepCount;
+  }
+});
+
+// Computed properties for button states - orientation aware
 const isLeftDisabled = computed(() => {
-  return isLeftCollapsed.value || stepCount.value === 1;
+  if (stepCount.value === 1) return true; // Always disabled in free drag mode
+  
+  if (orientation.value === 'scene-right') {
+    // In scene-right: left button increases scene, disable when scene is at max (100%)
+    return scenePercentage.value >= 95;
+  } else {
+    // In scene-left: left button decreases scene, disable when scene is at min (0%)
+    return scenePercentage.value <= 5;
+  }
 });
 
 const isRightDisabled = computed(() => {
-  return isRightCollapsed.value || stepCount.value === 1;
+  if (stepCount.value === 1) return true; // Always disabled in free drag mode
+  
+  if (orientation.value === 'scene-right') {
+    // In scene-right: right button decreases scene, disable when scene is at min (0%)
+    return scenePercentage.value <= 5;
+  } else {
+    // In scene-left: right button increases scene, disable when scene is at max (100%)
+    return scenePercentage.value >= 95;
+  }
 });
 
 // Step button click handlers with debug logging
@@ -82,7 +110,7 @@ const stepLeftButton = computed(() => {
     return {
       id: 'step-left',
       action: handleStepLeft,
-      disabled: isRightDisabled.value, // Disabled when resume is collapsed
+      disabled: isLeftDisabled.value, // Disabled when scene is collapsed (0%)
       title: 'Decrease Scene Size (Point Away From Scene)',
       icon: '‹'
     };
@@ -104,7 +132,7 @@ const stepRightButton = computed(() => {
     return {
       id: 'step-right',
       action: handleStepRight,
-      disabled: isLeftDisabled.value, // Disabled when scene is collapsed
+      disabled: isRightDisabled.value, // Disabled when resume is collapsed (scene at 100%)
       title: 'Increase Scene Size (Point Away From Resume)',
       icon: '›'
     };
@@ -122,7 +150,6 @@ watch(focalPointMode, (newMode, oldMode) => {
 }, { immediate: true });
 
 const {
-  orientation,
   toggleOrientation,
   getToggleButtonText,
   getOrientationLabel
@@ -199,22 +226,29 @@ function toggleFocalLock(event) {
   }, 0);
 }
 
-function handleSteppingClick(event) {
+async function handleSteppingClick(event) {
   event.stopPropagation();
   
   // Cycle through step counts: 1 -> 2 -> 3 -> ... -> 10 -> 1
-  if (resizeHandleManager) {
-    const currentSteps = resizeHandleManager.stepCount.value;
-    const nextSteps = currentSteps >= 10 ? 1 : currentSteps + 1;
-    resizeHandleManager.stepCount.value = nextSteps;
-    
-    // Update AppState and save
-    if (AppState?.resizeHandle) {
-      AppState.resizeHandle.stepCount = nextSteps;
-      saveState(AppState);
-    }
+  const currentSteps = stepCount.value;
+  const nextSteps = currentSteps >= 10 ? 1 : currentSteps + 1;
+  
+  // Update local reactive state immediately
+  stepCount.value = nextSteps;
+  
+  try {
+    // Save to AppState
+    await updateAppState({
+      resizeHandle: {
+        stepCount: nextSteps
+      }
+    });
     
     console.log(`[ResizeHandle] Step count changed: ${currentSteps} -> ${nextSteps}`);
+  } catch (error) {
+    console.error('[ResizeHandle] Failed to update step count:', error);
+    // Revert on error
+    stepCount.value = currentSteps;
   }
   
   // Reset hover state when step changes to prevent immediate hover preview
@@ -223,9 +257,9 @@ function handleSteppingClick(event) {
 
 function handleLayoutToggle(event) {
   event.stopPropagation();
-  window.CONSOLE_LOG_IGNORE('BEFORE toggle:', orientation.value);
+  console.log('[ResizeHandle] BEFORE toggle:', orientation.value);
   toggleOrientation();
-  window.CONSOLE_LOG_IGNORE('AFTER toggle:', orientation.value);
+  console.log('[ResizeHandle] AFTER toggle:', orientation.value);
 }
 
 function handleResizeHandleClick(event) {
@@ -236,31 +270,28 @@ function handleResizeHandleClick(event) {
 
 <template>
     <div id="resize-handle" class="resize-handle" @mousedown="startDrag" @click="handleResizeHandleClick">
-        <div class="button-container">
+        <div class="button-container" @click.stop @mousedown.stop>
             <button :id="stepLeftButton.id" class="toggle-circle" @click.stop="stepLeftButton.action" :disabled="stepLeftButton.disabled" :title="stepLeftButton.title">{{ stepLeftButton.icon }}</button>
             <button id="tri-state-toggle" 
                     class="toggle-circle" 
                     :class="buttonClasses"
                     @click.stop="toggleFocalLock" 
-                    @mousedown="startDrag"
                     @mouseenter="isHovering = true; hasJustClicked = false"
                     @mouseleave="isHovering = false; hasJustClicked = false"
                     :title="isHovering ? 'Next: ' + nextMode + ' (click to switch)' : 'Current: ' + focalPointMode + ' (hover to preview next)'">
                 <span>{{ displayIcon }}</span>
             </button>
-            <BadgeToggle @mousedown="startDrag" />
+            <BadgeToggle />
             <button id="layout-toggle" 
                     class="toggle-circle" 
                     @click.stop="handleLayoutToggle" 
-                    @mousedown="startDrag"
-                    :title="`Layout: ${getOrientationLabel()} (click to swap)`">
+                    :title="`Scene is ${orientation === 'scene-left' ? 'on the left' : 'on the right'} (click to move scene ${orientation === 'scene-left' ? 'right' : 'left'})`">
                 {{ getToggleButtonText() }}
             </button>
             <button id="stepping-indicator" 
                     class="toggle-circle" 
                     :class="{ 'hovering': isSteppingHovering, 'infinity-mode': stepCount === 1 }"
                     @click.stop="handleSteppingClick" 
-                    @mousedown="startDrag"
                     @mouseenter="isSteppingHovering = true"
                     @mouseleave="isSteppingHovering = false"
                     :title="stepCount === 1 ? 'Free dragging (no steps)' : `Stepping: ${stepCount} steps`">{{ displayStepCount }}</button>
@@ -286,6 +317,17 @@ function handleResizeHandleClick(event) {
     flex-shrink: 0;
 }
 
+/* Add drop shadow on the scene-facing edge */
+/* When scene is on left, shadow on left edge of handle */
+.scene-left .resize-handle {
+    box-shadow: -3px 0 8px rgba(0, 0, 0, 0.3);
+}
+
+/* When scene is on right, shadow on right edge of handle */
+.scene-right .resize-handle {
+    box-shadow: 3px 0 8px rgba(0, 0, 0, 0.3);
+}
+
 
 
 .button-container {
@@ -297,6 +339,7 @@ function handleResizeHandleClick(event) {
     flex-direction: column;
     align-items: center;
     gap: 10px;
+    pointer-events: auto; /* Ensure buttons can receive clicks */
 }
 
 .toggle-circle {
@@ -375,14 +418,18 @@ function handleResizeHandleClick(event) {
 }
 
 #layout-toggle {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: bold;
+    font-family: monospace;
+    line-height: 1;
+    transition: all 0.2s ease;
 }
 
 #layout-toggle:hover {
     background-color: white;
     color: black;
     border-color: black;
+    transform: scale(1.1);
 }
 
 /* Hover effects for step buttons only */

@@ -70,6 +70,7 @@ html[native-dark-active] #scene-container,
     cursor: pointer;
     z-index: 5; /* Changed from 4 to 5 to match BIZCARD_Z_INDEX_MIN */
     pointer-events: auto;
+    font-family: Arial, sans-serif !important; /* Override any other font-family rules */
 
     /* Default state styling using CSS variables */
     background-color: var(--data-background-color);
@@ -224,7 +225,7 @@ html[native-dark-active] #scene-container,
     padding: 10px;
     padding-bottom: 25px;
     background-color: transparent !important;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Arial, sans-serif;
     font-weight: normal;
     font-size: 12px;
     width: 100%;

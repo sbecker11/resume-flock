@@ -1,5 +1,4 @@
 <script setup>
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
 import { ref, onMounted, watch, computed } from 'vue';
 import { jobs } from '@/static_content/jobs/jobs.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
@@ -22,6 +21,15 @@ const {
   currentPaletteFilename,
   setCurrentPalette
 } = useColorPalette();
+
+// Debug palette loading
+watch(orderedPaletteNames, (names) => {
+  console.log('[ResumeContainer] orderedPaletteNames changed:', names);
+}, { immediate: true });
+
+watch(currentPaletteFilename, (filename) => {
+  console.log('[ResumeContainer] currentPaletteFilename changed:', filename);
+}, { immediate: true });
 
 const currentSortRule = ref({ field: 'startDate', direction: 'desc' });
 
@@ -110,27 +118,6 @@ function selectPrevious() {
     </div>
 </template>
 
-<script>
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
-
-export default {
-  name: 'ResumeContainer',
-  mixins: [BaseVueComponentMixin],
-  methods: {
-    getComponentDependencies() {
-      return ['ResizeHandleManager']; // ResumeContainer depends on ResizeHandle like SceneContainer
-    },
-    initialize(dependencies) {
-      window.CONSOLE_LOG_IGNORE("ResumeContainer initialized with dependencies:", Object.keys(dependencies));
-      // Using the imported selectionManager instead of dependency injection
-      // since it's already available from the import
-    },
-    cleanupDependencies() {
-      window.CONSOLE_LOG_IGNORE("ResumeContainer cleanup dependencies");
-    }
-  }
-}
-</script>
 
 <style scoped>
 #resume-content {

@@ -37,30 +37,30 @@
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { TARGET_CDIV_JOB_NUMBER } from "@/modules/constants/targetCDiv.mjs";
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
 
 export default {
   name: 'SingleLCurveTest',
-  mixins: [BaseVueComponentMixin],
+  // Removed BaseVueComponentMixin - no longer using IM framework
   
   methods: {
-    getComponentDependencies() {
-      return []; // SingleLCurveTest doesn't need dependencies currently
-    },
+    // DEPRECATED: IM methods removed during Vue migration
+    // getComponentDependencies() {
+    //   return []; // SingleLCurveTest doesn't need dependencies currently
+    // },
     
-    initialize(dependencies) {
-      console.log('[SingleLCurveTest] IM initialized');
-    },
+    // initialize(dependencies) {
+    //   console.log('[SingleLCurveTest] IM initialized');
+    // },
 
-    /**
-     * DOM setup phase - called after Vue DOM is ready
-     * DOM operations moved from initialize() for proper separation
-     */
-    async setupDom() {
-      // DOM operations are handled in the composition API setup()
-      // This method exists for IM compliance
-      console.log('[SingleLCurveTest.vue] DOM setup complete');
-    },
+    // /**
+    //  * DOM setup phase - called after Vue DOM is ready
+    //  * DOM operations moved from initialize() for proper separation
+    //  */
+    // async setupDom() {
+    //   // DOM operations are handled in the composition API setup()
+    //   // This method exists for IM compliance
+    //   console.log('[SingleLCurveTest.vue] DOM setup complete');
+    // },
 
     /**
      * Template ref injection for scene-content element

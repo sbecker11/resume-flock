@@ -1,19 +1,19 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-27T17:04:11.756Z",
+  "lastUpdated": "2025-07-28T18:13:03.169Z",
   "layout": {
     "orientation": "scene-left",
-    "scenePercentage": 49.14965986394558,
-    "resumePercentage": 50.85034013605442
+    "scenePercentage": 42.85714285714286,
+    "resumePercentage": 57.14285714285714
   },
   "resizeHandle": {
-    "stepCount": 4
+    "stepCount": 7
   },
   "focalPoint": {
     "mode": "locked"
   },
   "badgeToggle": {
-    "mode": "badges-only"
+    "mode": "no-badges"
   },
   "badges": {
     "height": "2.5em",
@@ -46,8 +46,8 @@
       }
     }
   },
-  "selectedJobNumber": 10,
-  "lastVisitedJobNumber": 10,
+  "selectedJobNumber": null,
+  "lastVisitedJobNumber": null,
   "resume": {
     "sortRule": {
       "field": "startDate",
@@ -55,36 +55,33 @@
     }
   },
   "theme": {
-    "colorPalette": "50_Dark_Grey_Monotone.json",
+    "colorPalette": "55 Emerald.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {
       "normal": {
-        "padding": "15px",
+        "padding": "8px",
         "innerBorderWidth": "1px",
         "innerBorderColor": "white",
         "outerBorderWidth": "0px",
         "outerBorderColor": "transparent",
-        "borderRadius": "25px",
-        "marginTop": "11px"
+        "borderRadius": "25px"
       },
       "hovered": {
-        "padding": "14px",
+        "padding": "7px",
         "innerBorderWidth": "2px",
         "innerBorderColor": "blue",
         "outerBorderWidth": "0px",
         "outerBorderColor": "transparent",
-        "borderRadius": "25px",
-        "marginTop": "11px"
+        "borderRadius": "25px"
       },
       "selected": {
-        "padding": "13px",
+        "padding": "6px",
         "innerBorderWidth": "3px",
         "innerBorderColor": "purple",
         "outerBorderWidth": "0px",
         "outerBorderColor": "transparent",
-        "borderRadius": "25px",
-        "marginTop": "11px"
+        "borderRadius": "25px"
       }
     },
     "rDivBorderOverrideSettings": {
@@ -422,6 +419,5 @@
         }
       }
     }
-  },
-  "colorPalette": "snow_springtime.json"
+  }
 }

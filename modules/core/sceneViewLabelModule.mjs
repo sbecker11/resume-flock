@@ -1,5 +1,6 @@
+// DEPRECATED: This module has been migrated to Vue composable useSceneViewLabel.mjs
+// This file is kept for backward compatibility only
 import * as domUtils from '../utils/domUtils.mjs';
-import { initializationManager } from './initializationManager.mjs';
 
 let _sceneViewLabelElement = null;
 
@@ -25,11 +26,8 @@ function getResizeHandlePosition() {
 }
 
 export function initialize() {
-    // Get ViewportManager from IM service locator
-    const viewportManager = initializationManager.getComponent('ViewportManager');
-    if (!viewportManager) {
-        throw new Error("sceneViewLabel requires ViewportManager to be initialized.");
-    }
+    // DEPRECATED: IM dependency removed - viewport functionality now handled by Vue composables
+    console.warn('sceneViewLabelModule.initialize() is deprecated. Use useSceneViewLabel() composable instead.');
     
     if (_sceneViewLabelElement) {
         window.CONSOLE_LOG_IGNORE("sceneViewLabel.initialize: already initialized");

@@ -1,6 +1,5 @@
 // scene/CardsController.mjs
 
-import { BaseComponent } from '../core/abstracts/BaseComponent.mjs'
 import * as utils from '../utils/utils.mjs';
 // Removed viewPort import - not used in this module
 import * as BizDetailsDivModule from './bizDetailsDivModule.mjs';
@@ -13,12 +12,12 @@ import { applyParallaxToBizCardDiv } from '../core/parallaxModule.mjs';
 // Removed direct jobs import - now using JobsDataManager dependency
 // Removed direct color palette import - now using ColorPaletteManager dependency
 import { AppState } from '../core/stateManager.mjs';
-import { initializationManager } from '../core/initializationManager.mjs';
+// Removed initializationManager - no longer using IM framework
 // Note: selectionManager accessed via IM dependency injection, not direct import
-// Import JobsDataManager to ensure it's registered with IM
-import '../core/jobsDataManager.mjs';
-import '../core/colorPaletteManager.mjs';
-import '../core/timelineManager.mjs'; // CardsController depends on Timeline for positioning
+// Removed broken IM imports
+// import '../core/jobsDataManager.mjs';
+// import '../core/colorPaletteManager.mjs';
+// Removed timelineManager - temporarily disabled
 // import { resumeListController } from '../resume/ResumeListController.mjs'; // No longer needed
 
 const BIZCARD_MAX_X_OFFSET = 100;
@@ -43,12 +42,11 @@ const OVERRIDE_SCENE_HZ = true;
  * 2. Applying the same sort logic to the bizCardDivs array
  * 3. Updating the visual order of cards in the scene
  */
-class CardsController extends BaseComponent {
-
+class CardsController {
     constructor() {
         console.log('[DEBUG] CardsController constructor called');
-        super('CardsController');
-        console.log('[DEBUG] CardsController super() completed');
+        // Removed super() - no longer extending BaseComponent
+        console.log('[DEBUG] CardsController constructor starting');
 
         // Singleton pattern: return existing instance if one exists
         if (CardsController.instance) {
@@ -59,7 +57,6 @@ class CardsController extends BaseComponent {
         // Create new instance
 
         this.bizCardDivs = [];
-        // isInitialized is managed by BaseComponent automatically
         this.originalJobsData = null;
         this.currentSortRule = null;
         this.sortedIndices = []; // Maps sorted position to original jobNumber
@@ -96,7 +93,6 @@ class CardsController extends BaseComponent {
 
     destroy() {
         this.bizCardDivs = null;
-        // isInitialized is managed by BaseComponent automatically
         this.originalJobsData = null;
         this.currentSortRule = null;
         this.sortedIndices = [];
@@ -1284,7 +1280,6 @@ class CardsController extends BaseComponent {
         if (CardsController.instance) {
             // Clean up any resources if needed
             CardsController.instance.bizCardDivs = [];
-            // isInitialized is managed by BaseComponent automatically
         }
         CardsController.instance = null;
     }
@@ -1539,7 +1534,6 @@ class CardsController extends BaseComponent {
     }
 }
 
-// Create singleton instance to trigger BaseComponent auto-registration
 const cardsController = new CardsController();
 
 // Global function for testing sorting

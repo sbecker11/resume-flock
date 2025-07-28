@@ -1,82 +1,119 @@
-import { ref, computed, nextTick, getCurrentInstance } from 'vue';
-import { BaseComponent } from '@/modules/core/abstracts/BaseComponent.mjs';
+import { ref, computed, nextTick, watch } from 'vue';
 import { useLayoutToggle } from './useLayoutToggle.mjs';
-import { AppState, saveState } from '@/modules/core/stateManager.mjs';
+import { useAppState } from './useAppState.mjs';
 import { performanceMonitor } from '@/modules/utils/performanceMonitor.mjs';
-import { errorBoundary } from '@/modules/core/errorBoundary.mjs';
 
 const HANDLE_WIDTH = 20;
 const DEFAULT_WIDTH_PERCENT = 50;
 
-// --- ResizeHandle Manager Component (IM-managed) ---
-export class ResizeHandleManager extends BaseComponent {
-  constructor() {
-    super('ResizeHandleManager');
-    this._resizeTimeoutId = null;
+// Global singleton state for resize handle
+let _resizeHandleState = null;
+
+function createResizeHandleState() {
+  const { appState, updateAppState } = useAppState();
+  
+  // Reactive state
+  const uiPercentage = ref(DEFAULT_WIDTH_PERCENT);
+  const sceneWidthInPixels = ref(0);
+  const isDragging = ref(false);
+  const stepCount = ref(1);
+  let _resizeTimeoutId = null;
+
+  function initializeState() {
+    // Use stored scene percentage directly as UI percentage
+    const storedScenePercentage = appState.value?.layout?.scenePercentage;
+    let initialPercentage = DEFAULT_WIDTH_PERCENT;
     
-    // Reactive state
-    this.uiPercentage = ref(DEFAULT_WIDTH_PERCENT);
-    this.sceneWidthInPixels = ref(0);
-    this.isDragging = ref(false);
-    this.stepCount = ref(1);
+    if (storedScenePercentage !== undefined) {
+      // Use the stored percentage directly - no complex conversion needed
+      initialPercentage = storedScenePercentage;
+      
+      console.log('[ResizeHandle] RESTORE DEBUG:');
+      console.log('  storedScenePercentage:', storedScenePercentage + '%');
+      console.log('  Using directly as initialPercentage:', initialPercentage + '%');
+    }
+    stepCount.value = appState.value?.resizeHandle?.stepCount || 1;
+    console.log('[ResizeHandle] DEBUG: appState.resizeHandle:', appState.value?.resizeHandle);
+    console.log('[ResizeHandle] DEBUG: stepCount loaded:', stepCount.value);
+    
+    // Use the stored percentage directly
+    console.log('[ResizeHandle] Initialization - using stored percentage:', initialPercentage);
+    
+    uiPercentage.value = initialPercentage;
   }
 
-  getDependencies() {
-    return []; // ResizeHandle is a foundation component - ViewportManager depends on it
-  }
-
-  initialize(dependencies = {}) {
-    // ResizeHandle doesn't depend on ViewportManager - ViewportManager depends on ResizeHandle
+  function initialize() {
+    // Initialize state from appState
+    initializeState();
     
-    // Initialize state from AppState
-    this.initializeState();
+    // Apply initial layout to set sceneWidthInPixels correctly
+    updateLayout(uiPercentage.value, false);
     
     // Listen for app state loaded event to update from saved state
     window.addEventListener('app-state-loaded', () => {
-      console.log('[ResizeHandleManager] App state loaded, re-initializing from saved state');
-      this.initializeState();
+      console.log('[ResizeHandle] App state loaded, re-initializing from saved state');
+      initializeState();
+      updateLayout(uiPercentage.value, false);
     });
     
+    // Watch AppState for stepCount changes
+    watch(() => appState.value?.resizeHandle?.stepCount, (newStepCount) => {
+      if (newStepCount !== undefined && stepCount.value !== newStepCount) {
+        console.log('[ResizeHandle] Step count updated from AppState watcher:', stepCount.value, '->', newStepCount);
+        stepCount.value = newStepCount;
+      }
+    }, { immediate: false });
+    
     // Add debounced window resize listener
-    window.addEventListener('resize', this.debouncedResizeHandler.bind(this));
+    window.addEventListener('resize', debouncedResizeHandler);
     
     // Add drag event listeners
-    this.setupDragHandlers();
+    setupDragHandlers();
   }
   
-  setupDragHandlers() {
+  function setupDragHandlers() {
     // Get layout orientation
     const { orientation } = useLayoutToggle();
     
     // Mouse move handler for dragging
     const handleMouseMove = (event) => {
-      if (this.isDragging.value) {
+      if (isDragging.value) {
         const windowWidth = window.innerWidth;
         
-        // For scene-right layout, mirror the mouse position horizontally
+        // Calculate available width (excluding ResizeHandle)
+        const handleWidth = 20;
+        const availableWidth = windowWidth - handleWidth;
+        
+        // Mouse coordinate handling depends on layout orientation
         let effectiveClientX = event.clientX;
+        let newSceneWidth;
+        
         if (orientation.value === 'scene-right') {
-          effectiveClientX = windowWidth - event.clientX;
+          // In scene-right: scene is on right, so dragging right expands scene
+          // Convert mouse position to scene width (scene grows from right edge)
+          newSceneWidth = Math.max(0, Math.min(availableWidth, windowWidth - effectiveClientX));
+        } else {
+          // In scene-left: scene is on left, so dragging right expands scene
+          newSceneWidth = Math.max(0, Math.min(availableWidth, effectiveClientX));
         }
         
-        const newSceneWidth = Math.max(0, Math.min(windowWidth, effectiveClientX)); // Allow full 0% to 100% range
-        const newPercentage = (newSceneWidth / windowWidth) * 100;
+        const newPercentage = Math.max(0, Math.min(100, (newSceneWidth / availableWidth) * 100));
         
-        this.uiPercentage.value = newPercentage;
-        this.updateLayout(newPercentage);
+        uiPercentage.value = newPercentage;
+        updateLayout(newPercentage);
         
-        console.log(`[ResizeHandleManager] Dragging (${orientation.value}) - mouse X: ${event.clientX}, effective X: ${effectiveClientX}, scene width: ${newSceneWidth}px, percentage: ${newPercentage.toFixed(1)}%`);
+        console.log(`[ResizeHandle] Dragging (${orientation.value}) - mouse X: ${event.clientX}, scene width: ${newSceneWidth}px, percentage: ${newPercentage.toFixed(1)}%`);
       }
     };
     
     // Mouse up handler to end dragging
     const handleMouseUp = (event) => {
-      if (this.isDragging.value) {
-        this.isDragging.value = false;
-        console.log('[ResizeHandleManager] Drag ended');
+      if (isDragging.value) {
+        isDragging.value = false;
+        console.log('[ResizeHandle] Drag ended');
         
         // Save state when drag ends
-        this.updateLayout(this.uiPercentage.value, true); // shouldSave = true
+        updateLayout(uiPercentage.value, true); // shouldSave = true
       }
     };
     
@@ -85,48 +122,20 @@ export class ResizeHandleManager extends BaseComponent {
     document.addEventListener('mouseup', handleMouseUp);
     
     // Store for cleanup
-    this.handleMouseMove = handleMouseMove;
-    this.handleMouseUp = handleMouseUp;
+    return { handleMouseMove, handleMouseUp };
   }
 
-  initializeState() {
-    // Convert stored true scene percentage back to internal percentage
-    const storedScenePercentage = AppState?.layout?.scenePercentage;
-    let initialPercentage = DEFAULT_WIDTH_PERCENT;
-    
-    if (storedScenePercentage) {
-      const windowWidth = window.innerWidth;
-      const resumeContainerWidth = 20;
-      const maxSceneWidth = windowWidth - resumeContainerWidth;
-      const storedSceneWidth = (storedScenePercentage / 100) * windowWidth;
-      initialPercentage = (storedSceneWidth / maxSceneWidth) * 100;
-    }
-    this.stepCount.value = AppState?.resizeHandle?.stepCount || 1;
-    console.log('[ResizeHandleManager] DEBUG: AppState.resizeHandle:', AppState?.resizeHandle);
-    console.log('[ResizeHandleManager] DEBUG: stepCount loaded:', this.stepCount.value);
-    
-    // Don't snap initial percentage - keep the actual stored value
-    console.log('[ResizeHandleManager] Initialization - keeping actual percentage:', initialPercentage);
-    
-    this.uiPercentage.value = initialPercentage;
-  }
-
-  clampToRange(val, min, max) {
+  function clampToRange(val, min, max) {
     return Math.max(min, Math.min(max, val));
   }
 
-  handleViewportResize() {
-    // With the new IM dependency chain, components should handle their own updates:
-    // - BullsEye listens for 'viewport-resize' events and recenters itself
-    // - AimPoint automatically syncs with BullsEye via bulls-eye-moved events  
-    // - FocalPoint automatically syncs with AimPoint via interval polling
-    // ResizeHandleManager should NOT directly manipulate these components
-    
-    console.log('[ResizeHandleManager] Viewport resize handled - letting IM dependency chain handle updates');
+  function handleViewportResize() {
+    // Components should handle their own updates
+    console.log('[ResizeHandle] Viewport resize handled - letting components handle their own updates');
   }
 
-  updateLayout(newUiPercentage, shouldSave = true, isStepOperation = false) {
-    console.log('[ResizeHandleManager] updateLayout() called with:', newUiPercentage);
+  async function updateLayout(newUiPercentage, shouldSave = true, isStepOperation = false) {
+    console.log('[ResizeHandle] updateLayout() called with:', newUiPercentage);
     
     // Performance monitoring
     const perfId = performanceMonitor.startTiming('resize_layout');
@@ -138,27 +147,27 @@ export class ResizeHandleManager extends BaseComponent {
         
         console.log('[ResizeHandleManager] Window width:', windowWidth, 'Max scene width:', maxSceneWidth);
         
-        let actualPercentage = this.clampToRange(newUiPercentage, 0, 100);
+        let actualPercentage = clampToRange(newUiPercentage, 0, 100);
         let finalSceneWidth = Math.floor((actualPercentage / 100) * maxSceneWidth);
         
         console.log('[ResizeHandleManager] Actual percentage:', actualPercentage, 'Final scene width:', finalSceneWidth);
         
         // Capture old width BEFORE updating
-        const oldSceneWidth = this.sceneWidthInPixels.value;
-        console.log('[ResizeHandleManager] OLD sceneWidthInPixels:', oldSceneWidth);
+        const oldSceneWidth = sceneWidthInPixels.value;
+        console.log('[ResizeHandle] OLD sceneWidthInPixels:', oldSceneWidth);
         
         // Store the values
-        this.sceneWidthInPixels.value = finalSceneWidth;
+        sceneWidthInPixels.value = finalSceneWidth;
         
         // Only snap during drag operations, not during step operations or initialization
-        if (this.stepCount.value > 1 && shouldSave && !isStepOperation) {
+        if (stepCount.value > 1 && shouldSave && !isStepOperation) {
             // Only snap when shouldSave=true AND not a step operation (during drag)
-            const increment = 100 / this.stepCount.value;
+            const increment = 100 / stepCount.value;
             const nearestStep = Math.round(actualPercentage / increment);
-            this.uiPercentage.value = nearestStep * increment;
-            console.log('[ResizeHandleManager] Snapped uiPercentage to step:', this.uiPercentage.value, '(was', actualPercentage, ')');
+            uiPercentage.value = nearestStep * increment;
+            console.log('[ResizeHandle] Snapped uiPercentage to step:', uiPercentage.value, '(was', actualPercentage, ')');
         } else if (!isStepOperation) {
-            this.uiPercentage.value = actualPercentage;
+            uiPercentage.value = actualPercentage;
         }
         // For step operations, uiPercentage is already set correctly, don't modify it
         
@@ -178,28 +187,32 @@ export class ResizeHandleManager extends BaseComponent {
         }
         // Skip logging when no change detected
         
-        if (AppState?.layout && (finalSceneWidth !== oldSceneWidth || shouldSave)) {
+        if (appState.value?.layout && (finalSceneWidth !== oldSceneWidth || shouldSave)) {
             if (isStepOperation) {
                 // For step operations, save the clean percentage values directly
-                console.log('[ResizeHandleManager] Step operation - saving clean percentages:', this.uiPercentage.value);
-                AppState.layout.scenePercentage = this.uiPercentage.value;
-                AppState.layout.resumePercentage = 100 - this.uiPercentage.value;
+                console.log('[ResizeHandle] Step operation - saving clean percentages:', uiPercentage.value);
+                await updateAppState({
+                    layout: {
+                        scenePercentage: uiPercentage.value,
+                        resumePercentage: 100 - uiPercentage.value
+                    }
+                });
             } else {
-                // Calculate true percentages of total window width for drag operations
-                const trueScenePercentage = (finalSceneWidth / windowWidth) * 100;
-                const trueResumePercentage = ((windowWidth - finalSceneWidth) / windowWidth) * 100;
+                // For drag operations, save the UI percentage directly (consistent with step operations)
+                const currentUIPercentage = uiPercentage.value;
+                const resumeUIPercentage = 100 - currentUIPercentage;
                 
-                console.log('[ResizeHandleManager] Drag operation - calculating from pixels:', trueScenePercentage, 'resume:', trueResumePercentage);
+                console.log('[ResizeHandle] Drag operation - saving UI percentages:', currentUIPercentage, 'resume:', resumeUIPercentage);
                 
-                AppState.layout.scenePercentage = trueScenePercentage;
-                AppState.layout.resumePercentage = trueResumePercentage;
+                if (shouldSave && finalSceneWidth !== oldSceneWidth) {
+                    await updateAppState({
+                        layout: {
+                            scenePercentage: currentUIPercentage,
+                            resumePercentage: resumeUIPercentage
+                        }
+                    });
+                }
             }
-            
-            if (shouldSave && finalSceneWidth !== oldSceneWidth) {
-                console.log('[ResizeHandleManager] Saving state for scene width change');
-                saveState(AppState);
-            }
-            // Skip logging when no save needed
         }
         
         // Log completion - no logAndReset method exists
@@ -210,123 +223,140 @@ export class ResizeHandleManager extends BaseComponent {
     }
   }
 
-  debouncedResizeHandler() {
-    if (this._resizeTimeoutId) {
-        clearTimeout(this._resizeTimeoutId);
+  function debouncedResizeHandler() {
+    if (_resizeTimeoutId) {
+        clearTimeout(_resizeTimeoutId);
     }
-    this._resizeTimeoutId = setTimeout(() => {
-        this.handleViewportResize();
-        this._resizeTimeoutId = null;
+    _resizeTimeoutId = setTimeout(() => {
+        handleViewportResize();
+        _resizeTimeoutId = null;
     }, 100);
   }
 
   // Stepping functionality
-  async collapseLeft() {
-    console.log('[ResizeHandleManager] collapseLeft() called');
-    console.log('[ResizeHandleManager] Current uiPercentage:', this.uiPercentage.value);
-    console.log('[ResizeHandleManager] Step count:', this.stepCount.value);
+  async function collapseLeft() {
+    console.log('[ResizeHandle] collapseLeft() called');
+    console.log('[ResizeHandle] Current uiPercentage:', uiPercentage.value);
+    console.log('[ResizeHandle] Step count:', stepCount.value);
     
     let newPercentage;
-    if (this.stepCount.value === 1) {
+    if (stepCount.value === 1) {
         newPercentage = 0;
     } else {
         // Clean integer math - force values to be exact multiples
-        const increment = 100 / this.stepCount.value; // e.g., 20 for 5 steps
-        const currentBlock = Math.ceil(this.uiPercentage.value / increment);
+        const increment = 100 / stepCount.value; // e.g., 20 for 5 steps
+        const currentBlock = Math.ceil(uiPercentage.value / increment);
         newPercentage = Math.max(0, currentBlock - 1) * increment;
         
         // Ensure result is clean integer (no float contamination)
         newPercentage = Math.round(newPercentage);
         
-        console.log('[ResizeHandleManager] collapseLeft - increment:', increment, 'currentBlock:', currentBlock);
-        console.log('[ResizeHandleManager] collapseLeft - from', this.uiPercentage.value, '-> newPercentage:', newPercentage);
+        console.log('[ResizeHandle] collapseLeft - increment:', increment, 'currentBlock:', currentBlock);
+        console.log('[ResizeHandle] collapseLeft - from', uiPercentage.value, '-> newPercentage:', newPercentage);
     }
     
-    console.log('[ResizeHandleManager] Updating layout to:', newPercentage);
+    console.log('[ResizeHandle] Updating layout to:', newPercentage);
     // Force the exact percentage without any snapping or processing
-    this.uiPercentage.value = newPercentage;
-    this.updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
+    uiPercentage.value = newPercentage;
+    await updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
     await nextTick();
-    // Note: ViewportManager should listen for resize events, not called directly
   }
 
-  async collapseRight() {
-    console.log('[ResizeHandleManager] collapseRight() called');
-    console.log('[ResizeHandleManager] Current uiPercentage:', this.uiPercentage.value);
-    console.log('[ResizeHandleManager] Step count:', this.stepCount.value);
+  async function collapseRight() {
+    console.log('[ResizeHandle] collapseRight() called');
+    console.log('[ResizeHandle] Current uiPercentage:', uiPercentage.value);
+    console.log('[ResizeHandle] Step count:', stepCount.value);
     
     let newPercentage;
-    if (this.stepCount.value === 1) {
+    if (stepCount.value === 1) {
         newPercentage = 100;
     } else {
         // Clean integer math - force values to be exact multiples
-        const increment = 100 / this.stepCount.value; // e.g., 20 for 5 steps
-        const currentBlock = Math.floor(this.uiPercentage.value / increment);
-        newPercentage = Math.min(100, currentBlock + 1) * increment;
+        const increment = 100 / stepCount.value; // e.g., 20 for 5 steps
+        const currentBlock = Math.floor(uiPercentage.value / increment);
+        newPercentage = Math.min(100, (currentBlock + 1) * increment);
         
         // Ensure result is clean integer (no float contamination)
         newPercentage = Math.round(newPercentage);
         
-        console.log('[ResizeHandleManager] collapseRight - increment:', increment, 'currentBlock:', currentBlock);
-        console.log('[ResizeHandleManager] collapseRight - from', this.uiPercentage.value, '-> newPercentage:', newPercentage);
+        console.log('[ResizeHandle] collapseRight - increment:', increment, 'currentBlock:', currentBlock);
+        console.log('[ResizeHandle] collapseRight - from', uiPercentage.value, '-> newPercentage:', newPercentage);
     }
     
-    console.log('[ResizeHandleManager] Updating layout to:', newPercentage);
+    console.log('[ResizeHandle] Updating layout to:', newPercentage);
     // Force the exact percentage without any snapping or processing
-    this.uiPercentage.value = newPercentage;
-    this.updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
+    uiPercentage.value = newPercentage;
+    await updateLayout(newPercentage, true, true); // shouldSave=true, isStepOperation=true
     await nextTick();
-    // Note: ViewportManager should listen for resize events, not called directly
   }
 
-  applyInitialLayout() {
-    this.updateLayout(this.uiPercentage.value, false);
+  function applyInitialLayout() {
+    updateLayout(uiPercentage.value, false);
   }
 
-  destroy() {
-    if (this._resizeTimeoutId) {
-        clearTimeout(this._resizeTimeoutId);
-        this._resizeTimeoutId = null;
+  function destroy() {
+    if (_resizeTimeoutId) {
+        clearTimeout(_resizeTimeoutId);
+        _resizeTimeoutId = null;
     }
-    window.removeEventListener('resize', this.debouncedResizeHandler.bind(this));
+    // removeEventListener calls would need the exact same function references
+    // This cleanup is handled by the Vue component lifecycle instead
+  }
+
+  // Initialize the state
+  const dragHandlers = setupDragHandlers();
+  
+  return {
+    // Reactive state
+    uiPercentage,
+    sceneWidthInPixels,
+    isDragging,
+    stepCount,
     
-    // Clean up drag event listeners
-    if (this.handleMouseMove) {
-      document.removeEventListener('mousemove', this.handleMouseMove);
-    }
-    if (this.handleMouseUp) {
-      document.removeEventListener('mouseup', this.handleMouseUp);
-    }
-  }
+    // Methods
+    initialize,
+    updateLayout,
+    collapseLeft,
+    collapseRight,
+    applyInitialLayout,
+    destroy,
+    
+    // For cleanup
+    dragHandlers
+  };
 }
-
-// Create singleton instance
-export const resizeHandleManager = new ResizeHandleManager();
 
 // --- Composable Wrapper (for Vue components) ---
 let _instance = null;
 
 export function useResizeHandle() {
   // Singleton check
-  if (_instance) {
-    return _instance;
+  if (!_resizeHandleState) {
+    _resizeHandleState = createResizeHandleState();
+    _resizeHandleState.initialize();
   }
 
   // Get layout orientation
   const { orientation } = useLayoutToggle();
 
-  // Create computed properties that reference the IM-managed state
-  const uiPercentage = computed(() => resizeHandleManager.uiPercentage?.value || DEFAULT_WIDTH_PERCENT);
-  const sceneWidthInPixels = computed(() => resizeHandleManager.sceneWidthInPixels?.value || 0);
-  const isDragging = computed(() => resizeHandleManager.isDragging?.value || false);
-  const stepCount = computed(() => resizeHandleManager.stepCount?.value || 1);
+  // Create computed properties that reference the singleton state
+  const uiPercentage = computed(() => _resizeHandleState.uiPercentage.value);
+  const sceneWidthInPixels = computed(() => _resizeHandleState.sceneWidthInPixels.value);
+  const isDragging = computed(() => _resizeHandleState.isDragging.value);
+  const stepCount = computed(() => _resizeHandleState.stepCount.value);
 
   const scenePercentage = computed(() => {
     // Calculate percentage based on available space (windowWidth - 20px resize handle)
     const windowWidth = window.innerWidth;
     const availableWidth = windowWidth - 20; // Subtract resize handle width
     const sceneWidth = sceneWidthInPixels.value;
-    return availableWidth > 0 ? (sceneWidth / availableWidth) * 100 : 50;
+    const rawPercentage = availableWidth > 0 ? (sceneWidth / availableWidth) * 100 : 0;
+    const finalPercentage = Math.max(0, Math.min(100, rawPercentage));
+    
+    console.log('[DEBUG scenePercentage] windowWidth:', windowWidth, 'availableWidth:', availableWidth, 'sceneWidth:', sceneWidth, 'rawPercentage:', rawPercentage, 'finalPercentage:', finalPercentage);
+    
+    // Clamp between 0 and 100
+    return finalPercentage;
   });
 
   const resumePercentage = computed(() => {
@@ -351,27 +381,27 @@ export function useResizeHandle() {
   // Legacy compatibility aliases
   const percentage = computed(() => scenePercentage.value);
 
-  // Wrapper functions that delegate to the IM-managed instance
+  // Wrapper functions that delegate to the singleton state
   function updateLayoutFromPercentage(newPercentage) {
-    return resizeHandleManager.updateLayout(newPercentage);
+    return _resizeHandleState.updateLayout(newPercentage);
   }
 
   function applyInitialLayout() {
-    return resizeHandleManager.applyInitialLayout();
+    return _resizeHandleState.applyInitialLayout();
   }
 
   function collapseLeft() {
-    return resizeHandleManager.collapseLeft();
+    return _resizeHandleState.collapseLeft();
   }
 
   function collapseRight() {
-    return resizeHandleManager.collapseRight();
+    return _resizeHandleState.collapseRight();
   }
 
   function startDrag(event) {
-    if (resizeHandleManager) {
-      resizeHandleManager.isDragging.value = true;
-      console.log('[ResizeHandleManager] Drag started');
+    if (_resizeHandleState) {
+      _resizeHandleState.isDragging.value = true;
+      console.log('[ResizeHandle] Drag started');
       event.preventDefault(); // Prevent text selection while dragging
     }
   }
@@ -387,6 +417,29 @@ export function useResizeHandle() {
     // No-op - IM handles initialization
   }
 
+  // Reactive window width for resize calculations
+  const windowWidth = ref(window.innerWidth);
+  
+  // Update window width on resize
+  const updateWindowWidth = () => {
+    windowWidth.value = window.innerWidth;
+  };
+  window.addEventListener('resize', updateWindowWidth);
+  
+  // Scene container style - account for ResizeHandle width
+  const sceneContainerStyle = computed(() => {
+    const handleWidth = 20; // ResizeHandle width from AppState
+    const availableWidth = windowWidth.value - handleWidth;
+    const sceneWidthPixels = (scenePercentage.value / 100) * availableWidth;
+    
+    return {
+      width: `${sceneWidthPixels}px`,
+      flexShrink: 0,
+      flexGrow: 0,
+      flexBasis: `${sceneWidthPixels}px`
+    };
+  });
+
   // Create the instance
   const resizeHandleInstance = {
     // Reactive state
@@ -396,6 +449,7 @@ export function useResizeHandle() {
     stepCount,
     scenePercentage,
     resumePercentage,
+    sceneContainerStyle,
     handleStyle,
     orientation,
     isLeftCollapsed,

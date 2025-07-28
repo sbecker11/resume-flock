@@ -223,18 +223,13 @@ window.LOG_JOB(2, 'test log on startup');
 
 // import './modules/timeline/timeline.css'; // Removed - now using Vue component
 import './modules/core/core.css'; // Import core styles for BullsEye and other components
-import './debug-browser.mjs'; // Debug functions for browser console
+import './scripts/debug-browser.mjs'; // Debug functions for browser console
 
 // @ts-nocheck
 import { createApp } from 'vue';
 import App from './App.vue';
-import { initializationManager } from './modules/core/initializationManager.mjs';
 
 window.CONSOLE_LOG_IGNORE('main.ts: About to create Vue app');
-
-// Make initializationManager available for debugging
-// @ts-ignore
-window.initializationManager = initializationManager;
 
 // All legacy module imports are now handled within the components that need them,
 // or in the App.vue component's onMounted hook.

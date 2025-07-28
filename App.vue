@@ -14,44 +14,13 @@
 
 <script>
 import AppContent from '@/modules/components/AppContent.vue';
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs';
 
-// Import core components to ensure they register with IM during module loading
-import '@/modules/core/stateManager.mjs';
-import '@/modules/core/vueDomManager.mjs';
-import '@/modules/scene/sceneContainerModule.mjs';
-import '@/modules/core/selectionManager.mjs';
-import '@/modules/core/bullsEye.mjs';
-import '@/modules/core/badgeManager.mjs';
-import '@/modules/utils/BadgePositioner.mjs';
-import '@/modules/scene/bizDetailsDivModule.mjs';
-import '@/modules/scene/CardsController.mjs';
-import '@/modules/composables/useViewport.mjs'; // Import to register ViewportManager
-import '@/modules/composables/useBullsEye.mjs'; // Import to register BullsEyeManager
-import '@/modules/composables/useAimPoint.mjs'; // Import to register AimPointManager
-import '@/modules/composables/useFocalPoint.mjs'; // Import to register FocalPointManager
-import '@/modules/composables/useResizeHandle.mjs'; // Import to register ResizeHandleManager
+// Vue composables are imported where needed - no global registration required
 
 export default {
   name: 'App',
-  mixins: [BaseVueComponentMixin],
   components: {
     AppContent
-  },
-  
-  methods: {
-    getComponentDependencies() {
-      return []; // App.vue doesn't need dependencies - just imports for registration
-    },
-    
-    initialize(dependencies) {
-      // App.vue doesn't need initialization - just a container for AppContent
-      console.log('[App.vue] Container initialized');
-    },
-    
-    cleanupDependencies() {
-      // No dependencies to clean up
-    }
   }
 };
 </script>

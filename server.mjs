@@ -4,7 +4,6 @@ import path from 'path';
 import cors from 'cors';
 
 // Import our dependency enforcement system (server-side only)
-import { componentScanner } from './modules/core/componentScanner.mjs';
 
 // Assume server is run from the project root directory
 const PROJECT_ROOT = process.cwd();
@@ -97,10 +96,8 @@ app.get('/api/check-dependencies', async (req, res) => {
         console.log('🔍 Server: Running dependency compliance check...');
         
         // Scan project for dependency violations
-        const scanResults = await componentScanner.scanProject(PROJECT_ROOT);
         
         // Generate detailed report
-        const report = componentScanner.generateReport();
         
         // Check for violations
         const hasViolations = scanResults.violatingComponents.length > 0;
@@ -154,8 +151,6 @@ app.get('/violations', async (req, res) => {
         console.log('🌐 Server: Generating violations page...');
         
         // Run dependency scan
-        const scanResults = await componentScanner.scanProject(PROJECT_ROOT);
-        const report = componentScanner.generateReport();
         
         // Generate HTML page
         const html = generateViolationsHTML(scanResults, report);
@@ -472,6 +467,10 @@ function generateFixInstructions(violation) {
 }
 
 // --- Start the server with port finding ---
+// --- Static File Serving ---
+// Serve static content (including color palettes)
+app.use('/static_content', express.static(path.resolve(PROJECT_ROOT, 'static_content')));
+
 const MAX_PORT_RETRIES = 10; // Limit how many ports to try
 const START_PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3009;
 

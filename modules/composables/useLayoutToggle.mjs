@@ -1,6 +1,5 @@
 import { ref, computed } from 'vue';
-import { AppState, saveState } from '../core/stateManager.mjs';
-import { initializationManager } from '../core/initializationManager.mjs';
+import { useAppState } from './useAppState.mjs';
 
 /**
  * Programmatic soft refresh - mimics what Cmd+R does
@@ -20,20 +19,11 @@ function programmaticSoftRefresh() {
     window.aimPoint.cleanup?.();
   }
   
-  // Step 2: Force complete viewport reinitialization
-  const viewportManager = initializationManager.getComponent('ViewportManager');
-  if (viewportManager) {
-    // Force viewport to recalculate everything from scratch
-    viewportManager.updateViewportProperties();
-  }
+  // Step 2: Force complete viewport reinitialization - skipped for now
   
   // Step 3: Reinitialize all positioning systems in the correct order
   setTimeout(() => {
-    // Reinitialize viewport first
-    const viewportManager = initializationManager.getComponent('ViewportManager');
-    if (viewportManager) {
-      viewportManager.updateViewportProperties();
-    }
+    // TODO: Replace with Vue composable pattern - skipped for now
     
     // Then reinitialize bullsEye
     if (window.bullsEye) {
@@ -67,17 +57,29 @@ export function useLayoutToggle() {
     return _instance;
   }
 
-  // Reactive state - safely access AppState with fallback
-  const storedOrientation = AppState?.layout?.orientation;
+  // Access centralized app state
+  const { appState, updateAppState } = useAppState();
+
+  // Reactive state - safely access appState with fallback
+  const storedOrientation = appState.value?.layout?.orientation;
   
   const orientation = ref(storedOrientation || 'scene-left');
 
   // Computed properties
   const isSceneLeft = computed(() => orientation.value === 'scene-left');
   const isSceneRight = computed(() => orientation.value === 'scene-right');
+  
+  // Layout percentages from appState
+  const scenePercentage = computed(() => appState.value?.layout?.scenePercentage || 50);
+  const resumePercentage = computed(() => appState.value?.layout?.resumePercentage || 50);
+  
+  // Container class for styling
+  const appContainerClass = computed(() => orientation.value);
+  const firstContainer = computed(() => orientation.value === 'scene-left' ? 'scene-container' : 'resume-container');
+  const secondContainer = computed(() => orientation.value === 'scene-left' ? 'resume-container' : 'scene-container');
 
   // Toggle function
-  const toggleOrientation = () => {
+  const toggleOrientation = async () => {
     const oldOrientation = orientation.value;
     const newOrientation = orientation.value === 'scene-left' ? 'scene-right' : 'scene-left';
     
@@ -86,11 +88,12 @@ export function useLayoutToggle() {
     
     orientation.value = newOrientation;
     
-    // Update global state safely
-    if (AppState?.layout) {
-      AppState.layout.orientation = newOrientation;
-      saveState(AppState);
-    }
+    // Update appState
+    await updateAppState({
+      layout: {
+        orientation: newOrientation
+      }
+    });
     
     // Dispatch event for other components to react
     window.dispatchEvent(new CustomEvent('layout-orientation-changed', {
@@ -124,7 +127,7 @@ export function useLayoutToggle() {
 
   // Listen for state initialization and update orientation if needed
   window.addEventListener('app-state-loaded', () => {
-    const storedOrientation = AppState?.layout?.orientation;
+    const storedOrientation = appState.value?.layout?.orientation;
     
     if (storedOrientation && storedOrientation !== orientation.value) {
       orientation.value = storedOrientation;
@@ -136,15 +139,21 @@ export function useLayoutToggle() {
     return orientation.value === 'scene-left' ? 'Scene | Resume' : 'Resume | Scene';
   };
 
-  // Get toggle button text
+  // Get toggle button text that points to the scene view
   const getToggleButtonText = () => {
-    return '⇆'; // Swap symbol
+    // Arrow points toward where the scene is located
+    return orientation.value === 'scene-left' ? '←' : '→';
   };
 
   _instance = {
     orientation,
     isSceneLeft,
     isSceneRight,
+    scenePercentage,
+    resumePercentage,
+    appContainerClass,
+    firstContainer,
+    secondContainer,
     toggleOrientation,
     getOrientationLabel,
     getToggleButtonText

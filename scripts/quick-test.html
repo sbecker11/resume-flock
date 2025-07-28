@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quick Focal Point Test</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #f0f0f0; }
+        .status { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
+        .error { background: #ffeeee; border: 1px solid red; }
+        .success { background: #eeffee; border: 1px solid green; }
+        .info { background: #eeeeff; border: 1px solid blue; }
+    </style>
+</head>
+<body>
+    <h1>Focal Point Quick Test</h1>
+    <div id="results"></div>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        addResult('Testing focal point positioning...', 'info');
+        
+        // Test the main app
+        fetch('http://localhost:5173')
+            .then(response => {
+                if (response.ok) {
+                    addResult('✅ App server is responding', 'success');
+                    
+                    // Create iframe to load the app
+                    const iframe = document.createElement('iframe');
+                    iframe.src = 'http://localhost:5173';
+                    iframe.style.width = '1px';
+                    iframe.style.height = '1px';
+                    iframe.style.border = 'none';
+                    iframe.style.position = 'absolute';
+                    iframe.style.left = '-9999px';
+                    document.body.appendChild(iframe);
+                    
+                    iframe.onload = function() {
+                        addResult('✅ App loaded in iframe', 'success');
+                        
+                        // Wait for initialization and check focal point
+                        setTimeout(() => {
+                            try {
+                                const doc = iframe.contentDocument;
+                                const focalPoint = doc.getElementById('focal-point');
+                                const bullsEye = doc.getElementById('bulls-eye');
+                                
+                                if (focalPoint) {
+                                    const computedStyle = iframe.contentWindow.getComputedStyle(focalPoint);
+                                    const left = computedStyle.left;
+                                    const top = computedStyle.top;
+                                    const visibility = computedStyle.visibility;
+                                    
+                                    addResult(`Focal Point Found:
+                                        <br>• left: ${left}
+                                        <br>• top: ${top}  
+                                        <br>• visibility: ${visibility}`, 
+                                        left === '0px' && top === '0px' ? 'error' : 'success');
+                                        
+                                    // Get position from getBoundingClientRect
+                                    const rect = focalPoint.getBoundingClientRect();
+                                    addResult(`Focal Point Rect:
+                                        <br>• x: ${rect.x}
+                                        <br>• y: ${rect.y}
+                                        <br>• width: ${rect.width}
+                                        <br>• height: ${rect.height}`, 'info');
+                                } else {
+                                    addResult('❌ Focal point element not found', 'error');
+                                }
+                                
+                                if (bullsEye) {
+                                    const computedStyle = iframe.contentWindow.getComputedStyle(bullsEye);
+                                    const left = computedStyle.left;
+                                    const top = computedStyle.top;
+                                    
+                                    addResult(`Bulls Eye Found:
+                                        <br>• left: ${left}
+                                        <br>• top: ${top}`, 'info');
+                                } else {
+                                    addResult('❌ Bulls eye element not found', 'error');
+                                }
+                                
+                                // Check IM components
+                                const win = iframe.contentWindow;
+                                if (win.initializationManager) {
+                                    const fm = win.initializationManager.getComponent('FocalPointManager');
+                                    if (fm) {
+                                        const state = fm.focalPointState?.value?.current;
+                                        addResult(`FocalPointManager State:
+                                            <br>• isInitialized: ${fm.isInitialized}
+                                            <br>• current.x: ${state?.x}
+                                            <br>• current.y: ${state?.y}
+                                            <br>• has element: ${!!fm.focalPointElement}`, 'info');
+                                    } else {
+                                        addResult('❌ FocalPointManager not found', 'error');
+                                    }
+                                } else {
+                                    addResult('❌ InitializationManager not found', 'error');
+                                }
+                                
+                            } catch (error) {
+                                addResult(`❌ Error checking focal point: ${error.message}`, 'error');
+                            }
+                        }, 5000); // Wait 5 seconds for full initialization
+                    };
+                    
+                    iframe.onerror = function() {
+                        addResult('❌ Failed to load app in iframe', 'error');
+                    };
+                    
+                } else {
+                    addResult(`❌ App server error: ${response.status}`, 'error');
+                }
+            })
+            .catch(error => {
+                addResult(`❌ Failed to connect to app: ${error.message}`, 'error');
+            });
+    </script>
+</body>
+</html>

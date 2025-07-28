@@ -1,6 +1,5 @@
 // modules/resume/resumeContainer.mjs
 
-import { BaseVueComponentMixin } from '@/modules/core/abstracts/BaseComponent.mjs'
 import * as sceneContainer  from '../scene/sceneContainerModule.mjs';
 import { getJobsData } from '../../static_content/jobs/jobs.mjs';
 import * as selectionManager from '../core/selectionManager.mjs';
