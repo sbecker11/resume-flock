@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useAppState } from './useAppState.mjs';
 
 /**
@@ -53,12 +53,20 @@ function programmaticSoftRefresh() {
 let _instance = null;
 
 export function useLayoutToggle() {
+  console.log('[useLayoutToggle] *** COMPOSABLE CALLED ***');
   if (_instance) {
+    console.log('[useLayoutToggle] *** RETURNING EXISTING INSTANCE ***');
     return _instance;
   }
 
+  console.log('[useLayoutToggle] *** CREATING NEW INSTANCE ***');
   // Access centralized app state
   const { appState, updateAppState } = useAppState();
+
+  // Add watcher to log when appState changes
+  watch(() => appState.value?.layout?.scenePercentage, (newValue, oldValue) => {
+    console.log(`[useLayoutToggle] *** appState.layout.scenePercentage changed: ${oldValue} -> ${newValue} ***`);
+  }, { immediate: true });
 
   // Reactive state - safely access appState with fallback
   const storedOrientation = appState.value?.layout?.orientation;
@@ -70,8 +78,18 @@ export function useLayoutToggle() {
   const isSceneRight = computed(() => orientation.value === 'scene-right');
   
   // Layout percentages from appState
-  const scenePercentage = computed(() => appState.value?.layout?.scenePercentage || 50);
-  const resumePercentage = computed(() => appState.value?.layout?.resumePercentage || 50);
+  const scenePercentage = computed(() => {
+    const appStateValue = appState.value?.layout?.scenePercentage;
+    const value = appStateValue !== undefined ? appStateValue : 50;
+    console.log(`[useLayoutToggle] *** CHECKING appState.value?.layout?.scenePercentage: ${appStateValue} -> returning: ${value} ***`);
+    console.log(`[useLayoutToggle] Full appState.value?.layout:`, appState.value?.layout);
+    return value;
+  });
+  const resumePercentage = computed(() => {
+    const calculated = 100 - scenePercentage.value;
+    console.log(`[useLayoutToggle] resumePercentage calculated as 100 - ${scenePercentage.value} = ${calculated}`);
+    return calculated;
+  });
   
   // Container class for styling
   const appContainerClass = computed(() => orientation.value);

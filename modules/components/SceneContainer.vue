@@ -112,7 +112,7 @@ defineExpose({
 
 #scene-container {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(to bottom, var(--background-light, #2a2a2a), var(--background-dark, #1a1a1a));
   border-right: 1px solid #333;
   flex-shrink: 0;
@@ -133,15 +133,16 @@ defineExpose({
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
 }
 
 #scene-plane {
   position: relative;
-  width: 100%;
+  width: 500px; /* Fixed width that's wider than most scene containers */
   height: var(--timeline-height, 2000px);
   min-height: 100%;
   overflow: visible;
+  /* Fixed width allows child elements to be positioned beyond typical scene container width */
 }
 
 /* Scene gradients - positioned at physical edges of scene-plane */
@@ -183,6 +184,8 @@ defineExpose({
   cursor: pointer;
   z-index: 10;
   box-sizing: border-box;
+  
+  /* Allow cards to extend beyond scene container boundaries */
   
   /* Color palette styling - these will be set by applyPaletteToElement */
   background-color: var(--data-background-color, #f0f0f0);

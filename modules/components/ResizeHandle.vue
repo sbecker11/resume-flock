@@ -157,6 +157,7 @@ const {
 
 const isHovering = ref(false);
 const isSteppingHovering = ref(false);
+const isLayoutHovering = ref(false);
 const hasJustClicked = ref(false); // Track if we just clicked (to maintain hover state)
 
 const nextMode = computed(() => {
@@ -165,6 +166,17 @@ const nextMode = computed(() => {
     case 'following': return 'dragging';
     case 'dragging': return 'locked';
     default: return 'locked';
+  }
+});
+
+// Get layout button text - shows opposite direction on hover
+const layoutButtonText = computed(() => {
+  if (isLayoutHovering.value) {
+    // On hover: show where scene will move to (opposite direction)
+    return orientation.value === 'scene-left' ? '→' : '←';
+  } else {
+    // Normal state: show where scene currently is
+    return getToggleButtonText();
   }
 });
 
@@ -284,9 +296,12 @@ function handleResizeHandleClick(event) {
             <BadgeToggle />
             <button id="layout-toggle" 
                     class="toggle-circle" 
+                    :class="{ 'hovering': isLayoutHovering }"
                     @click.stop="handleLayoutToggle" 
+                    @mouseenter="isLayoutHovering = true"
+                    @mouseleave="isLayoutHovering = false"
                     :title="`Scene is ${orientation === 'scene-left' ? 'on the left' : 'on the right'} (click to move scene ${orientation === 'scene-left' ? 'right' : 'left'})`">
-                {{ getToggleButtonText() }}
+                {{ layoutButtonText }}
             </button>
             <button id="stepping-indicator" 
                     class="toggle-circle" 
@@ -425,7 +440,7 @@ function handleResizeHandleClick(event) {
     transition: all 0.2s ease;
 }
 
-#layout-toggle:hover {
+#layout-toggle.hovering {
     background-color: white;
     color: black;
     border-color: black;

@@ -55,7 +55,7 @@ export function useCardsController() {
             const cards = []
             for (let index = 0; index < jobs.length; index++) {
                 const job = jobs[index]
-                const card = createBizCardDiv(job, index)
+                const card = createBizCardDiv(job, index, scenePlaneElement)
                 if (card) {
                     scenePlaneElement.appendChild(card)
                     cards.push(card)
@@ -82,7 +82,7 @@ export function useCardsController() {
         }
     }
 
-    function createBizCardDiv(job, jobNumber) {
+    function createBizCardDiv(job, jobNumber, scenePlane) {
         const cardId = createBizCardDivId(jobNumber)
         
         // Check if card already exists in DOM
@@ -96,8 +96,14 @@ export function useCardsController() {
         card.id = cardId
         card.setAttribute('data-job-number', jobNumber)
         
-        // Calculate timeline-based position
-        let x = 200 + (jobNumber % 3) * 50 // Simple horizontal offset
+        // Calculate position relative to scene-plane (absolute positioning)
+        // Use fixed coordinates that can extend beyond scene container width
+        const baseOffsetFromSceneLeft = 50  
+        const cardSpacing = 120  
+        let x = baseOffsetFromSceneLeft + (jobNumber % 3) * cardSpacing
+        
+        // Cards positioned at: 50px, 170px, 290px...
+        // When scene container is narrow, cards at higher x values should overflow
         let y = 100 // Default fallback
         
         try {

@@ -2,12 +2,47 @@
 
 ## Session Overview
 **Date**: 2025-07-29  
-**Primary Goal**: Complete cDiv clone system and scene plane click handling integration
-**Status**: ✅ **COMPLETED** - Full clone system with scene plane clearing now working
+**Primary Goal**: Debug and fix Vue composable reactivity issues in layout system
+**Status**: ✅ **COMPLETED** - Fixed singleton initialization and bullsEye centering bugs
 
 ## Key Accomplishments
 
-### ✅ Completed Scene Plane Click Handling Integration (2025-07-29)
+### ✅ Fixed Critical Vue Composable Reactivity Issues (2025-07-29)
+
+#### Issue 1: useLayoutToggle Singleton Not Initializing
+- **Problem**: `useLayoutToggle` composable was using singleton pattern but wasn't being properly initialized during app startup
+- **Symptoms**: No console logs from useLayoutToggle, scenePercentage computed properties not reactive
+- **Root Cause**: Singleton `_instance` was null because the composable wasn't being called during AppContent.vue initialization
+- **Solution**: Fixed singleton initialization to ensure the composable is properly instantiated when imported
+- **Result**: ✅ Layout percentage calculations now properly reactive and responsive to state changes
+
+#### Issue 2: BullsEye Not Recentering on Orientation Switch  
+- **Problem**: When switching between scene-left and scene-right layouts, bullsEye remained in old position instead of centering in scene container's new location
+- **Root Cause**: `programmaticSoftRefresh()` function during layout changes was calling `bullsEye.cleanup()` and `bullsEye.initialize()` without required DOM element parameters, causing bullsEye to lose its element references
+- **Debug Process**: Added extensive logging showing bullsEye was receiving events but had `{bullsEyeElement: false, sceneContainer: false}`
+- **Solution**: 
+  - Enhanced `cleanup()` method to preserve element references and just recenter
+  - Modified `initialize()` to handle parameter-less calls during programmatic refresh
+  - Added listener for `programmatic-soft-refresh-complete` event
+- **Result**: ✅ BullsEye now properly recenters when switching between scene-left ⟷ scene-right orientations
+
+#### Issue 3: Scene Percentage Reactivity Break
+- **Problem**: Scene and resume percentage calculations became non-reactive, breaking layout updates
+- **Root Cause**: Connected to useLayoutToggle singleton initialization issue
+- **Solution**: Fixed by resolving the singleton initialization, restoring proper computed property reactivity
+- **Result**: ✅ Percentage-based layout calculations now update correctly in real-time
+
+### ✅ Enhanced Event-Driven Architecture
+- **Added Event Listeners**: BullsEye now listens for multiple layout change events:
+  - `layout-orientation-changed` - immediate response to orientation toggle
+  - `scene-force-update` - response to scene layout finalization  
+  - `programmatic-soft-refresh-complete` - response to complete system reinitialization
+- **Improved Timing**: Used strategic timeouts (50-100ms) to ensure DOM updates complete before recentering
+- **Robust Error Handling**: Added extensive logging and null-checks for debugging complex event sequences
+
+## Previous Accomplishments
+
+### ✅ Completed Scene Plane Click Handling Integration (Earlier Session)
 - **Issue**: Scene plane clicks not integrated for clearing selections, missing consistency with clone click behavior
 - **Solution**: Added `scenePlaneModule.initialize()` call to `SceneContainer.vue` onMounted lifecycle
 - **Fix**: Removed broken `CardsController.mjs` import from `scenePlaneModule.mjs` (moved to archived_components)

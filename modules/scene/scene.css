@@ -1,11 +1,10 @@
 #scene-container {
     width: 50%; /* Initial width */
     height: 100vh; /* Full viewPort height */
-    overflow-y: scroll; 
+    overflow: visible; /* Allow cDivs to extend beyond boundaries */
     overscroll-behavior: contain;
     -ms-overflow-style: none; /* Hide scrollbar for IE and Edge */
     scrollbar-width: none; /* Hide scrollbar for Firefox */
-    overflow-x: hidden; /* prevent horizontal scrolling */
     position: relative;
     isolation: isolate;
     background-color: var(--background-dark);
@@ -64,12 +63,13 @@ html[native-dark-active] #scene-container,
     
 /* scene/scene.css */
 .biz-card-div {
-    position: absolute; /* Required for z-index to work */
+    position: absolute; /* Position relative to scene-plane like timeline */
     font-size: 12px;
     box-sizing: border-box;
     cursor: pointer;
-    z-index: 5; /* Changed from 4 to 5 to match BIZCARD_Z_INDEX_MIN */
+    z-index: 10; /* Above timeline z-index: 5 */
     pointer-events: auto;
+    /* Allow cards to extend beyond parent boundaries like timeline */
     font-family: Arial, sans-serif !important; /* Override any other font-family rules */
 
     /* Default state styling using CSS variables */

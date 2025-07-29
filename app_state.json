@@ -1,13 +1,13 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-29T00:16:46.428Z",
+  "lastUpdated": "2025-07-29T03:24:28.605Z",
   "layout": {
     "orientation": "scene-left",
-    "scenePercentage": 100,
-    "resumePercentage": 0
+    "scenePercentage": 22.67536704730832,
+    "resumePercentage": 77.32463295269167
   },
   "resizeHandle": {
-    "stepCount": 3
+    "stepCount": 1
   },
   "focalPoint": {
     "mode": "locked"

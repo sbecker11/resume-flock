@@ -199,12 +199,12 @@ export function useFocalPoint() {
       // Set crosshair cursor specifically on scene container and its children
       const sceneContainer = document.getElementById('scene-container');
       if (sceneContainer) {
-        sceneContainer.style.setProperty('cursor', 'crosshair', 'important');
+        sceneContainer.style.setProperty('cursor', 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair', 'important');
         
         // Apply crosshair to all elements within scene container
         const sceneElements = sceneContainer.querySelectorAll('*');
         sceneElements.forEach(el => {
-          el.style.setProperty('cursor', 'crosshair', 'important');
+          el.style.setProperty('cursor', 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair', 'important');
         });
         
         console.log('[useFocalPoint] Applied crosshair cursor to scene container and its children');
@@ -260,10 +260,10 @@ export function useFocalPoint() {
     }
     const sceneContainer = document.getElementById('scene-container');
     if (sceneContainer) {
-      sceneContainer.style.cursor = 'crosshair';
+      sceneContainer.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
     }
-    document.body.style.cursor = 'crosshair';
-    document.documentElement.style.cursor = 'crosshair';
+    document.body.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
+    document.documentElement.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
   }
 
   // Watch for aim point position changes (only when not in drag mode)
@@ -303,11 +303,11 @@ export function useFocalPoint() {
   // Test function for cursor debugging
   function testCrosshairCursor() {
     console.log('[useFocalPoint] Testing crosshair cursor manually');
-    document.body.style.cursor = 'crosshair';
-    document.documentElement.style.cursor = 'crosshair';
+    document.body.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
+    document.documentElement.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
     const sceneContainer = document.getElementById('scene-container');
     if (sceneContainer) {
-      sceneContainer.style.cursor = 'crosshair';
+      sceneContainer.style.cursor = 'url(\'/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png\') 8 8, crosshair';
     }
     console.log('[useFocalPoint] Applied crosshair cursor for testing');
   }

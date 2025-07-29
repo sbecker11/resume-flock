@@ -27,7 +27,7 @@ const BIZCARD_MIN_Z_DIFF = 2;
 const MIN_HEIGHT = 180; // Reduced from 200 for more square aspect
 
 // for debugging scene-to-viewport alignment
-const OVERRIDE_SCENE_HZ = true;
+const OVERRIDE_SCENE_HZ = false;
 
 // Timeline functions will be accessed when needed after initialization
 

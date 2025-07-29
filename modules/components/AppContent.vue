@@ -135,8 +135,18 @@ const timelineAlignment = computed(() => {
 })
 
 // Ensure rounded percentages that add up to 100%
-const roundedScenePercentage = computed(() => Math.round(scenePercentage.value))
-const roundedResumePercentage = computed(() => 100 - roundedScenePercentage.value)
+const roundedScenePercentage = computed(() => {
+  const rounded = Math.round(scenePercentage.value)
+  console.log(`[AppContent] scenePercentage: ${scenePercentage.value} -> rounded: ${rounded}`)
+  return rounded
+})
+const roundedResumePercentage = computed(() => {
+  const rawResumePercentage = resumePercentage.value
+  const rounded = Math.round(rawResumePercentage)
+  console.log(`[AppContent] *** DISPLAYED RESUME %: ${rounded}% *** (from composable: ${rawResumePercentage})`)
+  console.log(`[AppContent] scenePercentage: ${scenePercentage.value}, should be: ${100 - scenePercentage.value}`)
+  return rounded
+})
 
 // =============================================================================
 // EVENT HANDLERS
@@ -263,7 +273,7 @@ watch(appState, (newState) => {
   display: flex !important;
   height: 100vh;
   width: 100vw;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
 }
 
