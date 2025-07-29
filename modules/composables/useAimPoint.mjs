@@ -95,7 +95,6 @@ export function useAimPoint() {
     if (focalPointMode.value === FOCALPOINT_MODES.LOCKED) {
       const { position } = event.detail;
       setAimPoint(position.x, position.y, 'bulls-eye-moved');
-      console.log(`[useAimPoint] Bulls-eye moved, aim point updated to: ${position.x}, ${position.y}`);
     }
   });
 

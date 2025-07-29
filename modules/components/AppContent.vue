@@ -59,9 +59,10 @@ import { useAimPoint } from '../composables/useAimPoint.mjs'
 import { handleKeyDown } from '../core/keyDownModule.mjs'
 // Direct BullsEye import - no more IM framework
 import { bullsEye } from '../core/bullsEye.mjs'
+// Import parallax module to trigger auto-initialization
+import '../core/parallaxModule.mjs'
 // Temporarily commented out old IM modules during Vue migration
 // import { sceneContainer } from '../scene/sceneContainerModule.mjs'
-// import { parallaxModule } from '../core/parallaxModule.mjs'
 
 // =============================================================================
 // STATE MANAGEMENT - Centralized via composables

@@ -43,6 +43,11 @@ export function useFocalPoint() {
     focalPointElement.style.zIndex = '100';
     focalPointElement.style.pointerEvents = 'none';
     focalPointElement.style.visibility = (x.value > 0 && y.value > 0) ? 'visible' : 'hidden';
+    
+    // Dispatch event for parallax system
+    window.dispatchEvent(new CustomEvent('focal-point-changed', {
+      detail: { x: x.value, y: y.value }
+    }));
   }
 
   function setFocalPoint(newX, newY, source = 'composable') {
@@ -117,6 +122,15 @@ export function useFocalPoint() {
       if (focalPointElement) {
         focalPointElement.style.left = `${newX}px`;
         focalPointElement.style.top = `${newY}px`;
+        
+        // Update reactive values for parallax system
+        x.value = newX;
+        y.value = newY;
+        
+        // Dispatch parallax event in drag mode for real-time updates
+        window.dispatchEvent(new CustomEvent('focal-point-changed', {
+          detail: { x: newX, y: newY }
+        }));
       }
       // Cancel animation loop entirely - no need to run it in drag mode
       if (animationFrame) {
@@ -141,6 +155,19 @@ export function useFocalPoint() {
       if (focalPointElement) {
         focalPointElement.style.left = event.clientX + 'px';
         focalPointElement.style.top = event.clientY + 'px';
+        
+        // Update global focal point values for parallax system
+        targetX = event.clientX;
+        targetY = event.clientY;
+        
+        // Also update the reactive values so parallax can read them
+        x.value = event.clientX;
+        y.value = event.clientY;
+        
+        // Dispatch parallax event in drag mode for real-time updates
+        window.dispatchEvent(new CustomEvent('focal-point-changed', {
+          detail: { x: event.clientX, y: event.clientY }
+        }));
       }
     };
   }
@@ -159,11 +186,9 @@ export function useFocalPoint() {
         // Pure vanilla JS handler for drag mode - never calls Vue composable
         vanillaMouseHandler = createVanillaHandler();
         document.addEventListener('mousemove', vanillaMouseHandler, { passive: true });
-        console.log('[useFocalPoint] Pure vanilla JS mouse listener added for drag mode');
       } else {
         // Vue composable handler for other modes
         document.addEventListener('mousemove', handleMouseMove, { passive: true });
-        console.log('[useFocalPoint] Vue mouse listener added for non-drag mode');
       }
       mouseListenerActive = true;
     }
@@ -185,10 +210,12 @@ export function useFocalPoint() {
 
   // Listen for aim point changes to update focal point target
   window.addEventListener('focal-point-mode-changed', () => {
-    console.log('[useFocalPoint] Mode changed event received, current mode:', focalPointMode.value);
+    // Always remove existing mouse listener first when changing modes
+    removeMouseListener();
+    
     // Handle mode-specific behavior
     if (focalPointMode.value === FOCALPOINT_MODES.DRAGGING) {
-      // Switch to cursor-based drag mode - hide DOM element, show custom cursor
+      
       isDragModeActive = true;
       
       // Hide the focal point DOM element entirely
@@ -210,9 +237,37 @@ export function useFocalPoint() {
         console.log('[useFocalPoint] Applied crosshair cursor to scene container and its children');
       }
       
-      console.log('[useFocalPoint] Switched to cursor-based drag mode');
+      // Add the vanilla mouse listener for drag mode
+      addMouseListener();
+      
+    } else if (focalPointMode.value === FOCALPOINT_MODES.LOCKED) {
+      // Locked mode: no mouse listener, focal point follows aim point only
+      isDragModeActive = false;
+      
+      // Show the focal point DOM element
+      if (focalPointElement) {
+        focalPointElement.style.display = 'flex';
+      }
+      
+      // Restore normal cursor
+      const sceneContainer = document.getElementById('scene-container');
+      if (sceneContainer) {
+        sceneContainer.style.removeProperty('cursor');
+        const sceneElements = sceneContainer.querySelectorAll('*');
+        sceneElements.forEach(el => {
+          el.style.removeProperty('cursor');
+        });
+      }
+      
+      // Restart animation loop for locked mode
+      if (!aimPointWatcher) {
+        aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
+      }
+      
+      // NO mouse listener in locked mode - focal point only follows aim point
+      
     } else {
-      // Switch away from drag mode - show DOM element, restore normal cursor
+      // Following mode
       isDragModeActive = false;
       
       // Show the focal point DOM element
@@ -243,11 +298,15 @@ export function useFocalPoint() {
         aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
       }
       
+      // Add the Vue mouse listener back only for following mode
+      if (focalPointMode.value === FOCALPOINT_MODES.FOLLOWING) {
+        addMouseListener();
+      }
+      
       // Re-sync with aim point when mode changes to non-drag
       if (aimPoint.position.value.x && aimPoint.position.value.y) {
         setTarget(aimPoint.position.value.x, aimPoint.position.value.y, 'mode-change');
       }
-      console.log('[useFocalPoint] Switched back to DOM-based mode');
     }
   });
 
@@ -335,6 +394,11 @@ export function useFocalPoint() {
     cleanup,
     testCrosshairCursor
   };
+
+  // Make focal point available globally for parallax system
+  if (typeof window !== 'undefined') {
+    window.focalPoint = focalPointInstance;
+  }
 
   _instance = focalPointInstance;
   return focalPointInstance;

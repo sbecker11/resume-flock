@@ -57,51 +57,51 @@ const isRightDisabled = computed(() => {
 
 // Step button click handlers with debug logging
 async function handleStepLeft(event) {
-  console.log('[ResizeHandle] Step left clicked');
-  console.log('[ResizeHandle] Orientation:', orientation.value);
-  console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
-  console.log('[ResizeHandle] Step count:', stepCount.value);
-  console.log('[ResizeHandle] IsLeftDisabled:', isLeftDisabled.value);
+  // console.log('[ResizeHandle] Step left clicked');
+  // console.log('[ResizeHandle] Orientation:', orientation.value);
+  // console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
+  // console.log('[ResizeHandle] Step count:', stepCount.value);
+  // console.log('[ResizeHandle] IsLeftDisabled:', isLeftDisabled.value);
   event.stopPropagation();
   
   // In scene-left: left button decreases scene percentage
   // In scene-right: left button increases scene percentage (mirrored behavior)
   if (orientation.value === 'scene-right') {
-    console.log('[ResizeHandle] Scene-right: Calling collapseRight to increase scene percentage');
+    // console.log('[ResizeHandle] Scene-right: Calling collapseRight to increase scene percentage');
     await collapseRight();
   } else {
-    console.log('[ResizeHandle] Scene-left: Calling collapseLeft to decrease scene percentage');
+    // console.log('[ResizeHandle] Scene-left: Calling collapseLeft to decrease scene percentage');
     await collapseLeft();
   }
   
   // Ensure bulls-eye is recentered after step operation
   if (window.bullsEye) {
-    console.log('[ResizeHandle] Recentering bulls-eye after step left');
+    // console.log('[ResizeHandle] Recentering bulls-eye after step left');
     window.bullsEye.recenter();
   }
 }
 
 async function handleStepRight(event) {
-  console.log('[ResizeHandle] Step right clicked');
-  console.log('[ResizeHandle] Orientation:', orientation.value);
-  console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
-  console.log('[ResizeHandle] Step count:', stepCount.value);
-  console.log('[ResizeHandle] IsRightDisabled:', isRightDisabled.value);
+  // console.log('[ResizeHandle] Step right clicked');
+  // console.log('[ResizeHandle] Orientation:', orientation.value);
+  // console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
+  // console.log('[ResizeHandle] Step count:', stepCount.value);
+  // console.log('[ResizeHandle] IsRightDisabled:', isRightDisabled.value);
   event.stopPropagation();
   
   // In scene-left: right button increases scene percentage
   // In scene-right: right button decreases scene percentage (mirrored behavior)
   if (orientation.value === 'scene-right') {
-    console.log('[ResizeHandle] Scene-right: Calling collapseLeft to decrease scene percentage');
+    // console.log('[ResizeHandle] Scene-right: Calling collapseLeft to decrease scene percentage');
     await collapseLeft();
   } else {
-    console.log('[ResizeHandle] Scene-left: Calling collapseRight to increase scene percentage');
+    // console.log('[ResizeHandle] Scene-left: Calling collapseRight to increase scene percentage');
     await collapseRight();
   }
   
   // Ensure bulls-eye is recentered after step operation
   if (window.bullsEye) {
-    console.log('[ResizeHandle] Recentering bulls-eye after step right');
+    // console.log('[ResizeHandle] Recentering bulls-eye after step right');
     window.bullsEye.recenter();
   }
 }
@@ -200,13 +200,13 @@ const displayedIconMode = computed(() => {
 // The actual icon to show
 const displayIcon = computed(() => {
     const modeToShow = isHovering.value ? nextMode.value : focalPointMode.value;
-    console.log('displayIcon computed:', {
-        isHovering: isHovering.value,
-        currentMode: focalPointMode.value,
-        nextMode: nextMode.value,
-        modeToShow,
-        hasJustClicked: hasJustClicked.value
-    });
+    // console.log('displayIcon computed:', {
+    //     isHovering: isHovering.value,
+    //     currentMode: focalPointMode.value,
+    //     nextMode: nextMode.value,
+    //     modeToShow,
+    //     hasJustClicked: hasJustClicked.value
+    // });
     switch (modeToShow) {
         case 'locked': return '⦻';
         case 'following': return '›';

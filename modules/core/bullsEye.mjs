@@ -82,10 +82,6 @@ class BullsEye {
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
 
-        console.log('[BullsEye] Centering bulls-eye:', {
-            rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-            center: { x: centerX, y: centerY }
-        });
 
         this._bullsEyeElement.style.position = 'fixed';
         this._bullsEyeElement.style.left = `${centerX}px`;
@@ -96,6 +92,11 @@ class BullsEye {
 
         // Dispatch event for other components
         window.dispatchEvent(new CustomEvent('bulls-eye-moved', {
+            detail: { position: { x: centerX, y: centerY } }
+        }));
+        
+        // Dispatch bullseye-recentered event for parallax system
+        window.dispatchEvent(new CustomEvent('bullseye-recentered', {
             detail: { position: { x: centerX, y: centerY } }
         }));
     }

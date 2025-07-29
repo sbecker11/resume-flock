@@ -6,6 +6,9 @@ import { useColorPalette, applyPaletteToElement, readyPromise } from '@/modules/
 import * as dateUtils from '@/modules/utils/dateUtils.mjs'
 import { createBizCardDivId } from '@/modules/utils/bizCardUtils.mjs'
 import { linearInterp } from '@/modules/utils/mathUtils.mjs'
+import * as mathUtils from '@/modules/utils/mathUtils.mjs'
+import * as zUtils from '@/modules/utils/zUtils.mjs'
+import * as filters from '@/modules/core/filters.mjs'
 
 // Timeline constants (matching Timeline.vue)
 const TIMELINE_PADDING_TOP = 0;
@@ -145,6 +148,13 @@ export function useCardsController() {
         
         // Add color index for palette application
         card.setAttribute('data-color-index', jobNumber % 7) // Cycle through palette colors
+        
+        // Add Z-depth for parallax effects (using original random approach)
+        const sceneZ = mathUtils.getRandomInt(zUtils.ALL_CARDS_Z_MIN, zUtils.ALL_CARDS_Z_MAX);
+        card.setAttribute('data-sceneZ', sceneZ)
+        
+        // Apply sceneZ-based depth filters (brightness, blur, contrast, saturation)
+        card.style.filter = filters.get_filterStr_from_z(sceneZ)
         
         // Position only - styling is handled by CSS
         card.style.left = `${x}px`
@@ -339,7 +349,7 @@ export function useCardsController() {
             </div>
             <div class="biz-details-dates" style="font-weight: bold; padding: 2px; display: flex; justify-content: space-between;">
                 <span>${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A'}</span>
-                <span>#${jobNumber}</span>
+                <span>#${jobNumber} z:${sceneZ}</span>
             </div>
             <div class="job-stats" style="font-size: 10px; color: #666; margin-top: 4px;">
                 Skills: ${skillCount} | References: ${job.references ? job.references.length : 0}
@@ -430,6 +440,24 @@ export function useCardsController() {
         return card
     }
 
+    // Viewport change handler for repositioning selected clones
+    function handleViewportChangedForClones() {
+        // Find any existing clones and reposition them to scene center
+        const scenePlaneElement = document.getElementById('scene-plane')
+        if (!scenePlaneElement) return
+        
+        const clones = scenePlaneElement.querySelectorAll('[id$="-clone"]')
+        clones.forEach(clone => {
+            const sceneRect = scenePlaneElement.getBoundingClientRect()
+            const centerX = sceneRect.width / 2
+            clone.style.left = `${centerX - (parseFloat(clone.style.width) || 180) / 2}px`
+        })
+        
+        if (clones.length > 0) {
+            console.log(`[useCardsController] Repositioned ${clones.length} clones to scene center after viewport change`)
+        }
+    }
+
     // Set up selection event listeners for clone management
     onMounted(() => {
         // Delay to ensure DOM is ready
@@ -438,6 +466,11 @@ export function useCardsController() {
         // Listen for selection events to handle clone creation
         selectionManager.addEventListener('job-selected', handleJobSelected)
         selectionManager.addEventListener('selection-cleared', handleSelectionCleared)
+        
+        // Listen for viewport changes to reposition selected clones
+        window.addEventListener('viewport-changed', handleViewportChangedForClones)
+        window.addEventListener('resize-handle-changed', handleViewportChangedForClones)
+        window.addEventListener('resize', handleViewportChangedForClones)
     })
     
     // Clone management functions
@@ -503,9 +536,13 @@ export function useCardsController() {
         clone.style.left = `${centerX - (parseFloat(clone.style.width) || 180) / 2}px`
         clone.style.zIndex = '99' // Above other cards
         
+        // Get sceneZ from clone to verify it was copied
+        const cloneSceneZ = clone.getAttribute('data-sceneZ')
+        console.log(`[useCardsController] Clone sceneZ value: ${cloneSceneZ}`)
+        
         // Add visual indicator to distinguish clone from original
         clone.style.border = '3px solid #ff6b6b' // Red border for debugging
-        clone.title = `CLONE of Job ${jobNumber}` // Tooltip to identify clone
+        clone.title = `CLONE of Job ${jobNumber} (sceneZ: ${cloneSceneZ})` // Tooltip to identify clone with sceneZ
         
         // Add clone to DOM
         scenePlaneElement.appendChild(clone)
@@ -607,6 +644,11 @@ export function useCardsController() {
     onUnmounted(() => {
         selectionManager.removeEventListener('job-selected', handleJobSelected)
         selectionManager.removeEventListener('selection-cleared', handleSelectionCleared)
+        
+        // Remove viewport change listeners
+        window.removeEventListener('viewport-changed', handleViewportChangedForClones)
+        window.removeEventListener('resize-handle-changed', handleViewportChangedForClones)
+        window.removeEventListener('resize', handleViewportChangedForClones)
     })
 
     return {

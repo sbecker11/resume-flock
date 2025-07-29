@@ -28,16 +28,16 @@ function createResizeHandleState() {
       // Use the stored percentage directly - no complex conversion needed
       initialPercentage = storedScenePercentage;
       
-      console.log('[ResizeHandle] RESTORE DEBUG:');
-      console.log('  storedScenePercentage:', storedScenePercentage + '%');
-      console.log('  Using directly as initialPercentage:', initialPercentage + '%');
+      // console.log('[ResizeHandle] RESTORE DEBUG:');
+      // console.log('  storedScenePercentage:', storedScenePercentage + '%');
+      // console.log('  Using directly as initialPercentage:', initialPercentage + '%');
     }
     stepCount.value = appState.value?.resizeHandle?.stepCount || 1;
-    console.log('[ResizeHandle] DEBUG: appState.resizeHandle:', appState.value?.resizeHandle);
-    console.log('[ResizeHandle] DEBUG: stepCount loaded:', stepCount.value);
+    // console.log('[ResizeHandle] DEBUG: appState.resizeHandle:', appState.value?.resizeHandle);
+    // console.log('[ResizeHandle] DEBUG: stepCount loaded:', stepCount.value);
     
     // Use the stored percentage directly
-    console.log('[ResizeHandle] Initialization - using stored percentage:', initialPercentage);
+    // console.log('[ResizeHandle] Initialization - using stored percentage:', initialPercentage);
     
     uiPercentage.value = initialPercentage;
   }
