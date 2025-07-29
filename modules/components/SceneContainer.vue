@@ -177,7 +177,8 @@ defineExpose({
   font-family: var(--scene-font-family, 'Inter', sans-serif);
   font-size: 12px;
   width: 180px;
-  height: 200px;
+  /* height: 200px; - REMOVED: Height now set dynamically based on job duration */
+  min-height: 180px; /* Fallback minimum height if dynamic calculation fails */
   border: 1px solid #ccc;
   border-radius: 8px;
   padding: 10px;

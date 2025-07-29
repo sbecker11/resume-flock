@@ -114,6 +114,14 @@ function createResizeHandleState() {
         
         // Save state when drag ends
         updateLayout(uiPercentage.value, true); // shouldSave = true
+        
+        // Ensure bulls-eye is recentered after drag operation
+        if (window.bullsEye) {
+          console.log('[ResizeHandle] Recentering bulls-eye after drag');
+          setTimeout(() => {
+            window.bullsEye.recenter();
+          }, 50); // Small delay to allow layout to settle
+        }
       }
     };
     

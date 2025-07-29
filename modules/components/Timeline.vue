@@ -3,10 +3,10 @@
     <g v-for="item in years" :key="item.year" class="timeline-year">
       <!-- Debug circle at year position (removed) -->
       
-      <!-- Year Label -->
+      <!-- Year Label positioned above the year line -->
       <text
         :x="props.alignment === 'left' ? 70 : '166px'"
-        :y="props.alignment === 'left' ? item.y - 28 : item.y - 29"
+        :y="item.y - 17"
         class="year-label"
         :class="{ 'year-label-scene-left': props.alignment === 'right' }"
         :text-anchor="props.alignment === 'left' ? 'start' : 'end'"
@@ -14,20 +14,20 @@
         {{ item.year }}
       </text>
 
-      <!-- Continuous year line (from left edge to end of big year) -->
+      <!-- Continuous year line positioned at month 0 (January) -->
       <line
         :x1="props.alignment === 'left' ? '56px' : '50px'"
-        :y1="props.alignment === 'left' ? item.y - 16.67 + 4 : item.y - 16.67 + 3"
+        :y1="item.y + 3"
         :x2="props.alignment === 'left' ? '180px' : '166px'"
-        :y2="props.alignment === 'left' ? item.y - 16.67 + 4 : item.y - 16.67 + 3"
+        :y2="item.y + 2"
         class="year-tick-line"
       />
       
       <!-- Month Ticks -->
-      <g v-for="month in 12" :key="`${item.year}-${month}`">
+      <g v-for="month in 12" :key="`${item.year}-${month.toString().padStart(2, '0')}`">
         <text
           :x="props.alignment === 'left' ? 18 : '50px'"
-          :y="item.y - (month * 16.67)"
+          :y="item.y - ((month-1) * 16.67)"
           class="month-label"
           :text-anchor="props.alignment === 'left' ? 'start' : 'end'"
           style="list-style: none !important; list-style-type: none !important;"
@@ -36,9 +36,9 @@
         </text>
         <line
           :x1="props.alignment === 'left' ? '18px' : '10px'"
-          :y1="props.alignment === 'left' ? item.y - (month * 16.67) + 4 : item.y - (month * 16.67) + 3"
+          :y1="props.alignment === 'left' ? item.y - ((month-1) * 16.67) + 4 : item.y - ((month-1) * 16.67) + 3"
           :x2="props.alignment === 'left' ? '56px' : '50px'"
-          :y2="props.alignment === 'left' ? item.y - (month * 16.67) + 4 : item.y - (month * 16.67) + 3"
+          :y2="props.alignment === 'left' ? item.y - ((month-1) * 16.67) + 4 : item.y - ((month-1) * 16.67) + 3"
           class="month-tick-line"
         />
       </g>

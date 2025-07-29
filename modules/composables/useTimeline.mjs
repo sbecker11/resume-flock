@@ -77,7 +77,7 @@ function useTimeline() {
         const displayEndYear = Math.floor(endYear.value);
         
         for (let year = displayEndYear; year >= displayStartYear; year--) {
-            // Calculate position using the fractional start/end years for accuracy
+            // January 1st fractional year is just the integer year (year + 0)
             const yearPos = linearInterp(year, startYear.value, timelineHeight.value, endYear.value, TIMELINE_PADDING_TOP + 50);
             
             yearArray.push({
@@ -102,21 +102,40 @@ function useTimeline() {
         const yearFraction = month / 12 + day / 365.25 / 12;
         const dateAsYear = year + yearFraction;
 
-        // Use mathUtils linearInterp to map date years to pixel positions
-        // x: dateAsYear, x0: startYear, x1: endYear
-        // y0: timelineHeight (bottom), y1: topPadding (top)
-        const topPadding = TIMELINE_PADDING_TOP + 50; // 50px scene plane padding
-        const bottomPosition = timelineHeight.value;
+        // Based on measurements: 2026-01-01 -> 137px, position 0 -> 2026 + (137/200) years
+        const referenceDateYear = 2026 + (137/200); // 2026.685 years
+        const referencePosition = 0; // position 0
         
-        const yPosition = linearInterp(
-            dateAsYear,           // x: current date as fractional year
-            startYear.value,      // x0: timeline start (bottom)
-            bottomPosition,       // y0: bottom pixel position
-            endYear.value,        // x1: timeline end (top)
-            topPadding           // y1: top pixel position
-        );
+        // Use simple linear scaling: 200px per year
+        const yPosition = referencePosition + (referenceDateYear - dateAsYear) * 200;
 
         return yPosition;
+    }
+
+    function getDateForPosition(yPosition) {
+        if (!isInitialized.value) {
+            window.CONSOLE_LOG_IGNORE("getDateForPosition called before timeline was initialized.");
+            return null;
+        }
+
+        const topPadding = TIMELINE_PADDING_TOP;
+        const bottomPosition = timelineHeight.value;
+        
+        // Based on measurements: position 0 -> 2026 + (137/200) years
+        const referenceDateYear = 2026 + (137/200); // 2026.685 years
+        const referencePosition = 0; // position 0
+        
+        // Use simple linear scaling: 200px per year (reverse)
+        const dateAsYear = referenceDateYear - (yPosition - referencePosition) / 200;
+
+        // Convert fractional year back to date
+        const year = Math.floor(dateAsYear);
+        const yearRemainder = dateAsYear - year;
+        const month = Math.floor(yearRemainder * 12);
+        const monthRemainder = (yearRemainder * 12) - month;
+        const day = Math.floor(monthRemainder * 365.25 / 12) + 1;
+
+        return new Date(Date.UTC(year, month, day));
     }
 
 
@@ -127,6 +146,7 @@ function useTimeline() {
         timelineHeight: computed(() => timelineHeight.value),
         years,
         getPositionForDate,
+        getDateForPosition,
     };
 }
 

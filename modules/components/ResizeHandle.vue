@@ -56,7 +56,7 @@ const isRightDisabled = computed(() => {
 });
 
 // Step button click handlers with debug logging
-function handleStepLeft(event) {
+async function handleStepLeft(event) {
   console.log('[ResizeHandle] Step left clicked');
   console.log('[ResizeHandle] Orientation:', orientation.value);
   console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
@@ -68,14 +68,20 @@ function handleStepLeft(event) {
   // In scene-right: left button increases scene percentage (mirrored behavior)
   if (orientation.value === 'scene-right') {
     console.log('[ResizeHandle] Scene-right: Calling collapseRight to increase scene percentage');
-    collapseRight();
+    await collapseRight();
   } else {
     console.log('[ResizeHandle] Scene-left: Calling collapseLeft to decrease scene percentage');
-    collapseLeft();
+    await collapseLeft();
+  }
+  
+  // Ensure bulls-eye is recentered after step operation
+  if (window.bullsEye) {
+    console.log('[ResizeHandle] Recentering bulls-eye after step left');
+    window.bullsEye.recenter();
   }
 }
 
-function handleStepRight(event) {
+async function handleStepRight(event) {
   console.log('[ResizeHandle] Step right clicked');
   console.log('[ResizeHandle] Orientation:', orientation.value);
   console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
@@ -87,10 +93,16 @@ function handleStepRight(event) {
   // In scene-right: right button decreases scene percentage (mirrored behavior)
   if (orientation.value === 'scene-right') {
     console.log('[ResizeHandle] Scene-right: Calling collapseLeft to decrease scene percentage');
-    collapseLeft();
+    await collapseLeft();
   } else {
     console.log('[ResizeHandle] Scene-left: Calling collapseRight to increase scene percentage');
-    collapseRight();
+    await collapseRight();
+  }
+  
+  // Ensure bulls-eye is recentered after step operation
+  if (window.bullsEye) {
+    console.log('[ResizeHandle] Recentering bulls-eye after step right');
+    window.bullsEye.recenter();
   }
 }
 

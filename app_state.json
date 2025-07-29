@@ -1,13 +1,13 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-29T03:24:28.605Z",
+  "lastUpdated": "2025-07-29T20:45:02.837Z",
   "layout": {
     "orientation": "scene-left",
-    "scenePercentage": 22.67536704730832,
-    "resumePercentage": 77.32463295269167
+    "scenePercentage": 75,
+    "resumePercentage": 25
   },
   "resizeHandle": {
-    "stepCount": 1
+    "stepCount": 4
   },
   "focalPoint": {
     "mode": "locked"
@@ -55,7 +55,7 @@
     }
   },
   "theme": {
-    "colorPalette": "55 Emerald.json",
+    "colorPalette": "so_cherry.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {

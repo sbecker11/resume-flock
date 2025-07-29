@@ -286,33 +286,9 @@ watch(appState, (newState) => {
   flex-direction: row !important;
 }
 
-/* Debug: Make container borders more visible to see layout changes */
-#app-container.scene-left #scene-container {
-  border-right: 3px solid #00ff00 !important;
-  border-left: none !important;
-}
+/* Debug borders removed per user request */
 
-#app-container.scene-right #scene-container {
-  border-left: 3px solid #ff0000 !important;
-  border-right: none !important;
-}
-
-#app-container.scene-left #resume-container {
-  border-left: 2px solid #0000ff !important;
-}
-
-#app-container.scene-right #resume-container {
-  border-right: 2px solid #ffff00 !important;
-}
-
-/* Additional debug: Different background colors to make order more obvious */
-#app-container.scene-left {
-  background: linear-gradient(90deg, rgba(0,255,0,0.1) 0%, rgba(0,0,255,0.1) 100%) !important;
-}
-
-#app-container.scene-right {
-  background: linear-gradient(90deg, rgba(255,255,0,0.1) 0%, rgba(255,0,0,0.1) 100%) !important;
-}
+/* Debug background gradients also removed */
 
 /* Scene-specific styles moved to SceneContainer.vue */
 
