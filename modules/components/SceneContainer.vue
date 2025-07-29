@@ -35,6 +35,7 @@ import { useViewport } from '../composables/useViewport.mjs'
 
 // Core functionality
 import { bullsEye } from '../core/bullsEye.mjs'
+import * as scenePlaneModule from '../scene/scenePlaneModule.mjs'
 
 // Props from parent AppContent
 const props = defineProps({
@@ -85,6 +86,9 @@ onMounted(async () => {
     
     // Initialize business cards controller
     await initializeCardsController()
+    
+    // Initialize scene plane click handling for selection clearing
+    await scenePlaneModule.initialize()
     
     console.log('[SceneContainer] ✅ Scene initialization complete!')
     

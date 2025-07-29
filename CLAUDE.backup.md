@@ -1,11 +1,23 @@
 # CLAUDE Session Backup - Resume Flock IM Migration
 
 ## Session Overview
-**Date**: 2025-07-25  
-**Primary Goal**: Continue migration of focal point, aim point, and bulls-eye elements to IM (Initialization Manager) compliance  
-**Status**: ✅ **COMPLETED** - DOM separation pattern successfully implemented for SceneContainer and BullsEye
+**Date**: 2025-07-29  
+**Primary Goal**: Complete cDiv clone system and scene plane click handling integration
+**Status**: ✅ **COMPLETED** - Full clone system with scene plane clearing now working
 
 ## Key Accomplishments
+
+### ✅ Completed Scene Plane Click Handling Integration (2025-07-29)
+- **Issue**: Scene plane clicks not integrated for clearing selections, missing consistency with clone click behavior
+- **Solution**: Added `scenePlaneModule.initialize()` call to `SceneContainer.vue` onMounted lifecycle
+- **Fix**: Removed broken `CardsController.mjs` import from `scenePlaneModule.mjs` (moved to archived_components)
+- **Result**: ✅ Clicking empty scene space now clears selections same as clicking selected clones
+
+### ✅ Cleaned Up CardsController References (2025-07-29)
+- **Action**: Globally searched and removed all remaining `CardsController.mjs` references
+- **Files Updated**: `modules/scene/scenePlaneModule.mjs` - removed unused import
+- **Verification**: All actual code imports cleaned up, only documentation/chat references remain
+- **Result**: ✅ No more import errors, system uses `useCardsController` composable exclusively
 
 ### ✅ Fixed Critical Timeline Bug  
 - **Issue**: Timeline date-to-pixel conversion had incorrect parameter order in `linearInterp` call

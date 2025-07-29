@@ -2,7 +2,7 @@
 
 import * as utils from '../utils/utils.mjs';
 // Removed viewPort import - not used in this module
-import * as BizDetailsDivModule from './bizDetailsDivModule.mjs';
+// import * as BizDetailsDivModule from './bizDetailsDivModule.mjs'; // File doesn't exist - disabled since CardsController is not being used
 // Removed useTimeline composable - now using TimelineManager dependency
 import * as dateUtils from '../utils/dateUtils.mjs';
 import * as mathUtils from '../utils/mathUtils.mjs';
@@ -345,12 +345,12 @@ class CardsController {
             const colorIndex = jobNumber;
             bizCardDiv.setAttribute('data-color-index', colorIndex);
 
-            const bizCardDetailsDiv = BizDetailsDivModule.createBizCardDetailsDiv(bizCardDiv);
-            if (bizCardDetailsDiv instanceof Node) {
-                bizCardDiv.appendChild(bizCardDetailsDiv);
-            } else {
-                console.error(`[CardsController] bizCardDetailsDiv for job ${jobNumber} is not a Node:`, bizCardDetailsDiv);
-            }
+            // const bizCardDetailsDiv = BizDetailsDivModule.createBizCardDetailsDiv(bizCardDiv); // Disabled - module doesn't exist
+            // if (bizCardDetailsDiv instanceof Node) {
+            //     bizCardDiv.appendChild(bizCardDetailsDiv);
+            // } else {
+            //     console.error(`[CardsController] bizCardDetailsDiv for job ${jobNumber} is not a Node:`, bizCardDetailsDiv);
+            // }
 
                     // Apply the current color palette via ColorPaletteManager
         this.colorPaletteManager.applyPaletteToElement(bizCardDiv);
@@ -452,7 +452,6 @@ class CardsController {
         let sceneHeight = sceneBottom - sceneTop;
         const sceneCenterY = sceneTop + sceneHeight / 2;
         
-
         if (sceneHeight < MIN_HEIGHT) {
             sceneHeight = MIN_HEIGHT;
             let newSceneTop = sceneCenterY - MIN_HEIGHT / 2;
@@ -512,19 +511,19 @@ class CardsController {
         utils.validateNumberInRange(sceneZ, zUtils.ALL_CARDS_Z_MIN, zUtils.ALL_CARDS_Z_MAX);
         bizCardDiv.setAttribute("data-sceneZ", sceneZ);
         
-        // Log data-scene- values for job 0 only
-        const jobNumber = bizCardDiv.getAttribute('data-job-number');
-        if (jobNumber === '0') {
-            // console.log('Job 0 data-scene- attributes:', {
-            //     'data-sceneTop': bizCardDiv.getAttribute('data-sceneTop'),
-            //     'data-sceneBottom': bizCardDiv.getAttribute('data-sceneBottom'),
-            //     'data-sceneHeight': bizCardDiv.getAttribute('data-sceneHeight'),
-            //     'data-sceneLeft': bizCardDiv.getAttribute('data-sceneLeft'),
-            //     'data-sceneRight': bizCardDiv.getAttribute('data-sceneRight'),
-            //     'data-sceneWidth': bizCardDiv.getAttribute('data-sceneWidth'),
-            //     'data-sceneZ': bizCardDiv.getAttribute('data-sceneZ')
-            // });
-        }
+        // // Log data-scene- values for job 0 only
+        // const jobNumber = bizCardDiv.getAttribute('data-job-number');
+        // if (jobNumber === '0') {
+        //     // console.log('Job 0 data-scene- attributes:', {
+        //     //     'data-sceneTop': bizCardDiv.getAttribute('data-sceneTop'),
+        //     //     'data-sceneBottom': bizCardDiv.getAttribute('data-sceneBottom'),
+        //     //     'data-sceneHeight': bizCardDiv.getAttribute('data-sceneHeight'),
+        //     //     'data-sceneLeft': bizCardDiv.getAttribute('data-sceneLeft'),
+        //     //     'data-sceneRight': bizCardDiv.getAttribute('data-sceneRight'),
+        //     //     'data-sceneWidth': bizCardDiv.getAttribute('data-sceneWidth'),
+        //     //     'data-sceneZ': bizCardDiv.getAttribute('data-sceneZ')
+        //     // });
+        // }
         
         // set the z-relative style properties
         bizCardDiv.style.setProperty("z-index", zUtils.get_zIndexStr_from_z(sceneZ));
@@ -830,11 +829,11 @@ class CardsController {
         // Gather badges for each job skill using the new badge system
         try {
             const jobNumber = parseInt(bizCardDiv.getAttribute('data-job-number'), 10);
-            const badgesInfo = BizDetailsDivModule.createBadgesInfo(clone);
+            // const badgesInfo = BizDetailsDivModule.createBadgesInfo(clone); // Disabled - module doesn't exist
             // Created badges for selected job
             
             // Store the badges info on the clone for later use
-            clone.setAttribute('data-badges-info', JSON.stringify(badgesInfo));
+            // clone.setAttribute('data-badges-info', JSON.stringify(badgesInfo)); // Disabled - badgesInfo not available
         } catch (error) {
             console.error('Failed to create badges for selected job:', error);
         }
@@ -925,15 +924,15 @@ class CardsController {
         if (isClone) {
             // Allow deselection when clicking the clone
             if (isAlreadySelected) {
-                this.selectionManager.clearSelection('CardsController.handleBizCardDivClickEvent');
+                this.selectionManager.clearSelection();
             }
             return;
         }
 
         if (isAlreadySelected) {
-            this.selectionManager.clearSelection('CardsController.handleBizCardDivClickEvent');
+            this.selectionManager.clearSelection();
         } else {
-            this.selectionManager.selectJobNumber(jobNumber, 'CardsController.handleBizCardDivClickEvent');
+            this.selectionManager.selectJobNumber(jobNumber);
         }
     }
 
@@ -1534,7 +1533,8 @@ class CardsController {
     }
 }
 
-const cardsController = new CardsController();
+// Disabled: Vue app uses useCardsController composable instead
+// const cardsController = new CardsController();
 
 // Global function for testing sorting
 window.testCardsSorting = function() {

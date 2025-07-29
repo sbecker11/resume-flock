@@ -1,4 +1,5 @@
 import { AppState, saveState } from './stateManager.mjs';
+import { jobs } from '../../static_content/jobs/jobs.mjs';
 
 // Simple selection manager without IM framework
 class SelectionManager {
@@ -17,9 +18,12 @@ class SelectionManager {
         }
     }
 
-    selectJob(jobNumber) {
+    selectJobNumber(jobNumber) {
         const previousSelection = this.selectedJobNumber;
         this.selectedJobNumber = jobNumber;
+        
+        // Fetch dataJobObject using jobNumber
+        const dataJobObject = this.getJobDataByNumber(jobNumber);
         
         // Update AppState
         if (AppState) {
@@ -32,12 +36,13 @@ class SelectionManager {
         this.eventTarget.dispatchEvent(new CustomEvent('job-selected', {
             detail: { 
                 jobNumber, 
+                dataJobObject,
                 previousSelection,
                 source: 'SelectionManager'
             }
         }));
 
-        console.log(`[SelectionManager] Job ${jobNumber} selected`);
+        console.log(`[SelectionManager] Job ${jobNumber} selected:`, dataJobObject?.employer || 'Unknown');
     }
 
     clearSelection() {
@@ -60,6 +65,20 @@ class SelectionManager {
 
     getSelectedJobNumber() {
         return this.selectedJobNumber;
+    }
+
+    getJobDataByNumber(jobNumber) {
+        if (jobNumber === null || jobNumber === undefined) {
+            return null;
+        }
+        
+        // Jobs array is 0-indexed, jobNumber should match the array index
+        if (jobNumber >= 0 && jobNumber < jobs.length) {
+            return jobs[jobNumber];
+        }
+        
+        console.warn(`[SelectionManager] Job number ${jobNumber} out of range (0-${jobs.length - 1})`);
+        return null;
     }
 
     setHoveredJobNumber(jobNumber) {

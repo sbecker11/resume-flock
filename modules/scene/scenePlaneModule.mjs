@@ -1,4 +1,4 @@
-import { cardsController } from './CardsController.mjs';
+// CardsController moved to archived_components - no longer needed for scene plane clicks
 // import { resumeListController } from '../resume/ResumeListController.mjs'; // No longer needed
 import { selectionManager } from '../core/selectionManager.mjs';
 
