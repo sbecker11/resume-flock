@@ -18,7 +18,7 @@ class SelectionManager {
         }
     }
 
-    selectJobNumber(jobNumber) {
+    selectJobNumber(jobNumber, caller = 'unknown') {
         const previousSelection = this.selectedJobNumber;
         this.selectedJobNumber = jobNumber;
         
@@ -32,7 +32,7 @@ class SelectionManager {
             saveState(AppState);
         }
 
-        // Dispatch selection event
+        // Dispatch both new and legacy events for compatibility
         this.eventTarget.dispatchEvent(new CustomEvent('job-selected', {
             detail: { 
                 jobNumber, 
@@ -42,10 +42,18 @@ class SelectionManager {
             }
         }));
 
+        // Legacy event for recovered controllers
+        this.eventTarget.dispatchEvent(new CustomEvent('selectionChanged', {
+            detail: { 
+                selectedJobNumber: jobNumber, 
+                caller 
+            }
+        }));
+
         console.log(`[SelectionManager] Job ${jobNumber} selected:`, dataJobObject?.employer || 'Unknown');
     }
 
-    clearSelection() {
+    clearSelection(caller = 'unknown') {
         const previousSelection = this.selectedJobNumber;
         this.selectedJobNumber = null;
         
@@ -55,9 +63,14 @@ class SelectionManager {
             saveState(AppState);
         }
 
-        // Dispatch clear event
+        // Dispatch both new and legacy events for compatibility
         this.eventTarget.dispatchEvent(new CustomEvent('selection-cleared', {
             detail: { previousSelection }
+        }));
+
+        // Legacy event for recovered controllers
+        this.eventTarget.dispatchEvent(new CustomEvent('selectionCleared', {
+            detail: { caller }
         }));
 
         console.log('[SelectionManager] Selection cleared');
@@ -87,6 +100,29 @@ class SelectionManager {
         // Dispatch hover event
         this.eventTarget.dispatchEvent(new CustomEvent('job-hovered', {
             detail: { jobNumber }
+        }));
+    }
+
+    // Legacy API compatibility for recovered controllers
+    hoverJobNumber(jobNumber, caller = 'unknown') {
+        this.hoveredJobNumber = jobNumber;
+        
+        // Dispatch both new and legacy events for compatibility
+        this.eventTarget.dispatchEvent(new CustomEvent('job-hovered', {
+            detail: { jobNumber }
+        }));
+        
+        this.eventTarget.dispatchEvent(new CustomEvent('hoverChanged', {
+            detail: { hoveredJobNumber: jobNumber, caller }
+        }));
+    }
+
+    clearHover(caller = 'unknown') {
+        this.hoveredJobNumber = null;
+        
+        // Dispatch legacy clear hover event
+        this.eventTarget.dispatchEvent(new CustomEvent('hoverCleared', {
+            detail: { caller }
         }));
     }
 

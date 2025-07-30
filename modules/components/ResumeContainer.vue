@@ -58,7 +58,10 @@ const sortOptions = ref([
 function selectFirst() {
   window.CONSOLE_LOG_IGNORE("selectFirst button clicked");
   if (window.resumeListController) {
+    console.log('[ResumeContainer] Calling goToFirstResumeItem()');
     window.resumeListController.goToFirstResumeItem();
+  } else {
+    console.error('[ResumeContainer] ResumeListController not available!');
   }
 }
 function selectLast() {
@@ -143,11 +146,11 @@ function selectPrevious() {
 
 #resume-content-div-wrapper {
     flex-grow: 1;
-    /* overflow-y is now controlled by the legacy scroller */
+    /* overflow-y is now controlled by the InfiniteScrollingContainer */
     background-color: var(--grey-medium);
     color: black;
     position: relative; /* Needed for the absolute positioning of items by the scroller */
-    overflow: hidden; /* The scroller inside will handle overflow */
+    /* overflow is set by InfiniteScrollingContainer.setupContainer() to 'auto' */
 }
 
 #resume-content-div {

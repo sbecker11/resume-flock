@@ -337,8 +337,8 @@ export async function applyPaletteToElement(element) {
 
     const borderRadius = appState.value.theme?.borderRadius || '25px';
 
-    // Get global border and padding settings from appState (with defaults)
-    const borderSettings = appState.value.theme?.borderSettings || {
+    // Get global border and padding settings from appState (with defaults) - create deep copy to avoid readonly proxy issues
+    const defaultBorderSettings = {
         normal: {
             padding: '8px', // 8px padding + 2px border = 10px total, matching CSS expectations
             innerBorderWidth: '2px',
@@ -367,6 +367,13 @@ export async function applyPaletteToElement(element) {
             borderRadius: '25px'
         }
     };
+
+    // Create a deep copy to avoid readonly proxy issues
+    const borderSettings = appState.value.theme?.borderSettings ? {
+        normal: { ...appState.value.theme.borderSettings.normal },
+        hovered: { ...appState.value.theme.borderSettings.hovered },
+        selected: { ...appState.value.theme.borderSettings.selected }
+    } : defaultBorderSettings;
 
     // apply resume div border override settings if the element is a resume div
     if ( element.classList.contains('biz-resume-div') ) {

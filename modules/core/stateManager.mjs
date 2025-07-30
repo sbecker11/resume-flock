@@ -232,15 +232,24 @@ function migrateState(state) {
                 selected: { padding: '13px', innerBorderWidth: '3px', marginTop: '11px' }
             };
         } else {
-            // Update existing marginTop values
+            // Create new objects to avoid readonly proxy issues
             if (state.theme.rDivBorderOverrideSettings.normal) {
-                state.theme.rDivBorderOverrideSettings.normal.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.normal = {
+                    ...state.theme.rDivBorderOverrideSettings.normal,
+                    marginTop: '11px'
+                };
             }
             if (state.theme.rDivBorderOverrideSettings.hovered) {
-                state.theme.rDivBorderOverrideSettings.hovered.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.hovered = {
+                    ...state.theme.rDivBorderOverrideSettings.hovered,
+                    marginTop: '11px'
+                };
             }
             if (state.theme.rDivBorderOverrideSettings.selected) {
-                state.theme.rDivBorderOverrideSettings.selected.marginTop = '11px';
+                state.theme.rDivBorderOverrideSettings.selected = {
+                    ...state.theme.rDivBorderOverrideSettings.selected,
+                    marginTop: '11px'
+                };
             }
         }
         

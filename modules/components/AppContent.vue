@@ -51,6 +51,9 @@ import ResumeContainer from './ResumeContainer.vue'
 import { useAppState } from '../composables/useAppState.mjs'
 import { useColorPalette } from '../composables/useColorPalette.mjs'
 import { useLayoutToggle } from '../composables/useLayoutToggle.mjs'
+
+// Resume system initialization
+import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
 import { useResizeHandle } from '../composables/useResizeHandle.mjs'
 import { useFocalPoint } from '../composables/useFocalPoint.mjs'
 import { useAimPoint } from '../composables/useAimPoint.mjs'
@@ -194,6 +197,15 @@ onMounted(async () => {
     if (sceneContainerElement) {
       bullsEye.initialize(bullsEyeRef.value, sceneContainerElement)
     }
+    
+    // Initialize resume system (make controllers globally available)
+    console.log('[AppContent] 📋 Initializing resume system...')
+    await initializeResumeSystem()
+    
+    // Make test functions available for browser console testing
+    window.testResumeSystem = testResumeSystem
+    window.checkResumeDivs = checkResumeDivs
+    window.testScrolling = testScrolling
     
     // Setup keyboard event handling (app-level)
     document.addEventListener('keydown', handleKeyDown)
