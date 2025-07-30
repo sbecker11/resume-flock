@@ -66,23 +66,23 @@ class InfiniteScrollingContainer {
   }
 
   setupContainer() {
-    // The container passed in is the one we manipulate for scrolling
+    // DISABLE infinite scrolling setup to test basic scrolling
+    console.log('[DEBUG] InfiniteScrollingContainer: DISABLED - using basic native scrolling only');
+    
+    // Set only basic styles needed for native scrolling
     this.scrollport.style.position = 'relative';
-    this.scrollport.style.overflow = 'auto'; /* Changed to auto to enable scrolling */
-    this.scrollport.style.userSelect = 'none';
-    this.scrollport.style.cursor = 'ns-resize';
-    this.scrollport.style.backgroundColor = 'var(--grey-dark-6)'; // Ensure scrollport has correct background
+    this.scrollport.style.overflow = 'auto';
+    this.scrollport.style.backgroundColor = 'var(--grey-dark-6)';
     
-    // Set contentHolder background to match expected resume container background
+    // Simple content holder
     this.contentHolder.style.backgroundColor = 'var(--grey-dark-6)';
-    
-    // Ensure the contentHolder covers the entire scrollable area including negative space
     this.contentHolder.style.position = 'relative';
     this.contentHolder.style.width = '100%';
+    this.contentHolder.style.height = 'auto'; // Let content determine height
   }
 
   setItems(items, startingIndex = 0) {
-    // window.CONSOLE_LOG_IGNORE(`[DEBUG] InfiniteScroller.setItems: Setting ${items.length} items, startingIndex=${startingIndex}`);
+    console.log(`[DEBUG] InfiniteScroller.setItems: Called with ${items.length} items, startingIndex=${startingIndex}`);
     
     // Store the original items array
     this.originalItems = [...items];
@@ -115,6 +115,9 @@ class InfiniteScrollingContainer {
     //   }
     // }
     
+    // RE-ENABLE infinite scrolling now that Vue 3 watcher conflicts are resolved
+    console.log('[DEBUG] InfiniteScroller.setItems: Re-enabling infinite scrolling');
+    
     // Create the cloned structure
     this.createClonedStructure();
     
@@ -124,13 +127,7 @@ class InfiniteScrollingContainer {
     // Set the current index
     this.currentIndex = startingIndex;
     
-    // window.CONSOLE_LOG_IGNORE(`[DEBUG] InfiniteScroller.setItems: Setup complete, currentIndex=${this.currentIndex}`);
-    
-    // Force a recalculation of heights after setup to ensure all content is properly contained
-    setTimeout(() => {
-      // window.CONSOLE_LOG_IGNORE('[DEBUG] InfiniteScroller.setItems: Forcing initial height recalculation');
-      this.recalculateHeights();
-    }, 50);
+    console.log(`[DEBUG] InfiniteScroller.setItems: Infinite scrolling re-enabled with ${items.length} items`);
   }
 
   createClonedStructure() {
@@ -146,17 +143,17 @@ class InfiniteScrollingContainer {
 
     // Create structure: [tail clones] [original items] [head clones]
     
-    // Tail clones disabled for performance - seamless transitions not needed
-    // for (let i = 0; i < cloneCount; i++) {
-    //   const originalIndex = itemCount - cloneCount + i;
-    //   const clone = this.cloneItem(this.originalItems[originalIndex], originalIndex, 'tail');
-    //   const jobNumber = clone.getAttribute('data-job-number');
-    //   this.allItems.push({
-    //     element: clone,
-    //     originalIndex: originalIndex,
-    //     type: 'tail-clone',
-    //     });
-    // }
+    // Tail clones re-enabled for infinite scrolling upward transitions
+    for (let i = 0; i < cloneCount; i++) {
+      const originalIndex = itemCount - cloneCount + i;
+      const clone = this.cloneItem(this.originalItems[originalIndex], originalIndex, 'tail');
+      const jobNumber = clone.getAttribute('data-job-number');
+      this.allItems.push({
+        element: clone,
+        originalIndex: originalIndex,
+        type: 'tail-clone',
+        });
+    }
 
     // Add original items
     // window.CONSOLE_LOG_IGNORE(`[DEBUG] createClonedStructure: Adding original items:`);
@@ -322,18 +319,18 @@ class InfiniteScrollingContainer {
     let currentTop = 0;
     let minTop = 0; // Track the most negative position for content height calculation
     
-    // Phase 1: Tail clones disabled - no negative positioning needed
-    // for (let i = tailClones.length - 1; i >= 0; i--) {
-    //   const item = tailClones[i];
-    //   let contentHeight = this.measureItemHeight(item, measureHeights);
-    //   currentTop -= (contentHeight + totalSpacing + 3);
-    //   const topPosition = currentTop;
-    //   minTop = Math.min(minTop, topPosition);
-    //   this.positionItem(item, topPosition, contentHeight);
-    // }
+    // Phase 1: Position tail clones (negative positioning for upward infinite scrolling)
+    for (let i = tailClones.length - 1; i >= 0; i--) {
+      const item = tailClones[i];
+      let contentHeight = this.measureItemHeight(item, measureHeights);
+      currentTop -= (contentHeight + totalSpacing + 3);
+      const topPosition = currentTop;
+      minTop = Math.min(minTop, topPosition);
+      this.positionItem(item, topPosition, contentHeight);
+    }
     
-    // Phase 2: Position original items starting from 0
-    currentTop = 0;
+    // Phase 2: Position original items starting from small offset to prevent boundary lockup
+    currentTop = 20; // Start with 20px offset to ensure scrollable space above item 0
     const originalItems = this.allItems.filter(item => item.type === 'original');
     originalItems.forEach((item, originalIndex) => {
       const itemIndex = this.allItems.indexOf(item);
@@ -477,12 +474,16 @@ class InfiniteScrollingContainer {
     const { minTop, maxTop } = this.calculateItemPositions(true);
     
     // Set content holder height to span from most negative position to highest position
-    // Since we disabled tail clones, minTop should be 0, so totalHeight = maxTop
+    // With tail clones enabled, we need to handle negative positioning
     const totalHeight = Math.max(maxTop - minTop, maxTop, 2000); // Ensure minimum scrollable height
     this.contentHolder.style.height = `${totalHeight}px`;
     console.log(`[DEBUG] ContentHolder height set to: ${totalHeight}px (maxTop: ${maxTop}, minTop: ${minTop})`);
-    // No transform needed since tail clones are disabled
-    this.contentHolder.style.transform = 'none';
+    // Apply transform to shift content up by the negative offset if needed
+    if (minTop < 0) {
+      this.contentHolder.style.transform = `translateY(${Math.abs(minTop)}px)`;
+    } else {
+      this.contentHolder.style.transform = 'none';
+    }
     
     // Apply additional styling for proper measurement and layout
     this.allItems.forEach(item => {
@@ -611,8 +612,14 @@ class InfiniteScrollingContainer {
     // window.CONSOLE_LOG_IGNORE(`  - Actual height: ${actualHeight}`);
     // window.CONSOLE_LOG_IGNORE(`  - Current positioning height: ${currentTop}`);
     
+    // Add permanent top padding to prevent scrollTop=0 boundary lockups
+    this.contentHolder.style.paddingTop = '50px';
+    
     // Set the total height of the content holder for proper scrolling
-    this.contentHolder.style.height = `${actualHeight}px`;
+    this.contentHolder.style.height = `${actualHeight + 50}px`; // Add padding to total height
+    
+    // Initialize scroll position to show within the padding area
+    this.scrollport.scrollTop = 25; // Position within the 50px padding
     
     // Don't automatically scroll to index 0 - let the caller decide where to scroll
     // this.scrollToIndex(0, false);
@@ -703,7 +710,7 @@ class InfiniteScrollingContainer {
       behavior: 'smooth'
     });
     
-    window.CONSOLE_LOG_IGNORE(`[DEBUG] InfiniteScroller.scrollToIndex: Scrolling to targetScrollTop=${targetScrollTop}`);
+    // window.CONSOLE_LOG_IGNORE(`[DEBUG] InfiniteScroller.scrollToIndex: Scrolling to targetScrollTop=${targetScrollTop}`);
     
     // Re-enable seamless transitions after scroll completes
     setTimeout(() => {
@@ -764,9 +771,7 @@ class InfiniteScrollingContainer {
   }
 
   checkForSeamlessTransition() {
-    // Temporarily disable seamless transitions to improve performance
-    // This eliminates the pause when scrolling to items around 20-22
-    return false;
+    console.log('[DEBUG] checkForSeamlessTransition: Re-enabled for infinite scrolling');
     
     // Skip seamless transitions during targeted scrolling or direct job selection
     if (this._isTargetScrolling || this._directScrolling) {
@@ -901,10 +906,10 @@ class InfiniteScrollingContainer {
       document.addEventListener('touchend', this.handleEnd.bind(this), { passive: true });
     }
 
-    // Mouse wheel events
-    this.scrollport.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
+    // Mouse wheel events - DISABLED to prevent lockups at boundaries
+    // this.scrollport.addEventListener('wheel', this.handleWheel.bind(this), { passive: false });
 
-    // Scroll events for seamless transitions
+    // Scroll events for seamless transitions - RE-ENABLED for infinite scrolling
     this.scrollport.addEventListener('scroll', this.handleScroll.bind(this), { passive: true });
 
     // Resize observer to handle container width changes
@@ -978,22 +983,37 @@ class InfiniteScrollingContainer {
   }
 
   handleWheel(e) {
-    e.preventDefault(); // Prevent default scroll behavior
-    
-    // Apply wheel delta to container scroll
+    const currentScrollTop = this.scrollport.scrollTop;
     const delta = e.deltaY;
-    this.scrollport.scrollTop += delta;
     
-    // Trigger seamless transition check after a brief delay
-    clearTimeout(this.wheelTimeout);
-    this.wheelTimeout = setTimeout(() => {
-      this.checkForSeamlessTransition();
-    }, 100);
+    // Special handling for upward scroll at top boundary
+    if (currentScrollTop <= 5 && delta < 0) {
+      console.log(`[DEBUG] Upward scroll at top boundary: scrollTop=${currentScrollTop}, delta=${delta} - PREVENTING to stop lockup`);
+      
+      // Prevent the wheel event that's causing the lockup
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+    
+    // Debug downward scroll at boundary
+    if (currentScrollTop <= 5 && delta > 0) {
+      console.log(`[DEBUG] Downward scroll at top boundary: scrollTop=${currentScrollTop}, delta=${delta} - allowing`);
+    }
+    
+    // For all other cases, allow natural scrolling
+    return;
   }
 
   handleScroll() {
-    // Allow natural scroll behavior - no custom processing needed
-    // This prevents lockups while maintaining scroll functionality
+    // Re-enabled for infinite scrolling - check for boundary transitions
+    if (!this.isDragging) {
+      // Debounce the seamless transition check
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = setTimeout(() => {
+        this.checkForSeamlessTransition();
+      }, 50);
+    }
   }
   
   // Ensure selected styling is applied to visible selected items during scroll
@@ -1343,18 +1363,21 @@ class InfiniteScrollingContainer {
     // Set content holder height to span full range including negative positions
     const totalHeight = maxTop - minTop;
     this.contentHolder.style.height = `${totalHeight}px`;
-    // Temporarily disable transform to test positioning
-    // this.contentHolder.style.transform = `translateY(${Math.abs(minTop)}px)`;
+    // Apply transform to handle negative positioning from tail clones
+    if (minTop < 0) {
+      this.contentHolder.style.transform = `translateY(${Math.abs(minTop)}px)`;
+    } else {
+      this.contentHolder.style.transform = 'none';
+    }
     
     // window.CONSOLE_LOG_IGNORE(`[DEBUG] InfiniteScroller.recalculateHeights: Recalculation complete, total height: ${currentTop}px`);
   }
 
   // Method to recalculate heights after palette application
   recalculateHeightsAfterPalette() {
-    // Wait a bit for palette application to complete
-    setTimeout(() => {
-      this.recalculateHeights();
-    }, 100);
+    // DISABLED: Palette changes don't affect rDiv heights, so no recalculation needed
+    console.log('[DEBUG] recalculateHeightsAfterPalette: DISABLED - palette changes do not affect heights');
+    return;
   }
 
   // Method to update a specific item's height and recalculate positions

@@ -3,18 +3,18 @@
 import { resumeListController } from './ResumeListController.mjs';
 import { resumeItemsController } from '../scene/ResumeItemsController.mjs';
 import { selectionManager } from '../core/selectionManager.mjs';
-import { jobs } from '../../static_content/jobs/jobs.mjs';
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs';
 
 /**
- * Create basic resume divs without CardsController dependency
- * This is a temporary solution to get the resume system working with Vue composables
+ * Create basic resume divs from loaded jobs data
+ * Uses Vue 3 dependency pattern instead of direct jobs import
  */
-async function createBasicResumeDivs(resumeListController, resumeItemsController) {
+async function createBasicResumeDivs(resumeListController, resumeItemsController, jobsData) {
     console.log('[ResumeSystemInitializer] Creating basic resume divs from jobs data...');
     
     try {
         // Create mock bizCardDivs from jobs data
-        const mockBizCardDivs = jobs.map((job, index) => {
+        const mockBizCardDivs = jobsData.map((job, index) => {
             const mockDiv = document.createElement('div');
             mockDiv.setAttribute('data-job-number', index.toString());
             mockDiv.setAttribute('data-color-index', (index % 10).toString()); // Simple color cycling
@@ -45,12 +45,12 @@ async function createBasicResumeDivs(resumeListController, resumeItemsController
             resumeItemsController.bizResumeDivs = resumeDivs;
             
             // Initialize the sort indices
-            resumeListController.sortedIndices = Array.from({length: jobs.length}, (_, i) => i);
+            resumeListController.sortedIndices = Array.from({length: jobsData.length}, (_, i) => i);
             
             // Setup infinite scrolling - this is crucial for scrollability!
             console.log('[ResumeSystemInitializer] Setting up infinite scrolling...');
             console.log(`[ResumeSystemInitializer] About to setup infinite scrolling with ${resumeDivs.length} resume divs`);
-            console.log(`[ResumeSystemInitializer] Jobs array length: ${jobs.length}`);
+            console.log(`[ResumeSystemInitializer] Jobs array length: ${jobsData.length}`);
             resumeListController.setupInfiniteScrolling();
             
             return true;
@@ -65,13 +65,16 @@ async function createBasicResumeDivs(resumeListController, resumeItemsController
 }
 
 /**
- * Initialize the resume system controllers and make them globally available
- * This replaces the IM framework approach with a simpler direct initialization
+ * Initialize the resume system controllers using Vue 3 dependency management
+ * This replaces the direct jobs import with reactive dependency pattern
  */
 export async function initializeResumeSystem() {
-    console.log('[ResumeSystemInitializer] Initializing resume system...');
+    console.log('[ResumeSystemInitializer] Initializing resume system with Vue 3 dependency pattern...');
     
     try {
+        // Get the global jobs dependency manager
+        const jobsDependency = getGlobalJobsDependency();
+        
         // Make controllers and selectionManager globally available (as expected by Vue components and other modules)
         window.resumeListController = resumeListController;
         window.resumeItemsController = resumeItemsController;
@@ -79,6 +82,20 @@ export async function initializeResumeSystem() {
         
         // Initialize the controllers themselves
         resumeItemsController.registerForInitialization();
+        
+        // Register resumeListController as dependent on jobs data
+        jobsDependency.registerController('ResumeListController', async (jobsData) => {
+            console.log('[ResumeSystemInitializer] Initializing ResumeListController with jobs data...');
+            
+            // Initialize the controller with jobs data (THIS WAS MISSING!)
+            await resumeListController.initialize(jobsData);
+            
+            console.log('[ResumeSystemInitializer] ✅ ResumeListController initialized with jobs data');
+        });
+        
+        // Start jobs loading (this will trigger controller initialization when complete)
+        console.log('[ResumeSystemInitializer] Starting jobs data loading...');
+        const jobsData = await jobsDependency.loadJobs();
         
         // Wait for DOM elements to be available (retry with delays)
         let attempts = 0;
@@ -98,8 +115,8 @@ export async function initializeResumeSystem() {
                     resumeListController.resumecontentdivElement = resumeContentDiv;
                     resumeListController.resumecontentdivwrapperElement = resumeContentWrapper;
                     
-                    // Create basic resume divs from jobs data (without CardsController dependency)
-                    await createBasicResumeDivs(resumeListController, resumeItemsController);
+                    // Create basic resume divs from loaded jobs data
+                    await createBasicResumeDivs(resumeListController, resumeItemsController, jobsData);
                     
                     return true;
                 }
@@ -117,20 +134,21 @@ export async function initializeResumeSystem() {
         
         await waitForDOMElements();
         
-        console.log('[ResumeSystemInitializer] ✅ Resume system initialized successfully');
+        console.log('[ResumeSystemInitializer] ✅ Resume system initialized successfully with Vue 3 dependency pattern');
         console.log('[ResumeSystemInitializer] - resumeListController available at window.resumeListController');
         console.log('[ResumeSystemInitializer] - resumeItemsController available at window.resumeItemsController');
+        console.log('[ResumeSystemInitializer] - Jobs loaded via reactive dependency management');
         
         // Create a visual indicator that shows the resume system status
         const indicator = document.createElement('div');
         indicator.id = 'resume-system-indicator';
         indicator.style.cssText = 'position: fixed; top: 10px; right: 10px; background: green; color: white; padding: 5px; z-index: 9999; font-size: 12px; line-height: 1.2;';
         
-        const totalJobs = jobs.length;
+        const totalJobs = jobsData.length;
         const createdDivs = resumeListController.bizResumeDivs?.length || 0;
         const infiniteItems = resumeListController.infiniteScroller?.originalItems?.length || 0;
         
-        indicator.innerHTML = `✅ Resume System<br/>Jobs: ${totalJobs}<br/>Divs: ${createdDivs}<br/>Infinite: ${infiniteItems}`;
+        indicator.innerHTML = `✅ Resume System (Vue3)<br/>Jobs: ${totalJobs}<br/>Divs: ${createdDivs}<br/>Infinite: ${infiniteItems}`;
         document.body.appendChild(indicator);
         
         // Remove the indicator after 5 seconds  
@@ -155,9 +173,17 @@ export function isResumeSystemInitialized() {
  * Available in browser console as window.testResumeSystem()
  */
 export function testResumeSystem() {
-    console.log('=== RESUME SYSTEM TEST ===');
+    console.log('=== RESUME SYSTEM TEST (Vue 3 Dependencies) ===');
     console.log('window.resumeListController exists:', !!window.resumeListController);
     console.log('window.resumeItemsController exists:', !!window.resumeItemsController);
+    
+    // Test Vue 3 dependency manager
+    const jobsDependency = getGlobalJobsDependency();
+    console.log('Vue 3 Jobs Dependency:');
+    console.log('- isReady:', jobsDependency.isReady.value);
+    console.log('- isLoading:', jobsDependency.isLoading.value);
+    console.log('- hasError:', jobsDependency.hasError.value);
+    console.log('- jobsCount:', jobsDependency.jobsCount.value);
     
     if (window.resumeListController) {
         console.log('ResumeListController methods:');

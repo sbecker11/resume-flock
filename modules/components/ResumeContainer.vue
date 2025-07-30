@@ -33,12 +33,12 @@ watch(currentPaletteFilename, (filename) => {
 
 const currentSortRule = ref({ field: 'startDate', direction: 'desc' });
 
-// Watch for changes in the sort rule and apply them
-watch(currentSortRule, (newSortRule) => {
-  if (window.resumeListController) {
-    window.resumeListController.applySortRule(newSortRule);
-  }
-});
+// Watch for changes in the sort rule and apply them - DISABLED to prevent lockups
+// watch(currentSortRule, (newSortRule) => {
+//   if (window.resumeListController) {
+//     window.resumeListController.applySortRule(newSortRule);
+//   }
+// });
 
 // Watch for changes in the color palette selection and save them
 watch(currentPaletteFilename, async (newFilename) => {

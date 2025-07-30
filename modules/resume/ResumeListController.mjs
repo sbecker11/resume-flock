@@ -1031,20 +1031,9 @@ class ResumeListController extends BaseComponent {
   }
 
   applyNewSort() {
-    if (!this.infiniteScroller) return;
-
-    console.log(`[DEBUG] applyNewSort: sortedIndices=`, this.sortedIndices);
-
-    // Create new array of divs in sorted order
-    const sortedDivs = this.sortedIndices.map(originalIndex => this.bizResumeDivs[originalIndex]);
-    console.log(`[DEBUG] applyNewSort: sortedDivs length=`, sortedDivs.length);
-
-    // Update the infinite scroller with the new order, starting at index 0
-    const startingIndex = 0;
-    this.infiniteScroller.setItems(sortedDivs, startingIndex);
-
-    // After setting items, explicitly scroll to the new starting index without animation
-    this.infiniteScroller.scrollToIndex(startingIndex, false); // false = no animation
+    // Temporarily disable applyNewSort to prevent lockups
+    console.log(`[DEBUG] applyNewSort: DISABLED to prevent lockups - sortedIndices=`, this.sortedIndices);
+    return;
     
     // Recalculate heights after palette application to ensure proper positioning
     this.infiniteScroller.recalculateHeightsAfterPalette();

@@ -1,6 +1,6 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-30T05:12:50.530Z",
+  "lastUpdated": "2025-07-30T19:46:53.159Z",
   "layout": {
     "orientation": "scene-right",
     "scenePercentage": 50,
@@ -55,7 +55,7 @@
     }
   },
   "theme": {
-    "colorPalette": "sweeps.json",
+    "colorPalette": "mitzibushi_red.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {
