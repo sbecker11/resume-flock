@@ -830,8 +830,16 @@ class ResumeListController extends BaseComponent {
 
     // Save the new sort rule to global state, unless during initial page load
     if (!isInitializing) {
-        AppState.resume.sortRule = this.currentSortRule;
-        saveState(AppState);
+        try {
+            if (AppState && AppState.resume) {
+                AppState.resume.sortRule = this.currentSortRule;
+                saveState(AppState);
+            } else {
+                console.warn('[DEBUG] AppState or AppState.resume is null, cannot save sort rule');
+            }
+        } catch (error) {
+            console.warn('[DEBUG] Error saving sort rule to AppState:', error);
+        }
     }
 
     // Dispatch event for other controllers to listen to
@@ -1094,12 +1102,29 @@ class ResumeListController extends BaseComponent {
   }
 
   applyNewSort() {
-    // Temporarily disable applyNewSort to prevent lockups
-    console.log(`[DEBUG] applyNewSort: DISABLED to prevent lockups - sortedIndices=`, this.sortedIndices);
-    return;
+    console.log(`[DEBUG] applyNewSort: Applying new sort order - sortedIndices=`, this.sortedIndices);
     
-    // Recalculate heights after palette application to ensure proper positioning
-    this.infiniteScroller.recalculateHeightsAfterPalette();
+    if (!this.infiniteScroller) {
+      console.warn('[DEBUG] applyNewSort: infiniteScroller not available');
+      return;
+    }
+    
+    // Get the first job number in the newly sorted list
+    const firstJobInNewSort = this.sortedIndices.length > 0 ? this.sortedIndices[0] : null;
+    
+    if (firstJobInNewSort !== null) {
+      console.log(`[DEBUG] applyNewSort: Scrolling to first item in new sort: job ${firstJobInNewSort}`);
+      
+      // Scroll to the first item in the newly sorted list
+      this.infiniteScroller.scrollToIndex(0); // Index 0 is the first item in the sorted list
+      
+      // Also select the first item to make it visually obvious
+      if (typeof selectionManager !== 'undefined') {
+        selectionManager.selectJobNumber(firstJobInNewSort, 'ResumeListController.applyNewSort');
+      }
+    } else {
+      console.warn('[DEBUG] applyNewSort: No items in sorted list to scroll to');
+    }
   }
 
   // Convenience methods for common sorts

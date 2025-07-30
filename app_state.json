@@ -1,10 +1,10 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-30T22:31:49.413Z",
+  "lastUpdated": "2025-07-30T23:49:32.382Z",
   "layout": {
     "orientation": "scene-left",
-    "scenePercentage": 50,
-    "resumePercentage": 50
+    "scenePercentage": 75,
+    "resumePercentage": 25
   },
   "resizeHandle": {
     "stepCount": 4
@@ -55,7 +55,7 @@
     }
   },
   "theme": {
-    "colorPalette": "mitzibushi_red.json",
+    "colorPalette": "springtime.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {

@@ -71,8 +71,16 @@ function addParallaxEventListener(eventName) {
   
   const { source, delay } = PARALLAX_EVENTS[eventName];
   const handler = delay > 0 ? 
-    () => debouncedRenderAllCDivs(delay) : 
-    () => debouncedRenderAllCDivs(0);
+    () => {
+      const focalPointMode = window.focalPoint?.focalPointMode?.value || 'unknown';
+      console.log(`[ParallaxModule] 🎯 Received '${eventName}' event from ${source} (mode: ${focalPointMode}, ${delay}ms delay)`);
+      debouncedRenderAllCDivs(delay);
+    } : 
+    () => {
+      const focalPointMode = window.focalPoint?.focalPointMode?.value || 'unknown';
+      console.log(`[ParallaxModule] 🎯 Received '${eventName}' event from ${source} (mode: ${focalPointMode})`);
+      debouncedRenderAllCDivs(0);
+    };
   
   window.addEventListener(eventName, handler);
   console.log(`[ParallaxModule] ✅ Registered listener for '${eventName}' (${source}, ${delay}ms delay)`);
@@ -112,10 +120,7 @@ function calculateParallaxDisplacements() {
   let dh = (bullsEyePos.x - focalPointPos.x) * PARALLAX_X_EXAGGERATION_FACTOR;
   let dv = (bullsEyePos.y - focalPointPos.y) * PARALLAX_Y_EXAGGERATION_FACTOR;
   
-  // Update previous values
-  previousDisplacements.dh = dh;
-  previousDisplacements.dv = dv;
-  
+  // Don't update previous values here - let the caller do it after comparison
   return { dh, dv };
 }
 
@@ -130,16 +135,38 @@ export function hasClone(bizCardDiv) {
 function refreshAllParallaxTransforms() {
   requestAnimationFrame(() => {
     const { dh, dv } = calculateParallaxDisplacements();
+    // console.log(`[ParallaxModule] 🔄 refreshAllParallaxTransforms: dh=${dh.toFixed(2)}, dv=${dv.toFixed(2)}`);
+    // console.log(`[ParallaxModule] 📊 Previous: dh=${previousDisplacements.dh}, dv=${previousDisplacements.dv}`);
+    
+    // new deltas are zero, so no parallax update
     if (dh == 0 && dv == 0) {
+      console.log(`[ParallaxModule] ⏹️ No displacement, skipping parallax update`);
       return;
     }
+    // no change in deltas, so no parallax update
     if (dh == previousDisplacements.dh && dv == previousDisplacements.dv) {
+      console.log(`[ParallaxModule] ⏹️ No change in displacement, skipping parallax update`);
       return;
     }
+        
     const bizCardDivs = document.getElementsByClassName('biz-card-div');
+    // console.log(`[ParallaxModule] 🎴 Applying parallax to ${bizCardDivs.length} cDivs`);
+    
+    let appliedCount = 0;
+    let skippedCount = 0;
+    
+    // apply new deltas to all cDivs
     for (const bizCardDiv of bizCardDivs) {
-      applyParallaxToBizCardDiv(bizCardDiv, dh, dv);
+      const wasApplied = applyParallaxToBizCardDiv(bizCardDiv, dh, dv);
+      if (wasApplied) appliedCount++;
+      else skippedCount++;
     }
+
+    // save new deltas
+    previousDisplacements.dh = dh;
+    previousDisplacements.dv = dv;
+    
+    // console.log(`[ParallaxModule] ✅ Parallax applied to ${appliedCount} cDivs, skipped ${skippedCount}`);
   });
 }
 
@@ -165,14 +192,16 @@ if (typeof window !== 'undefined') {
  */
 export function applyParallaxToBizCardDiv(bizCardDiv, dh, dv) {
   if (!bizCardDiv) {
-    return; // skip null bizCardDiv
+    return false; // skip null bizCardDiv
   }
   if (hasClone(bizCardDiv)) {
-      return; // Do not apply parallax to the original card if it's selected (has a clone).
+      console.log(`[ParallaxModule] ⏭️ Skipping ${bizCardDiv.id} - has clone (selected)`);
+      return false; // Do not apply parallax to the original card if it's selected (has a clone).
   }
   const sceneZ = parseFloat(bizCardDiv.getAttribute('data-sceneZ'));
   if (isNaN(sceneZ)) {
-      return; // Element doesn't have a valid Z position.
+      console.log(`[ParallaxModule] ⏭️ Skipping ${bizCardDiv.id} - no valid sceneZ`);
+      return false; // Element doesn't have a valid Z position.
   }
 
   // The parallax effect is scaled by the card's Z position.
@@ -188,8 +217,8 @@ export function applyParallaxToBizCardDiv(bizCardDiv, dh, dv) {
   let translateY = 0;
   
   // scene to viewport translation
-  const bullsEyePos = getBullsEyePosition();
-  translateX += bullsEyePos.x;
+  // const bullsEyePos = getBullsEyePosition();
+  // translateX += bullsEyePos.x;
   
   // only original cDivs with zScale > 0 are subject to parallax
   translateX += dh * zScale;
@@ -197,4 +226,7 @@ export function applyParallaxToBizCardDiv(bizCardDiv, dh, dv) {
   
   const transformString = `translateX(${translateX}px) translateY(${translateY}px)`;
   bizCardDiv.style.transform = transformString;
+  
+  // console.log(`[ParallaxModule] ✅ Applied parallax to ${bizCardDiv.id}: zScale=${zScale.toFixed(3)}, transform=${transformString}`);
+  return true;
 }

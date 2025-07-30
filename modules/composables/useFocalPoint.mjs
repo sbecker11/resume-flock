@@ -62,8 +62,24 @@ export function useFocalPoint() {
       cancelAnimationFrame(animationFrame);
       animationFrame = null;
     }
+    
+    // If we're in drag mode, preserve the state and re-add the listener after a brief delay
+    const wasDragModeActive = isDragModeActive;
+    
     removeMouseListener();
-    _instance = null;
+    
+    // Re-add drag mode listener if we were in drag mode
+    if (wasDragModeActive) {
+      console.log('[useFocalPoint] 🔄 Restoring drag mode listener after cleanup');
+      setTimeout(() => {
+        if (isDragModeActive) {
+          addMouseListener();
+        }
+      }, 100);
+    }
+    
+    // Don't reset _instance to null during programmatic refresh - keep the singleton alive
+    // _instance = null;
   }
 
   // Initialize with center position
@@ -151,23 +167,34 @@ export function useFocalPoint() {
   
   // Create separate vanilla JS handler that never touches Vue
   function createVanillaHandler() {
+    let lastX = null;
+    let lastY = null;
     return (event) => {
-      if (focalPointElement) {
-        focalPointElement.style.left = event.clientX + 'px';
-        focalPointElement.style.top = event.clientY + 'px';
+      // Only log and dispatch if coordinates actually changed
+      if (event.clientX !== lastX || event.clientY !== lastY) {
+        console.log(`[FocalPoint] 🖱️ Vanilla handler called: x=${event.clientX}, y=${event.clientY}`);
         
-        // Update global focal point values for parallax system
-        targetX = event.clientX;
-        targetY = event.clientY;
+        if (focalPointElement) {
+          focalPointElement.style.left = event.clientX + 'px';
+          focalPointElement.style.top = event.clientY + 'px';
+          
+          // Update global focal point values for parallax system
+          targetX = event.clientX;
+          targetY = event.clientY;
+          
+          // Also update the reactive values so parallax can read them
+          x.value = event.clientX;
+          y.value = event.clientY;
+          
+          // Dispatch parallax event in drag mode for real-time updates
+          console.log(`[FocalPoint] 📡 Dispatching focal-point-changed from vanilla handler`);
+          window.dispatchEvent(new CustomEvent('focal-point-changed', {
+            detail: { x: event.clientX, y: event.clientY }
+          }));
+        }
         
-        // Also update the reactive values so parallax can read them
-        x.value = event.clientX;
-        y.value = event.clientY;
-        
-        // Dispatch parallax event in drag mode for real-time updates
-        window.dispatchEvent(new CustomEvent('focal-point-changed', {
-          detail: { x: event.clientX, y: event.clientY }
-        }));
+        lastX = event.clientX;
+        lastY = event.clientY;
       }
     };
   }
@@ -186,11 +213,15 @@ export function useFocalPoint() {
         // Pure vanilla JS handler for drag mode - never calls Vue composable
         vanillaMouseHandler = createVanillaHandler();
         document.addEventListener('mousemove', vanillaMouseHandler, { passive: true });
+        console.log('[useFocalPoint] ✅ Added vanilla mouse listener for drag mode');
       } else {
         // Vue composable handler for other modes
         document.addEventListener('mousemove', handleMouseMove, { passive: true });
+        console.log('[useFocalPoint] ✅ Added Vue mouse listener for non-drag mode');
       }
       mouseListenerActive = true;
+    } else {
+      console.log('[useFocalPoint] ⚠️ Mouse listener already active, skipping add');
     }
   }
 
@@ -199,10 +230,10 @@ export function useFocalPoint() {
       if (vanillaMouseHandler) {
         document.removeEventListener('mousemove', vanillaMouseHandler, { passive: true });
         vanillaMouseHandler = null;
-        console.log('[useFocalPoint] Pure vanilla JS mouse listener removed');
+        console.log('[useFocalPoint] ⚠️ Pure vanilla JS mouse listener removed - STACK TRACE:', new Error().stack);
       } else {
         document.removeEventListener('mousemove', handleMouseMove, { passive: true });
-        console.log('[useFocalPoint] Vue mouse listener removed');
+        console.log('[useFocalPoint] ⚠️ Vue mouse listener removed - STACK TRACE:', new Error().stack);
       }
       mouseListenerActive = false;
     }
@@ -210,6 +241,7 @@ export function useFocalPoint() {
 
   // Listen for aim point changes to update focal point target
   window.addEventListener('focal-point-mode-changed', () => {
+    console.log('[useFocalPoint] 🚨 focal-point-mode-changed event received - STACK TRACE:', new Error().stack);
     // Always remove existing mouse listener first when changing modes
     removeMouseListener();
     
