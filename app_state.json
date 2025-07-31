@@ -1,13 +1,13 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-07-30T23:49:32.382Z",
+  "lastUpdated": "2025-07-31T17:26:39.674Z",
   "layout": {
     "orientation": "scene-left",
-    "scenePercentage": 75,
-    "resumePercentage": 25
+    "scenePercentage": 40,
+    "resumePercentage": 60
   },
   "resizeHandle": {
-    "stepCount": 4
+    "stepCount": 5
   },
   "focalPoint": {
     "mode": "locked"
@@ -55,7 +55,7 @@
     }
   },
   "theme": {
-    "colorPalette": "springtime.json",
+    "colorPalette": "sweeps.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {

@@ -119,7 +119,7 @@
   }
 
   body.hovering-scene-plane-while-dragging {
-    cursor: url('/static_content/icons/x-hairs/icons8-pulsar-line-white-16.png') 8 8, crosshair !important;
+    cursor: var(--crosshair-cursor) !important;
   }
 
   /* Make sure these cursor styles take precedence */

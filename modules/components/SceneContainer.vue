@@ -135,7 +135,8 @@ defineExpose({
   height: 100%;
   max-height: var(--timeline-height, 2000px);
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: auto;
+  scrollbar-width: thin;
   /* Limit scroll area to actual timeline content height */
   padding: 0;
   margin: 0;
