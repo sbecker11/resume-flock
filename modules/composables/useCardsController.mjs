@@ -997,7 +997,7 @@ export function useCardsController() {
                 
                 if (hasClone) {
                     console.log(`🟢 Job ${jobNumber} has clone - SHOWING badges`)
-                    showBadges()
+                    showBadgesWithObserver()
                 } else {
                     console.log(`🟡 Job ${jobNumber} selected but no clone yet - waiting for clone`)
                     // Wait a bit for clone creation, then check again
@@ -1005,19 +1005,75 @@ export function useCardsController() {
                         const cloneExists = document.getElementById(`${cardElement.id}-clone`) !== null
                         if (cloneExists) {
                             console.log(`🟢 Clone now exists for job ${jobNumber} - SHOWING badges`)
-                            showBadges()
+                            showBadgesWithObserver()
                         }
                     }, 50)
                 }
             } else {
-                hideBadges()
+                hideBadgesWithObserver()
             }
         })
         
         selectionManager.addEventListener('selectionCleared', () => {
             console.log(`🟡 selectionCleared event for job ${jobNumber}`)
-            hideBadges()
+            hideBadgesWithObserver()
         })
+        
+        // Add resize listeners to maintain badge position relative to clone
+        const handleResize = () => {
+            if (bizCardBadgesDiv.style.display === 'block') {
+                console.log(`📐 Resize detected - updating badge position for job ${jobNumber}`)
+                updateBadgePosition()
+            }
+        }
+        
+        // Listen for various resize events
+        window.addEventListener('resize', handleResize)
+        window.addEventListener('viewport-changed', handleResize)
+        window.addEventListener('resize-handle-changed', handleResize)
+        
+        // Add ResizeObserver to watch for clone element size/position changes
+        let resizeObserver = null
+        if (window.ResizeObserver) {
+            resizeObserver = new ResizeObserver(() => {
+                if (bizCardBadgesDiv.style.display === 'block') {
+                    console.log(`🔍 ResizeObserver - updating badge position for job ${jobNumber}`)
+                    updateBadgePosition()
+                }
+            })
+        }
+        
+        // Store cleanup function for this badge container
+        bizCardBadgesDiv._cleanup = () => {
+            window.removeEventListener('resize', handleResize)
+            window.removeEventListener('viewport-changed', handleResize)
+            window.removeEventListener('resize-handle-changed', handleResize)
+            if (resizeObserver) {
+                resizeObserver.disconnect()
+            }
+        }
+        
+        // Enhanced show/hide functions with ResizeObserver
+        const showBadgesWithObserver = () => {
+            showBadges()
+            // Start observing the clone element for size/position changes
+            if (resizeObserver) {
+                const cloneElement = document.getElementById(`${cardElement.id}-clone`)
+                if (cloneElement) {
+                    resizeObserver.observe(cloneElement)
+                    console.log(`👁️ Started observing clone ${cloneElement.id} for resize`)
+                }
+            }
+        }
+        
+        const hideBadgesWithObserver = () => {
+            hideBadges()
+            // Stop observing when badges are hidden
+            if (resizeObserver) {
+                resizeObserver.disconnect()
+                console.log(`👁️ Stopped observing for job ${jobNumber}`)
+            }
+        }
         
         // Badges will only show when a clone exists for this card
         
@@ -1035,6 +1091,14 @@ export function useCardsController() {
         window.removeEventListener('viewport-changed', handleViewportChangedForClones)
         window.removeEventListener('resize-handle-changed', handleViewportChangedForClones)
         window.removeEventListener('resize', handleViewportChangedForClones)
+        
+        // Clean up badge container resize listeners
+        const badgeContainers = document.querySelectorAll('.biz-card-badges-div')
+        badgeContainers.forEach(container => {
+            if (container._cleanup) {
+                container._cleanup()
+            }
+        })
     })
 
     return {

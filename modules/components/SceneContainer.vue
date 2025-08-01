@@ -142,10 +142,27 @@ defineExpose({
   max-height: var(--timeline-height, 2000px);
   overflow-y: auto;
   overflow-x: auto;
-  scrollbar-width: thin;
+  /* Hide scrollbar for Firefox - with !important */
+  scrollbar-width: none !important;
+  /* Fallback: Make scrollbar thin if browser doesn't support 'none' */
+  -ms-overflow-style: none !important; /* IE and Edge */
   /* Limit scroll area to actual timeline content height */
   padding: 0;
   margin: 0;
+}
+
+/* Hide scrollbar for WebKit browsers (Chrome, Safari, Edge) - High specificity */
+#scene-container #scene-content::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Additional WebKit scrollbar properties to ensure complete hiding */
+#scene-container #scene-content::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+#scene-container #scene-content::-webkit-scrollbar-thumb {
+  display: none !important;
 }
 
 #scene-plane {

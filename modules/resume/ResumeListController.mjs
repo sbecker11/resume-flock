@@ -3,6 +3,7 @@
 import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';
 import { InfiniteScrollingContainer } from './infiniteScrollingContainer.mjs';
 import * as domUtils from '../utils/domUtils.mjs';
+import { dragStateManager } from '../core/dragStateManager.mjs';
 // No longer directly interacting with these for selection
 // import { bizCardDivManager } from '../scene/bizCardDivManager.mjs';
 // import * as scenePlane from '../scene/scenePlane.mjs';
@@ -433,7 +434,9 @@ class ResumeListController extends BaseComponent {
     // Force a recalculation of heights after initialization to ensure all content is properly contained
     setTimeout(() => {
       console.log('[DEBUG] setupInfiniteScrolling: Forcing initial height recalculation');
-      this.infiniteScroller.recalculateHeights();
+      dragStateManager.executeOrDefer(() => {
+        this.infiniteScroller.recalculateHeights();
+      }, 'setupInfiniteScrolling-recalculateHeights');
     }, 100);
     
     // After setting items, verify the infinite scroller has the correct mapping
@@ -454,7 +457,9 @@ class ResumeListController extends BaseComponent {
     }
     
     // Recalculate heights after palette application to ensure proper positioning
-    this.infiniteScroller.recalculateHeightsAfterPalette();
+    dragStateManager.executeOrDefer(() => {
+      this.infiniteScroller.recalculateHeightsAfterPalette();
+    }, 'applyPalette-recalculateHeights');
     
     // Add global debug function for testing
     window.debugInfiniteScroller = (jobNumber) => {
@@ -738,7 +743,9 @@ class ResumeListController extends BaseComponent {
     window.forceRecalculateHeights = () => {
       console.log('[TEST] Force recalculating infinite scroller heights');
       if (window.resumeListController && window.resumeListController.infiniteScroller) {
-        window.resumeListController.infiniteScroller.recalculateHeights();
+        dragStateManager.executeOrDefer(() => {
+          window.resumeListController.infiniteScroller.recalculateHeights();
+        }, 'forceRecalculateHeights-manual');
       } else {
         console.log('ResumeListController or infinite scroller not available');
       }
@@ -1608,7 +1615,9 @@ class ResumeListController extends BaseComponent {
     // Force recalculation of heights when badge mode changes
     if (this.infiniteScroller) {
       requestAnimationFrame(() => {
-        this.infiniteScroller.recalculateHeights();
+        dragStateManager.executeOrDefer(() => {
+          this.infiniteScroller.recalculateHeights();
+        }, 'badgeModeChanged-recalculateHeights');
       });
     }
   }

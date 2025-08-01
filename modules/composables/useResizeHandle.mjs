@@ -2,6 +2,7 @@ import { ref, computed, nextTick, watch } from 'vue';
 import { useLayoutToggle } from './useLayoutToggle.mjs';
 import { useAppState } from './useAppState.mjs';
 import { performanceMonitor } from '@/modules/utils/performanceMonitor.mjs';
+import { dragStateManager } from '../core/dragStateManager.mjs';
 
 const HANDLE_WIDTH = 20;
 const DEFAULT_WIDTH_PERCENT = 50;
@@ -111,6 +112,9 @@ function createResizeHandleState() {
       if (isDragging.value) {
         isDragging.value = false;
         console.log('[ResizeHandle] Drag ended');
+        
+        // Notify drag state manager to resume calculations
+        dragStateManager.endDrag('ResizeHandle');
         
         // Save state when drag ends
         updateLayout(uiPercentage.value, true); // shouldSave = true
@@ -418,6 +422,10 @@ export function useResizeHandle() {
     if (_resizeHandleState) {
       _resizeHandleState.isDragging.value = true;
       console.log('[ResizeHandle] Drag started');
+      
+      // Notify drag state manager to suspend calculations
+      dragStateManager.startDrag('ResizeHandle');
+      
       event.preventDefault(); // Prevent text selection while dragging
     }
   }
