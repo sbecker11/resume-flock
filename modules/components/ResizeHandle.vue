@@ -7,6 +7,7 @@ import { useLayoutToggle } from '@/modules/composables/useLayoutToggle.mjs';
 import { useAppState } from '@/modules/composables/useAppState';
 import BadgeToggle from '@/modules/components/BadgeToggle.vue';
 import type { ResizeHandleProps, ResizeHandleEmits } from '@/modules/types/components';
+import { useBullsEyeService } from '@/modules/core/globalServices';
 
 // Local type definitions
 interface StepButton {
@@ -37,6 +38,9 @@ const stepCount: Ref<number> = ref(1);
 
 const { orientation } = useLayoutToggle();
 const { updateAppState, appState } = useAppState();
+
+// Use Vue 3 provide/inject instead of window.bullsEye
+const bullsEye = useBullsEyeService();
 
 // Initialize step count from AppState
 onMounted(() => {
@@ -90,9 +94,9 @@ async function handleStepLeft(event: MouseEvent): Promise<void> {
   }
   
   // Ensure bulls-eye is recentered after step operation
-  if (window.bullsEye) {
+  if (bullsEye) {
     // console.log('[ResizeHandle] Recentering bulls-eye after step left');
-    window.bullsEye.recenter();
+    bullsEye.recenter();
   }
 }
 
@@ -115,9 +119,9 @@ async function handleStepRight(event: MouseEvent): Promise<void> {
   }
   
   // Ensure bulls-eye is recentered after step operation
-  if (window.bullsEye) {
+  if (bullsEye) {
     // console.log('[ResizeHandle] Recentering bulls-eye after step right');
-    window.bullsEye.recenter();
+    bullsEye.recenter();
   }
 }
 

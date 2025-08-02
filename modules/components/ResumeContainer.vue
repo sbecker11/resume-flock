@@ -4,10 +4,18 @@ import { jobs } from '@/static_content/jobs/jobs.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { useColorPalette } from '@/modules/composables/useColorPalette.mjs';
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
+import { useResumeListController } from '@/modules/core/globalServices';
 
 
 // Get the same percentage as the resize handle
 const { scenePercentage } = useResizeHandle();
+
+// Use Vue 3 provide/inject instead of window.resumeListController
+const resumeListController = useResumeListController();
+
+// Debug injection
+console.log('[ResumeContainer] Resume list controller injected:', !!resumeListController);
+console.log('[ResumeContainer] Window fallback available:', !!window.resumeListController);
 
 // Calculate resume percentage as 100 minus scene percentage
 const resumePercentage = computed(() => {
@@ -36,8 +44,8 @@ const currentSortRule = ref({ field: 'startDate', direction: 'desc' });
 // Watch for changes in the sort rule and apply them
 watch(currentSortRule, (newSortRule) => {
   console.log('[ResumeContainer] Sort rule changed:', newSortRule);
-  if (window.resumeListController) {
-    window.resumeListController.applySortRule(newSortRule);
+  if (resumeListController) {
+    resumeListController.applySortRule(newSortRule);
   }
 }, { deep: true });
 
@@ -55,32 +63,42 @@ const sortOptions = ref([
   { value: { field: 'role', direction: 'asc' }, text: 'Role (A-Z)' },
 ]);
 
-// Methods for buttons - these will now call the legacy controller
+// Methods for buttons - these will now call the legacy controller via provide/inject
 function selectFirst() {
-  window.CONSOLE_LOG_IGNORE("selectFirst button clicked");
-  if (window.resumeListController) {
+  console.log("selectFirst button clicked");
+  const controller = resumeListController || window.resumeListController;
+  if (controller) {
     console.log('[ResumeContainer] Calling goToFirstResumeItem()');
-    window.resumeListController.goToFirstResumeItem();
+    controller.goToFirstResumeItem();
   } else {
-    console.error('[ResumeContainer] ResumeListController not available!');
+    console.error('[ResumeContainer] ResumeListController not available via provide/inject or window!');
   }
 }
 function selectLast() {
-  window.CONSOLE_LOG_IGNORE("selectLast button clicked");
-  if (window.resumeListController) {
-    window.resumeListController.goToLastResumeItem();
+  console.log("selectLast button clicked");
+  const controller = resumeListController || window.resumeListController;
+  if (controller) {
+    controller.goToLastResumeItem();
+  } else {
+    console.error('[ResumeContainer] ResumeListController not available for selectLast!');
   }
 }
 function selectNext() {
-  window.CONSOLE_LOG_IGNORE("selectNext button clicked");
-  if (window.resumeListController) {
-    window.resumeListController.goToNextResumeItem();
+  console.log("selectNext button clicked");
+  const controller = resumeListController || window.resumeListController;
+  if (controller) {
+    controller.goToNextResumeItem();
+  } else {
+    console.error('[ResumeContainer] ResumeListController not available for selectNext!');
   }
 }
 function selectPrevious() {
-  window.CONSOLE_LOG_IGNORE("selectPrevious button clicked");
-  if (window.resumeListController) {
-    window.resumeListController.goToPreviousResumeItem();
+  console.log("selectPrevious button clicked");
+  const controller = resumeListController || window.resumeListController;
+  if (controller) {
+    controller.goToPreviousResumeItem();
+  } else {
+    console.error('[ResumeContainer] ResumeListController not available for selectPrevious!');
   }
 }
 

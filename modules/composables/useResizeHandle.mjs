@@ -184,13 +184,8 @@ function createResizeHandleState() {
         // Save state when drag ends
         updateLayout(uiPercentage.value, true); // shouldSave = true
         
-        // Ensure bulls-eye is recentered after drag operation
-        if (window.bullsEye) {
-          // console.log('[ResizeHandle] Recentering bulls-eye after drag');
-          setTimeout(() => {
-            window.bullsEye.recenter();
-          }, 50); // Small delay to allow layout to settle
-        }
+        // Note: Bulls-eye recentering is now handled by individual components using provide/inject
+        // Each component that needs bulls-eye access should use useBullsEyeService()
       }
     };
     

@@ -4,6 +4,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAppStore } from '../stores/appStore.mjs'
 import { useAppContext, FOCAL_POINT_KEY, provideDependency } from './useAppContext.mjs'
+import { useBullsEyeService } from '../core/globalServices'
 
 // Focal point modes
 export const FOCALPOINT_MODES = {
@@ -18,6 +19,9 @@ const CROSSHAIR_CURSOR = 'url(\'/static_content/icons/x-hairs/icons8-accuracy-32
 export function useFocalPoint() {
   const { store, actions } = useAppStore()
   const appContext = useAppContext()
+  
+  // Use provide/inject for bulls-eye service
+  const bullsEye = useBullsEyeService()
   
   // Template ref for focal point element
   const focalPointElement = ref(null)
@@ -251,11 +255,13 @@ export function useFocalPoint() {
       }
       removeCrosshairCursor()
       
-      // Move focal point to current bulls-eye position immediately
-      if (window.bullsEye && window.bullsEye.isReady()) {
-        const bullsEyePos = window.bullsEye.getPosition()
+      // Move focal point to current bulls-eye position immediately using provide/inject
+      if (bullsEye && bullsEye.isReady()) {
+        const bullsEyePos = bullsEye.getPosition()
         console.log(`[FocalPoint] Locked mode activated - moving to bulls-eye at (${bullsEyePos.x}, ${bullsEyePos.y})`)
         setTarget(bullsEyePos.x, bullsEyePos.y, 'mode-locked')
+      } else {
+        console.warn('[FocalPoint] Bulls-eye service not available via provide/inject')
       }
     }
   }, { immediate: true })

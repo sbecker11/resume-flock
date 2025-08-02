@@ -417,14 +417,11 @@ class ResumeItemsController {
             bizResumeDiv.offsetHeight; // Reading offsetHeight forces a reflow
             
             // Trigger height recalculation to accommodate visible stats div
-            if (window.resumeListController && window.resumeListController.infiniteScroller) {
-                window.resumeListController.infiniteScroller.recalculateHeights();
-                window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleSelectionChanged: Triggered height recalculation`);
-            }
+            this._triggerHeightRecalculation('[DEBUG] ResumeItemsController.handleSelectionChanged: Triggered height recalculation');
             
-            window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleSelectionChanged: Applied 'selected' class to resume div`);
+            console.log(`[DEBUG] ResumeItemsController.handleSelectionChanged: Applied 'selected' class to resume div`);
         } else {
-            window.CONSOLE_LOG_IGNORE(`ResumeItemsController: No resume div found for job number ${selectedJobNumber}`);
+            console.log(`ResumeItemsController: No resume div found for job number ${selectedJobNumber}`);
         }
     }
 
@@ -439,16 +436,13 @@ class ResumeItemsController {
         });
         
         // Trigger height recalculation to accommodate hidden stats divs
-        if (window.resumeListController && window.resumeListController.infiniteScroller) {
-            window.resumeListController.infiniteScroller.recalculateHeights();
-            window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleSelectionCleared: Triggered height recalculation`);
-        }
+        this._triggerHeightRecalculation('[DEBUG] ResumeItemsController.handleSelectionCleared: Triggered height recalculation');
     }
 
     handleBadgeModeChanged(event) {
         const { mode, previousMode, caller } = event.detail;
         
-        window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleBadgeModeChanged: Mode changed from ${previousMode} to ${mode} (caller: ${caller})`);
+        console.log(`[DEBUG] ResumeItemsController.handleBadgeModeChanged: Mode changed from ${previousMode} to ${mode} (caller: ${caller})`);
         
         // Force browser repaint to ensure stats visibility updates are applied immediately
         this.bizResumeDivs.forEach(div => {
@@ -458,10 +452,7 @@ class ResumeItemsController {
         });
         
         // Trigger height recalculation to accommodate visible/hidden stats divs
-        if (window.resumeListController && window.resumeListController.infiniteScroller) {
-            window.resumeListController.infiniteScroller.recalculateHeights();
-            window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleBadgeModeChanged: Triggered height recalculation for badge mode change`);
-        }
+        this._triggerHeightRecalculation('[DEBUG] ResumeItemsController.handleBadgeModeChanged: Triggered height recalculation for badge mode change');
     }
 
     handleColorPaletteChanged(event) {
@@ -500,6 +491,20 @@ class ResumeItemsController {
             instance.isInitialized = false;
         }
         ResumeItemsController.instance = null;
+    }
+
+    // Helper method to trigger height recalculation (replaces direct window access)
+    _triggerHeightRecalculation(debugMessage) {
+        // Try to access via window first (backwards compatibility)
+        if (window.resumeListController && window.resumeListController.infiniteScroller) {
+            window.resumeListController.infiniteScroller.recalculateHeights();
+            console.log(debugMessage);
+        } else {
+            // Fallback: dispatch event for components using provide/inject
+            window.dispatchEvent(new CustomEvent('resume-height-recalculation-needed', {
+                detail: { message: debugMessage }
+            }));
+        }
     }
 
     // Static method to get the current instance

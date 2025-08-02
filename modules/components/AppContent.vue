@@ -52,7 +52,7 @@ import { useAppContext } from '../composables/useAppContext.mjs'
 import { useAppStore } from '../stores/appStore.mjs'
 import { useFocalPoint } from '../composables/useFocalPointVue3.mjs'
 import { useBullsEye } from '../composables/useBullsEyeVue3.mjs'
-import { useParallax } from '../composables/useParallaxVue3.mjs'
+import { useParallaxEnhanced } from '../composables/useParallaxVue3Enhanced.mjs'
 import { useColorPalette } from '../composables/useColorPalette.mjs'
 import { useLayoutToggle } from '../composables/useLayoutToggle.mjs'
 import { useResizeHandle } from '../composables/useResizeHandle.mjs'
@@ -61,8 +61,11 @@ import { useAppState } from '../composables/useAppState.ts'
 // Resume system initialization (to be migrated)
 import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
 
-// Core functionality imports (minimal during migration)
-import { handleKeyDown } from '../core/keyDownModule.mjs'
+// Vue 3 keyboard navigation (replaces legacy keyDownModule)
+import { useKeyboardNavigation } from '../composables/useKeyboardNavigation.mjs'
+
+// Vue 3 provide/inject system to replace global window objects
+import { provideGlobalServices } from '../core/globalServices'
 
 // =============================================================================
 // VUE 3 ARCHITECTURE - Dependency injection and stores
@@ -109,10 +112,37 @@ const {
   setSceneContainerElement
 } = useBullsEye()
 
-// Vue 3 parallax system
+// Vue 3 enhanced parallax system (using provide/inject)
 const {
-  renderAllCDivs
-} = useParallax()
+  renderAllCDivs,
+  stats: parallaxStats,
+  checkServices
+} = useParallaxEnhanced()
+
+// Vue 3 keyboard navigation (replaces legacy keyDownModule)
+const keyboardNavigation = useKeyboardNavigation()
+
+// Early provide/inject setup (before child components mount)
+console.log('[AppContent] 🔗 Setting up provide/inject system early...')
+const debugFunctions = {
+  testResumeSystem: () => console.log('testResumeSystem placeholder'),
+  checkResumeDivs: () => console.log('checkResumeDivs placeholder'), 
+  testScrolling: () => console.log('testScrolling placeholder'),
+  getBullsEyePosition: () => window.getBullsEyePosition?.() || { x: 0, y: 0 },
+  getFocalPointPosition: () => window.getFocalPointPosition?.() || { x: 0, y: 0 },
+  getViewportOrigin: () => window.getViewportOrigin?.() || { x: 0, y: 0 },
+  renderAllCDivs: () => window.renderAllCDivs?.()
+}
+
+// Provide services immediately (will be updated after resume system initialization)
+const serviceUpdater = provideGlobalServices({
+  bullsEye: window.bullsEye || null,
+  resumeListController: window.resumeListController || null,
+  resumeItemsController: window.resumeItemsController || null,
+  focalPoint: window.focalPoint || null,
+  appState: window.appState || null,
+  debugFunctions
+})
 
 // Computed properties from store
 const focalPointX = computed(() => store.focalPoint.x)
@@ -237,17 +267,45 @@ onMounted(async () => {
     // PHASE 4: Critical positioning systems now handled by reactive watchers
     console.log('[AppContent] 🎯 Critical positioning systems handled by reactive watchers')
     
+    // PHASE 4.5: Check parallax system services
+    console.log('[AppContent] 🔧 Checking parallax system services...')
+    checkServices()
+    console.log('[AppContent] 📊 Parallax stats:', parallaxStats.value)
+    
     // PHASE 5: Resume system (legacy during migration)
     console.log('[AppContent] 📋 Initializing resume system...')
     await initializeResumeSystem()
     
-    // Make debugging functions available
+    // PHASE 6: Update provide/inject system with initialized services
+    console.log('[AppContent] 🔧 Updating provide/inject system with initialized services...')
+    console.log('  - bullsEye:', !!window.bullsEye)
+    console.log('  - resumeListController:', !!window.resumeListController)
+    console.log('  - resumeItemsController:', !!window.resumeItemsController)
+    console.log('  - focalPoint:', !!window.focalPoint)
+    console.log('  - appState:', !!window.appState)
+    
+    // Update debug functions with real implementations
+    debugFunctions.testResumeSystem = testResumeSystem
+    debugFunctions.checkResumeDivs = checkResumeDivs
+    debugFunctions.testScrolling = testScrolling
+    
+    // Update services with initialized values
+    serviceUpdater.updateServices({
+      bullsEye: window.bullsEye,
+      resumeListController: window.resumeListController,
+      resumeItemsController: window.resumeItemsController,
+      focalPoint: window.focalPoint,
+      appState: window.appState,
+      debugFunctions
+    })
+    
+    // Keep window globals temporarily for backwards compatibility during migration
     window.testResumeSystem = testResumeSystem
     window.checkResumeDivs = checkResumeDivs
     window.testScrolling = testScrolling
     
-    // PHASE 6: Global event handlers
-    document.addEventListener('keydown', handleKeyDown)
+    // PHASE 7: Global event handlers (now handled by Vue 3 composables)
+    console.log('[AppContent] 🎹 Keyboard navigation handled by Vue 3 composable')
     
     console.log('[AppContent] ✅ Vue 3 app initialization complete!')
     

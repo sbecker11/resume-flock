@@ -1313,6 +1313,109 @@ This **Infinite Scrolling Container** represents a significant advancement in vi
 
 ### Future work
 
+⏺ Here are key steps to make the resume-flock app
+  more Vue 3-sanctioned:
+
+  🎯 Vue 3 Modernization Opportunities
+
+  1. State Management Modernization
+
+  - Replace dual state systems (useAppState + useAppStore) with Pinia
+    - Single source of truth for all application state
+    - Better TypeScript integration and devtools support
+    - Eliminate state synchronization issues between systems
+
+  2. Legacy Module Migration
+
+  - Convert remaining legacy modules to composables:
+    - modules/core/parallaxModule.mjs → useParallax.mjs
+    - modules/core/keyDownModule.mjs → useKeyboard.mjs
+    - modules/resume/infiniteScrollingContainer.mjs → useInfiniteScroll.mjs
+  - Eliminate global window dependencies (e.g., window.bullsEye,
+  window.resumeListController)
+
+  3. TypeScript Expansion
+
+  - Convert all .mjs files to .ts:
+    - All composables: useColorPalette.mjs → useColorPalette.ts
+    - All components: Timeline.vue, SceneContainer.vue, etc.
+    - Store modules: appStore.mjs → appStore.ts
+  - Add comprehensive type definitions for all data structures
+
+  4. Component Architecture Enhancement
+
+  - Implement proper component composition:
+    - Split large components (AppContent.vue, SceneContainer.vue) into
+  smaller, focused components
+    - Use <script setup> with proper prop definitions everywhere
+  - Add Vue 3 built-in components:
+    - <Teleport> for modals/overleys instead of fixed positioning
+    - <Suspense> for async component loading
+    - <Transition> for smooth animations
+
+  5. Reactivity System Optimization
+
+  - Replace manual DOM queries with template refs:
+    - All document.getElementById() calls in percentage calculations
+    - Direct DOM measurements in resize calculations
+  - Use Vue 3 reactivity APIs:
+    - shallowRef() for performance optimization where deep reactivity isn't
+   needed
+    - readonly() for preventing accidental mutations
+    - triggerRef() for manual reactivity triggers
+
+  6. Modern Vue 3 Patterns
+
+  - Implement provide/inject for dependency injection instead of global
+  singletons
+  - Use defineAsyncComponent for code splitting large components
+  - Add proper error boundaries with onErrorCaptured
+  - Implement proper SSR support if needed
+
+  7. Build System & Tooling
+
+  - Upgrade to Vite 6 (latest version)
+  - Add Vue 3 specific ESLint rules:
+    - @vue/eslint-config-typescript
+    - Vue 3 composition API linting rules
+  - Implement proper tree-shaking for unused code elimination
+
+  8. Performance Optimization
+
+  - Use v-memo directive for expensive list rendering (infinite scroll)
+  - Implement virtual scrolling with Vue 3 compatible libraries
+  - Add proper lazy loading for components and images
+  - UsemarkRaw() for non-reactive objects
+
+  9. Testing Modernization
+
+  - Add Vue 3 testing setup:
+    - Vitest + Vue Test Utils for component testing
+    - Proper TypeScript test configuration
+    - Component composition testing
+
+  10. Architecture Cleanup
+
+  - Remove IM (Initialization Manager) remnants completely
+  - Eliminate jQuery-style DOM manipulation
+  - Replace custom event systems with Vue 3's built-in event handling
+  - Standardize all async operations with proper loading states
+
+  🚀 Immediate High-Impact Steps
+
+  1. Install Pinia and migrate state management
+  2. Convert core composables to TypeScript (.mjs → .ts)
+  3. Replace global window objects with provide/inject
+  4. Split large components into focused, reusable pieces
+  5. Add proper error handling with Vue 3 patterns
+
+  These changes would transform the app into a modern, Vue 3-first
+  application with better maintainability, performance, and developer
+  experience! 🎯
+
+
+
+
 - Provide the option to print the resume to a PDF file
 - Need to ease focal point to BullsEye when any skillCardDiv is selected (or clicked?)
 - Need to add stamp icons to post cards

@@ -1,6 +1,6 @@
 {
   "version": "1.2",
-  "lastUpdated": "2025-08-02T00:45:30.505Z",
+  "lastUpdated": "2025-08-02T01:37:50.177Z",
   "layout": {
     "orientation": "scene-left",
     "scenePercentage": 50,
@@ -53,7 +53,7 @@
     }
   },
   "theme": {
-    "colorPalette": "Black_Monotone.json",
+    "colorPalette": "yellow_grey.json",
     "brightnessFactorSelected": 2,
     "brightnessFactorHovered": 1.75,
     "borderSettings": {
