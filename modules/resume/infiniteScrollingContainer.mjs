@@ -1,5 +1,5 @@
 // modules/resume/infiniteScrollingContainer.mjs
-// SIMPLIFIED VERSION - Native flexbox flow with no positioning
+// TRUE INFINITE SCROLLING - Creates illusion of infinite content with head/tail clones
 
 import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { selectionManager } from '../core/selectionManager.mjs';
@@ -14,19 +14,27 @@ class InfiniteScrollingContainer {
     };
 
     this.originalItems = [];
+    this.headClones = [];
+    this.tailClones = [];
     this.currentIndex = 0;
     this._isInitialized = false;
+
+    // Infinite scrolling configuration
+    this.CLONE_COUNT = 10; // Number of clones to create above and below
+    this.SCROLL_BUFFER = 200; // Pixels from edge to trigger repositioning
+    this.isRepositioning = false;
 
     this.init();
   }
 
   init() {
     this.setupContainer();
-    console.log('[InfiniteScrollingContainer] Initialized with native flexbox flow');
+    this.setupScrollListener();
+    console.log('[InfiniteScrollingContainer] Initialized with true infinite scrolling');
   }
 
   setupContainer() {
-    console.log('[DEBUG] InfiniteScrollingContainer: Using native flexbox flow - no positioning');
+    console.log('[DEBUG] InfiniteScrollingContainer: Setting up infinite scrolling container');
     
     // Set up scrollport for native scrolling
     this.scrollport.style.position = 'relative';
@@ -44,32 +52,116 @@ class InfiniteScrollingContainer {
     this.contentHolder.style.alignItems = 'stretch';
   }
 
+  setupScrollListener() {
+    this.scrollport.addEventListener('scroll', () => {
+      if (!this.isRepositioning && this.originalItems.length > 0) {
+        this.checkScrollBoundaries();
+      }
+    });
+  }
+
   setItems(items, startingIndex = 0) {
-    console.log(`[DEBUG] InfiniteScrollingContainer.setItems: ${items.length} items with native flexbox`);
+    console.log(`[DEBUG] InfiniteScrollingContainer.setItems: ${items.length} items with infinite scrolling`);
     
     this.originalItems = [...items];
+    this.headClones = [];
+    this.tailClones = [];
     
     // Clear existing content
     this.contentHolder.innerHTML = '';
     
-    // Add all items to container with flexbox flow
+    // Create head clones (items that appear above the original list)
+    this.createHeadClones();
+    
+    // Add original items
     this.originalItems.forEach((item, index) => {
       if (item) {
-        // Remove any existing positioning styles
-        this.clearPositioningStyles(item);
-        
-        // Set flexbox child properties
-        item.style.position = 'relative';
-        item.style.width = '100%';
-        item.style.height = 'auto';
-        item.style.flexShrink = '0';
-        
-        // Append to container
+        this.prepareItemForInfiniteScroll(item, index, 'original');
         this.contentHolder.appendChild(item);
       }
     });
     
-    console.log(`[DEBUG] InfiniteScrollingContainer: Added ${this.originalItems.length} items to flexbox container`);
+    // Create tail clones (items that appear below the original list)
+    this.createTailClones();
+    
+    console.log(`[DEBUG] InfiniteScrollingContainer: Created infinite scroll structure - ${this.headClones.length} head clones + ${this.originalItems.length} originals + ${this.tailClones.length} tail clones`);
+    
+    this._isInitialized = true;
+  }
+
+  createHeadClones() {
+    // Create clones of the last N items to appear above the first item
+    const sourceItems = this.originalItems.slice(-this.CLONE_COUNT);
+    
+    sourceItems.forEach((sourceItem, index) => {
+      if (sourceItem) {
+        const clone = this.createInfiniteClone(sourceItem, 'head', this.originalItems.length - this.CLONE_COUNT + index);
+        this.headClones.push(clone);
+        this.contentHolder.appendChild(clone);
+      }
+    });
+  }
+
+  createTailClones() {
+    // Create clones of the first N items to appear below the last item
+    const sourceItems = this.originalItems.slice(0, this.CLONE_COUNT);
+    
+    sourceItems.forEach((sourceItem, index) => {
+      if (sourceItem) {
+        const clone = this.createInfiniteClone(sourceItem, 'tail', index);
+        this.tailClones.push(clone);
+        this.contentHolder.appendChild(clone);
+      }
+    });
+  }
+
+  createInfiniteClone(sourceItem, cloneType, originalIndex) {
+    const clone = sourceItem.cloneNode(true);
+    
+    // Mark as infinite scroll clone
+    clone.classList.add('infinite-scroll-clone');
+    clone.classList.add(`${cloneType}-clone`);
+    clone.dataset.originalIndex = originalIndex;
+    clone.dataset.cloneType = cloneType;
+    
+    // Remove/modify IDs to avoid duplicates
+    if (clone.id) {
+      clone.id = `${clone.id}-${cloneType}-clone`;
+    }
+    
+    // Update any child element IDs
+    const childrenWithIds = clone.querySelectorAll('[id]');
+    childrenWithIds.forEach(child => {
+      if (child.id) {
+        child.id = `${child.id}-${cloneType}-clone`;
+      }
+    });
+    
+    this.prepareItemForInfiniteScroll(clone, originalIndex, cloneType);
+    
+    // Apply color palette to the clone
+    try {
+      applyPaletteToElement(clone);
+    } catch (error) {
+      console.warn('Failed to apply palette to infinite scroll clone:', error);
+    }
+    
+    return clone;
+  }
+
+  prepareItemForInfiniteScroll(item, index, type) {
+    // Remove any existing positioning styles
+    this.clearPositioningStyles(item);
+    
+    // Set flexbox child properties
+    item.style.position = 'relative';
+    item.style.width = '100%';
+    item.style.height = 'auto';
+    item.style.flexShrink = '0';
+    
+    // Add data attributes for tracking
+    item.dataset.infiniteScrollType = type;
+    item.dataset.infiniteScrollIndex = index;
   }
 
   clearPositioningStyles(element) {
@@ -84,16 +176,98 @@ class InfiniteScrollingContainer {
     element.style.removeProperty('transform');
   }
 
+  checkScrollBoundaries() {
+    const scrollTop = this.scrollport.scrollTop;
+    const scrollHeight = this.scrollport.scrollHeight;
+    const clientHeight = this.scrollport.clientHeight;
+    
+    // Check if scrolled too close to top (into head clones)
+    if (scrollTop < this.SCROLL_BUFFER) {
+      console.log('[InfiniteScrollingContainer] Near top boundary - repositioning');
+      this.repositionToBottom();
+    }
+    
+    // Check if scrolled too close to bottom (into tail clones)
+    if (scrollTop + clientHeight > scrollHeight - this.SCROLL_BUFFER) {
+      console.log('[InfiniteScrollingContainer] Near bottom boundary - repositioning');
+      this.repositionToTop();
+    }
+  }
+
+  repositionToBottom() {
+    if (this.isRepositioning) return;
+    this.isRepositioning = true;
+    
+    // Calculate scroll position in original content range
+    const headClonesHeight = this.calculateHeadClonesHeight();
+    const originalContentHeight = this.calculateOriginalContentHeight();
+    const currentScrollInOriginals = this.scrollport.scrollTop - headClonesHeight;
+    
+    // Jump to equivalent position at bottom (in tail clones area)
+    const newScrollTop = headClonesHeight + originalContentHeight + currentScrollInOriginals;
+    
+    this.scrollport.scrollTop = newScrollTop;
+    
+    console.log(`[InfiniteScrollingContainer] Repositioned from top area to bottom: ${this.scrollport.scrollTop}px`);
+    
+    // Allow repositioning again after a brief delay
+    setTimeout(() => {
+      this.isRepositioning = false;
+    }, 100);
+  }
+
+  repositionToTop() {
+    if (this.isRepositioning) return;
+    this.isRepositioning = true;
+    
+    // Calculate scroll position in original content range
+    const headClonesHeight = this.calculateHeadClonesHeight();
+    const originalContentHeight = this.calculateOriginalContentHeight();
+    const currentScrollInTailClones = this.scrollport.scrollTop - headClonesHeight - originalContentHeight;
+    
+    // Jump to equivalent position at top (in head clones area)
+    const newScrollTop = headClonesHeight + currentScrollInTailClones;
+    
+    this.scrollport.scrollTop = newScrollTop;
+    
+    console.log(`[InfiniteScrollingContainer] Repositioned from bottom area to top: ${this.scrollport.scrollTop}px`);
+    
+    // Allow repositioning again after a brief delay
+    setTimeout(() => {
+      this.isRepositioning = false;
+    }, 100);
+  }
+
+  calculateHeadClonesHeight() {
+    return this.headClones.reduce((total, clone) => {
+      return total + (clone.offsetHeight || 0);
+    }, 0);
+  }
+
+  calculateOriginalContentHeight() {
+    return this.originalItems.reduce((total, item) => {
+      return total + (item.offsetHeight || 0);
+    }, 0);
+  }
+
+  calculateTailClonesHeight() {
+    return this.tailClones.reduce((total, clone) => {
+      return total + (clone.offsetHeight || 0);
+    }, 0);
+  }
+
   scrollToIndex(originalIndex, animate = true) {
     console.log(`[DEBUG] scrollToIndex: ${originalIndex} with animate=${animate}`);
     
     if (originalIndex < 0 || originalIndex >= this.originalItems.length) {
-      console.warn(`[DEBUG] scrollToIndex: Invalid index ${originalIndex}`);
-      return;
+      console.warn(`[DEBUG] scrollToIndex: Invalid index ${originalIndex} - using modulo to wrap around`);
+      // Use modulo to wrap around the index for infinite scrolling
+      originalIndex = ((originalIndex % this.originalItems.length) + this.originalItems.length) % this.originalItems.length;
     }
     
     const targetItem = this.originalItems[originalIndex];
     if (targetItem) {
+      // Scroll to the original item (not clones)
       targetItem.scrollIntoView({ 
         behavior: animate ? 'smooth' : 'auto', 
         block: 'center' 
@@ -167,12 +341,14 @@ class InfiniteScrollingContainer {
   }
 
   goToNext() {
-    const nextIndex = (this.currentIndex + 1) % this.originalItems.length;
+    // Infinite scrolling - no bounds checking needed
+    const nextIndex = this.currentIndex + 1;
     this.scrollToIndex(nextIndex);
   }
 
   goToPrevious() {
-    const prevIndex = (this.currentIndex - 1 + this.originalItems.length) % this.originalItems.length;
+    // Infinite scrolling - no bounds checking needed  
+    const prevIndex = this.currentIndex - 1;
     this.scrollToIndex(prevIndex);
   }
 
@@ -193,8 +369,11 @@ class InfiniteScrollingContainer {
   destroy() {
     // Clean up
     this.originalItems = [];
+    this.headClones = [];
+    this.tailClones = [];
     this.currentIndex = 0;
     this._isInitialized = false;
+    this.isRepositioning = false;
   }
 
   // Static methods for singleton compatibility

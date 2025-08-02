@@ -1,5 +1,5 @@
 import { ref, onMounted, watch, computed, getCurrentInstance } from 'vue';
-import { useAppState } from './useAppState.mjs';
+import { useAppState } from './useAppState.ts';
 import * as colorUtils from '@/modules/utils/colorUtils.mjs';
 
 const PALETTE_DIR = './static_content/colorPalettes/';
@@ -281,9 +281,9 @@ export async function applyPaletteToElement(element) {
 
     // Ensure appState is available
     if (!appState.value) {
-        console.warn('AppState not loaded, skipping palette application');
+        console.warn('[applyPaletteToElement] ❌ AppState not loaded, skipping palette application');
         console.warn('[applyPaletteToElement] appState.value:', appState.value);
-        return;
+        throw new Error('AppState not available for palette application');
     }
     
     // console.log('[applyPaletteToElement] AppState available, checking palettes...');
@@ -294,8 +294,10 @@ export async function applyPaletteToElement(element) {
 
     // If the attribute is not set or is not a valid number,
     // this element has not been configured for color theming
-    if (paletteColorIndexAttr === null || isNaN(parseInt(paletteColorIndexAttr, 10))) 
-        return;
+    if (paletteColorIndexAttr === null || isNaN(parseInt(paletteColorIndexAttr, 10))) {
+        console.warn(`[applyPaletteToElement] ❌ Element missing or invalid data-color-index: "${paletteColorIndexAttr}"`);
+        throw new Error(`Element missing data-color-index attribute`);
+    }
     const paletteColorIndex = parseInt(paletteColorIndexAttr, 10);
 
     // Get the palette name from the filename

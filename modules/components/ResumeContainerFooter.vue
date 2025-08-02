@@ -6,24 +6,15 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { computed } from 'vue';
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 
-export default {
-  name: 'ResumeContainerFooter',
-  setup() {
-    const { percentage: scenePercentage } = useResizeHandle();
+const { percentage: scenePercentage } = useResizeHandle();
 
-    const resumePercentage = computed(() => {
-      return 100 - Math.round(scenePercentage.value);
-    });
-
-    return {
-      resumePercentage
-    };
-  }
-};
+const resumePercentage = computed(() => {
+  return 100 - Math.round(scenePercentage.value);
+});
 </script>
 
 <style scoped>
@@ -45,15 +36,5 @@ export default {
   background-color: transparent !important;
 }
 
-.viewer-label {
-  font-family: sans-serif;
-  font-size: 14px;
-  font-weight: 400;
-  color: black;
-  user-select: none;
-  text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
-  white-space: nowrap;
-  background-color: transparent !important;
-  pointer-events: auto; /* Allow interaction with the text */
-}
+/* .viewer-label styling consolidated in AppContent.vue */
 </style> 

@@ -1,5 +1,12 @@
 import { ref, computed, getCurrentInstance } from 'vue';
-import { useAimPoint, FOCALPOINT_MODES } from './useAimPoint.mjs';
+// useAimPoint removed during Vue 3 migration - using simplified approach
+
+// Focal point modes
+export const FOCALPOINT_MODES = {
+  LOCKED: 'LOCKED',
+  FOLLOWING: 'FOLLOWING',
+  DRAGGING: 'DRAGGING'
+};
 
 // Cursor constant - single source of truth
 const CROSSHAIR_CURSOR = 'url(\'/static_content/icons/x-hairs/icons8-accuracy-32-whiter.png\') 16 16, crosshair';
@@ -20,9 +27,8 @@ export function useFocalPoint() {
   // Computed position object
   const position = computed(() => ({ x: x.value, y: y.value }));
   
-  // Get focal point mode from aim point
-  const aimPoint = useAimPoint();
-  const focalPointMode = computed(() => aimPoint.focalPointMode.value || FOCALPOINT_MODES.LOCKED);
+  // Simplified focal point mode (no aim point dependency)
+  const focalPointMode = ref(FOCALPOINT_MODES.LOCKED);
   const isLocked = computed(() => focalPointMode.value === FOCALPOINT_MODES.LOCKED);
   const isDragging = computed(() => focalPointMode.value === FOCALPOINT_MODES.DRAGGING);
 
@@ -294,10 +300,7 @@ export function useFocalPoint() {
         });
       }
       
-      // Restart animation loop for locked mode
-      if (!aimPointWatcher) {
-        aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
-      }
+      // Simplified locked mode - no aim point tracking needed
       
       // NO mouse listener in locked mode - focal point only follows aim point
       
@@ -328,20 +331,14 @@ export function useFocalPoint() {
       x.value = targetX;
       y.value = targetY;
       
-      // Restart animation loop for non-drag modes
-      if (!aimPointWatcher) {
-        aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
-      }
+      // Simplified following mode - no aim point tracking needed
       
       // Add the Vue mouse listener back only for following mode
       if (focalPointMode.value === FOCALPOINT_MODES.FOLLOWING) {
         addMouseListener();
       }
       
-      // Re-sync with aim point when mode changes to non-drag
-      if (aimPoint.position.value.x && aimPoint.position.value.y) {
-        setTarget(aimPoint.position.value.x, aimPoint.position.value.y, 'mode-change');
-      }
+      // No aim point sync needed in simplified system
     }
   });
 
@@ -360,38 +357,15 @@ export function useFocalPoint() {
     document.documentElement.style.cursor = CROSSHAIR_CURSOR;
   }
 
-  // Watch for aim point position changes (only when not in drag mode)
-  let lastAimX = aimPoint.x.value;
-  let lastAimY = aimPoint.y.value;
-  let aimPointWatcher = null;
-  
-  function checkAimPointChanges() {
-    // Stop animation loop entirely in drag mode - no overhead at all
-    if (focalPointMode.value === FOCALPOINT_MODES.DRAGGING) {
-      if (aimPointWatcher) {
-        cancelAnimationFrame(aimPointWatcher);
-        aimPointWatcher = null;
-      }
-      return;
-    }
-    
-    const currentAimX = aimPoint.x.value;
-    const currentAimY = aimPoint.y.value;
-    
-    if (currentAimX !== lastAimX || currentAimY !== lastAimY) {
-      // Use smooth easing in non-drag modes
-      setTarget(currentAimX, currentAimY, 'aim-point-change');
-      lastAimX = currentAimX;
-      lastAimY = currentAimY;
-    }
-    
-    // Continue watching only in non-drag modes
-    aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
-  }
-  
-  // Start watching aim point changes only if not in drag mode initially
-  if (focalPointMode.value !== FOCALPOINT_MODES.DRAGGING) {
-    aimPointWatcher = requestAnimationFrame(checkAimPointChanges);
+  // Simplified focal point system - no aim point dependency
+
+  // Mode cycling function
+  function cycleMode() {
+    const modes = Object.values(FOCALPOINT_MODES);
+    const currentIndex = modes.indexOf(focalPointMode.value);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    focalPointMode.value = modes[nextIndex];
+    console.log(`[useFocalPoint] Mode cycled to: ${focalPointMode.value}`);
   }
 
   // Test function for cursor debugging
@@ -426,6 +400,7 @@ export function useFocalPoint() {
     setFocalPointElement,
     setTarget,
     updatePosition,
+    cycleMode,
     cleanup,
     testCrosshairCursor
   };

@@ -7,19 +7,48 @@
  * @param {*} event 
  */
 export function handleKeyDown(event) {
+    // Always allow special debug shortcut
     if (event.ctrlKey && event.shiftKey && event.altKey && event.key === 'D') {
         window.CONSOLE_LOG_IGNORE("Ctrl+Shift+Alt+D detected: Dumping managers to console");
         window.dumpManagersToConsole();
+        return;
+    }
+
+    // Skip navigation shortcuts when user is typing in input elements
+    const activeElement = document.activeElement;
+    const isInputActive = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT' ||
+        activeElement.isContentEditable ||
+        activeElement.hasAttribute('contenteditable')
+    );
+
+    if (isInputActive && (event.key.startsWith('Arrow') || event.key === ' ')) {
+        // Let input elements handle their own arrow key navigation
+        return;
     }
 
     switch (event.key) {
-        // Arrow keys and spacebar are currently disabled pending a refactor
-        // to use the central selectionManager or a new composable.
+        // Arrow key navigation using sorted order
+        case "ArrowUp":
+            event.preventDefault();
+            window.CONSOLE_LOG_IGNORE("ArrowUp: Going to previous item in sorted order");
+            if (window.resumeListController) {
+                window.resumeListController.goToPreviousResumeItem();
+            }
+            break;
+        case "ArrowDown":
+            event.preventDefault();
+            window.CONSOLE_LOG_IGNORE("ArrowDown: Going to next item in sorted order");
+            if (window.resumeListController) {
+                window.resumeListController.goToNextResumeItem();
+            }
+            break;
         case "ArrowLeft":
         case "ArrowRight":
-        case "ArrowUp":
-        case "ArrowDown":
         case " ": // Spacebar
+            // These keys remain disabled for now
             break;
 
         // Focal point mode controls

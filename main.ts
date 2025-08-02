@@ -75,7 +75,7 @@ window.LOGGING_CONTROL = {
   },
   
   // Check if a log message is about job numbers that we want to preserve
-  isJobNumberLog(message, args) {
+  isJobNumberLog(message: string, args: any[]) {
     const lowerMessage = message.toLowerCase();
     
     // Look for job number patterns
@@ -94,7 +94,7 @@ window.LOGGING_CONTROL = {
   },
   
   // Log job numbers in clean single column format
-  logJobNumber(message, args, originalLog) {
+  logJobNumber(message: string, args: any[], originalLog: typeof console.log) {
     if (this.jobNumberFormat === 'single-column') {
       // Extract job number from the message
       const jobNumberMatch = message.match(/job\s*(\d+)|jobnumber[:\s=]*(\d+)|job.*(\d+)/i);
@@ -125,12 +125,12 @@ window.LOGGING_CONTROL = {
   },
   
   // Check if message contains positioning info we want to preserve
-  isPositioningInfo(message) {
+  isPositioningInfo(message: string) {
     return /centery|distance.*cdiv|top:|position/i.test(message);
   },
   
   // Get job details from DOM if available (name, centerY, distance)
-  getJobDetails(jobNum) {
+  getJobDetails(jobNum: string | number) {
     try {
       const card = document.querySelector(`[data-job-number="${jobNum}"]`);
       if (!card) return null;
@@ -139,7 +139,7 @@ window.LOGGING_CONTROL = {
       const centerY = card.getAttribute('data-sceneCenterY');
       
       if (roleElement && centerY) {
-        const role = roleElement.textContent.trim();
+        const role = roleElement.textContent?.trim() || 'Unknown Role';
         
         // Calculate distance to reference cDiv if available
         const selectedCard = document.querySelector('.biz-card-div.selected');
@@ -191,7 +191,7 @@ window.LOGGING_CONTROL = {
   },
   
   // Global utility function to log job numbers consistently
-  logJob(jobNumber, context = '') {
+  logJob(jobNumber: string | number, context: string = '') {
     if (!this.suppressAllExceptJobNumbers) {
       this._originals.log(`LOG_JOB: Suppression disabled, not logging job ${jobNumber}`);
       return;
@@ -223,7 +223,7 @@ window.LOG_JOB(2, 'test log on startup');
 
 // import './modules/timeline/timeline.css'; // Removed - now using Vue component
 import './modules/core/core.css'; // Import core styles for BullsEye and other components
-import './scripts/debug-browser.mjs'; // Debug functions for browser console
+// Debug scripts moved to /tmp during Vue 3 migration cleanup
 
 // @ts-nocheck
 import { createApp } from 'vue';

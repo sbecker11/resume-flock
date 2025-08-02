@@ -1,10 +1,25 @@
-<script setup>
-import { ref, computed, watch, onMounted } from 'vue';
-import { useAimPoint } from '@/modules/composables/useAimPoint.mjs';
+<script setup lang="ts">
+import { ref, computed, watch, onMounted, type Ref, type ComputedRef } from 'vue';
+// useAimPoint removed during Vue 3 migration cleanup
+import { useFocalPoint } from '@/modules/composables/useFocalPointVue3.mjs';
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useLayoutToggle } from '@/modules/composables/useLayoutToggle.mjs';
-import { useAppState } from '@/modules/composables/useAppState.mjs';
+import { useAppState } from '@/modules/composables/useAppState';
 import BadgeToggle from '@/modules/components/BadgeToggle.vue';
+import type { ResizeHandleProps, ResizeHandleEmits } from '@/modules/types/components';
+
+// Local type definitions
+interface StepButton {
+  id: string;
+  action: (event: MouseEvent) => Promise<void>;
+  disabled: boolean;
+  title: string;
+  icon: string;
+}
+
+// Component props and emits with type safety
+const props = withDefaults(defineProps<ResizeHandleProps>(), {});
+const emit = defineEmits<ResizeHandleEmits>();
 
 // --- Composables ---
 const { 
@@ -18,7 +33,7 @@ const {
 } = useResizeHandle();
 
 // Local reactive step count - simpler approach
-const stepCount = ref(1);
+const stepCount: Ref<number> = ref(1);
 
 const { orientation } = useLayoutToggle();
 const { updateAppState, appState } = useAppState();
@@ -31,7 +46,7 @@ onMounted(() => {
 });
 
 // Computed properties for button states - orientation aware
-const isLeftDisabled = computed(() => {
+const isLeftDisabled: ComputedRef<boolean> = computed(() => {
   if (stepCount.value === 1) return true; // Always disabled in free drag mode
   
   if (orientation.value === 'scene-right') {
@@ -43,7 +58,7 @@ const isLeftDisabled = computed(() => {
   }
 });
 
-const isRightDisabled = computed(() => {
+const isRightDisabled: ComputedRef<boolean> = computed(() => {
   if (stepCount.value === 1) return true; // Always disabled in free drag mode
   
   if (orientation.value === 'scene-right') {
@@ -56,7 +71,7 @@ const isRightDisabled = computed(() => {
 });
 
 // Step button click handlers with debug logging
-async function handleStepLeft(event) {
+async function handleStepLeft(event: MouseEvent): Promise<void> {
   // console.log('[ResizeHandle] Step left clicked');
   // console.log('[ResizeHandle] Orientation:', orientation.value);
   // console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
@@ -81,7 +96,7 @@ async function handleStepLeft(event) {
   }
 }
 
-async function handleStepRight(event) {
+async function handleStepRight(event: MouseEvent): Promise<void> {
   // console.log('[ResizeHandle] Step right clicked');
   // console.log('[ResizeHandle] Orientation:', orientation.value);
   // console.log('[ResizeHandle] Current percentage:', scenePercentage.value);
@@ -107,7 +122,7 @@ async function handleStepRight(event) {
 }
 
 // Step buttons for resize handle movement
-const stepLeftButton = computed(() => {
+const stepLeftButton: ComputedRef<StepButton> = computed(() => {
   if (orientation.value === 'scene-right') {
     // In scene-right: left button increases scene size (points away from scene)
     return {
@@ -129,7 +144,7 @@ const stepLeftButton = computed(() => {
   }
 });
 
-const stepRightButton = computed(() => {
+const stepRightButton: ComputedRef<StepButton> = computed(() => {
   if (orientation.value === 'scene-right') {
     // In scene-right: right button decreases scene size (points away from resume)
     return {
@@ -151,10 +166,11 @@ const stepRightButton = computed(() => {
   }
 });
 
+// Get focal point mode from useFocalPoint - restored tri-state functionality
 const { 
-  focalPointMode,
-  cycleFocalPointMode
-} = useAimPoint();
+  mode: focalPointMode,
+  cycleMode: cycleFocalPointMode
+} = useFocalPoint();
 
 // Debug watcher to see mode changes
 watch(focalPointMode, (newMode, oldMode) => {
@@ -233,7 +249,7 @@ const displayStepCount = computed(() => {
 });
 
 // --- Component Methods ---
-function toggleFocalLock(event) {
+function toggleFocalLock(event: MouseEvent): void {
   console.log('ResizeHandle: tri-state focal point toggle clicked');
   console.log('ResizeHandle: Current mode before cycling:', focalPointMode.value);
   event.stopPropagation();
@@ -250,7 +266,7 @@ function toggleFocalLock(event) {
   }, 0);
 }
 
-async function handleSteppingClick(event) {
+async function handleSteppingClick(event: MouseEvent): Promise<void> {
   event.stopPropagation();
   
   // Cycle through step counts: 1 -> 2 -> 3 -> ... -> 10 -> 1
@@ -279,14 +295,14 @@ async function handleSteppingClick(event) {
   isSteppingHovering.value = false;
 }
 
-function handleLayoutToggle(event) {
+function handleLayoutToggle(event: MouseEvent): void {
   event.stopPropagation();
   console.log('[ResizeHandle] BEFORE toggle:', orientation.value);
   toggleOrientation();
   console.log('[ResizeHandle] AFTER toggle:', orientation.value);
 }
 
-function handleResizeHandleClick(event) {
+function handleResizeHandleClick(event: MouseEvent): void {
   // Prevent resize handle clicks from propagating to parent containers
   event.stopPropagation();
 }
@@ -333,7 +349,9 @@ function handleResizeHandleClick(event) {
     width: 20px;
     height: 100%;
     cursor: col-resize;
-    background-color: var(--resize-handle-bg-color, #333);
+    background-color: var(--resize-handle-bg-color, #444);
+    border-left: 1px solid #555;
+    border-right: 1px solid #555;
     z-index: 10000;
     display: flex;
     flex-direction: column;

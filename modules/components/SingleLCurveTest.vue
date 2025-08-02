@@ -34,50 +34,22 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { TARGET_CDIV_JOB_NUMBER } from "@/modules/constants/targetCDiv.mjs";
 
-export default {
-  name: 'SingleLCurveTest',
-  // Removed BaseVueComponentMixin - no longer using IM framework
-  
-  methods: {
-    // DEPRECATED: IM methods removed during Vue migration
-    // getComponentDependencies() {
-    //   return []; // SingleLCurveTest doesn't need dependencies currently
-    // },
-    
-    // initialize(dependencies) {
-    //   console.log('[SingleLCurveTest] IM initialized');
-    // },
+// Template ref for scene-content element
+const scenecontentElement = ref(null);
 
-    // /**
-    //  * DOM setup phase - called after Vue DOM is ready
-    //  * DOM operations moved from initialize() for proper separation
-    //  */
-    // async setupDom() {
-    //   // DOM operations are handled in the composition API setup()
-    //   // This method exists for IM compliance
-    //   console.log('[SingleLCurveTest.vue] DOM setup complete');
-    // },
-
-    /**
-     * Template ref injection for scene-content element
-     * Replaces getElementById('scene-content') calls
-     * @param {HTMLElement} element - The DOM element from template ref
-     */
-    setSceneContentElement(element) {
-      this.scenecontentElement = element;
-      console.log('[SingleLCurveTest.vue] scene-content element set via template ref');
-    },
-    
-    cleanupDependencies() {
-      // Cleanup handled in setup() onUnmounted
-    }
-  },
-  
-  setup() {
+/**
+ * Template ref injection for scene-content element
+ * Replaces getElementById('scene-content') calls
+ * @param {HTMLElement} element - The DOM element from template ref
+ */
+const setSceneContentElement = (element) => {
+  scenecontentElement.value = element;
+  console.log('[SingleLCurveTest.vue] scene-content element set via template ref');
+};
     const showConnection = ref(false);
     const showDebugInfo = ref(true);
     const badgeLeft = ref(0);
@@ -164,7 +136,7 @@ export default {
       if (!selectedCDiv) return;
 
       // Get scene-content for coordinate reference
-      const sceneContent = this.scenecontentElement;
+      const sceneContent = scenecontentElement.value;
       if (!sceneContent) return;
 
       const sceneRect = sceneContent.getBoundingClientRect();
@@ -245,22 +217,11 @@ export default {
       window.removeEventListener('card-deselect', handleCardDeselect);
     });
 
-    return {
-      showConnection,
-      showDebugInfo,
-      badgeLeft,
-      badgeCenterY,
-      cDivCenterX,
-      cDivTop,
-      cDivBottom,
-      pathCase,
-      connectionPath,
-      containerStyle,
-      svgStyle,
-      debugStyle
-    };
-  }
-};
+// Variables automatically exposed by script setup
+// Also expose setSceneContentElement for template ref injection
+defineExpose({
+  setSceneContentElement
+});
 </script>
 
 <style scoped>

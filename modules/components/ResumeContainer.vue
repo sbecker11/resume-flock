@@ -252,14 +252,7 @@ function selectPrevious() {
 }
 /* rDiv styles moved to global styles section below */
 
-.viewer-label {
-    font-family: sans-serif;
-    font-size: 14px;
-    color: black;
-    user-select: none;
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5);
-    white-space: nowrap;
-}
+/* .viewer-label styling consolidated in AppContent.vue */
 </style>
 
 <style>

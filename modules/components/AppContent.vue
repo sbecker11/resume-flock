@@ -21,14 +21,14 @@
       <div class="resume-content">
         <div class="resume-wrapper">
           <ResumeContainer />
-          <div id="resume-view-label">
-            <span class="viewer-label">Resume Viewer ({{ roundedResumePercentage }}%)</span>
-          </div>
         </div>
+      </div>
+      <!-- Resume Viewer Label - positioned inside resume container like Scene Viewer -->
+      <div id="resume-view-label">
+        <span class="viewer-label">Resume Viewer ({{ roundedResumePercentage }}%)</span>
       </div>
     </div>
 
-    <div id="aim-point" ref="aimPointRef"></div>
     <div id="bulls-eye" ref="bullsEyeRef">+</div>
     <div 
       id="focal-point" 
@@ -47,64 +47,76 @@ import SceneContainer from './SceneContainer.vue'
 import ResizeHandle from './ResizeHandle.vue'
 import ResumeContainer from './ResumeContainer.vue'
 
-// Centralized state management - replaces IM framework
-import { useAppState } from '../composables/useAppState.mjs'
+// Vue 3 architecture - pure Vue patterns with critical systems preserved
+import { useAppContext } from '../composables/useAppContext.mjs'
+import { useAppStore } from '../stores/appStore.mjs'
+import { useFocalPoint } from '../composables/useFocalPointVue3.mjs'
+import { useBullsEye } from '../composables/useBullsEyeVue3.mjs'
+import { useParallax } from '../composables/useParallaxVue3.mjs'
 import { useColorPalette } from '../composables/useColorPalette.mjs'
 import { useLayoutToggle } from '../composables/useLayoutToggle.mjs'
-
-// Resume system initialization
-import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
 import { useResizeHandle } from '../composables/useResizeHandle.mjs'
-import { useFocalPoint } from '../composables/useFocalPoint.mjs'
-import { useAimPoint } from '../composables/useAimPoint.mjs'
+import { useAppState } from '../composables/useAppState.ts'
 
-// Core functionality imports
+// Resume system initialization (to be migrated)
+import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
+
+// Core functionality imports (minimal during migration)
 import { handleKeyDown } from '../core/keyDownModule.mjs'
-// Direct BullsEye import - no more IM framework
-import { bullsEye } from '../core/bullsEye.mjs'
-// Import parallax module to trigger auto-initialization
-import '../core/parallaxModule.mjs'
-// Temporarily commented out old IM modules during Vue migration
-// import { sceneContainer } from '../scene/sceneContainerModule.mjs'
 
 // =============================================================================
-// STATE MANAGEMENT - Centralized via composables
+// VUE 3 ARCHITECTURE - Dependency injection and stores
 // =============================================================================
 
-// Load AppState once for entire application
-const { appState, loadAppState } = useAppState()
+// Use app-wide context provided by App.vue
+const { registerDependency, getDependency } = useAppContext()
 
-// Layout and viewport management
-const { 
-  orientation, 
-  toggleOrientation, 
-  scenePercentage, 
-  resumePercentage,
-  appContainerClass,
-  firstContainer,
-  secondContainer
-} = useLayoutToggle()
+// Use centralized app store
+const { store, computed: storeComputed, actions: storeActions } = useAppStore()
+
+// Layout management from store
+const orientation = computed({
+  get: () => store.orientation,
+  set: (value) => storeActions.setOrientation(value)
+})
+const scenePercentage = computed({
+  get: () => store.scenePercentage,
+  set: (value) => storeActions.setScenePercentage(value)
+})
+const resumePercentage = storeComputed.resumePercentage
+const appContainerClass = computed(() => store.orientation)
+const firstContainer = computed(() => store.orientation === 'scene-left' ? 'scene-container' : 'resume-container')
+const secondContainer = computed(() => store.orientation === 'scene-left' ? 'resume-container' : 'scene-container')
 
 // Resize handle functionality
-const { 
-  sceneContainerStyle 
-} = useResizeHandle()
+const { sceneContainerStyle } = useResizeHandle()
 
 // Color palette management
 const { loadPalettes } = useColorPalette()
 
-// Focal point system
+// Vue 3 critical systems - all preserved
 const { 
   position: focalPointPosition,
-  x: focalPointX,
-  y: focalPointY,
+  mode: focalPointMode,
   isLocked: focalPointIsLocked,
   isDragging: focalPointIsDragging,
   setFocalPointElement
 } = useFocalPoint()
 
-// Aim point system  
-const { setAimPointElement } = useAimPoint()
+// Vue 3 bulls-eye system
+const {
+  setBullsEyeElement,
+  setSceneContainerElement
+} = useBullsEye()
+
+// Vue 3 parallax system
+const {
+  renderAllCDivs
+} = useParallax()
+
+// Computed properties from store
+const focalPointX = computed(() => store.focalPoint.x)
+const focalPointY = computed(() => store.focalPoint.y)
 
 // App-level focal point and aim point (positioned relative to entire app)
 
@@ -125,10 +137,32 @@ const focalPointStyle = computed(() => ({
 // TEMPLATE REFS - App-level elements
 // =============================================================================
 
+// Template refs with reactive watchers
 const sceneContainerRef = ref(null)  // Reference to SceneContainer component
-const aimPointRef = ref(null)
 const bullsEyeRef = ref(null)
 const focalPointRef = ref(null)
+
+// Make template refs reactive - watch for changes and update systems
+watch(focalPointRef, (newRef) => {
+  if (newRef) {
+    setFocalPointElement(newRef)
+  }
+}, { immediate: true })
+
+watch(bullsEyeRef, (newRef) => {
+  if (newRef) {
+    setBullsEyeElement(newRef)
+  }
+}, { immediate: true })
+
+watch(sceneContainerRef, (newRef) => {
+  if (newRef) {
+    const sceneContainerElement = newRef?.$refs?.sceneContainerRef
+    if (sceneContainerElement) {
+      setSceneContainerElement(sceneContainerElement)
+    }
+  }
+}, { immediate: true })
 
 // =============================================================================
 // COMPUTED PROPERTIES
@@ -138,19 +172,28 @@ const timelineAlignment = computed(() => {
   return orientation.value === 'scene-left' ? 'right' : 'left'
 })
 
-// Ensure rounded percentages that add up to 100%
+// Use the reactive store values and map them to display 0-100% range
 const roundedScenePercentage = computed(() => {
-  const rounded = Math.round(scenePercentage.value)
-  console.log(`[AppContent] scenePercentage: ${scenePercentage.value} -> rounded: ${rounded}`)
-  return rounded
-})
+  const rawPercentage = scenePercentage.value;
+  
+  // Debug logging for percentage mapping
+  if (rawPercentage <= 10 || rawPercentage >= 90) {
+    console.log(`[Scene %] Raw: ${rawPercentage}% -> Mapped: ${rawPercentage <= 10 ? 0 : 100}%`);
+  }
+  
+  if (rawPercentage <= 10) return 0;
+  if (rawPercentage >= 90) return 100;
+  
+  const mapped = ((rawPercentage - 5) / 90) * 100;
+  const result = Math.round(Math.max(0, Math.min(100, mapped)));
+  
+  console.log(`[Scene %] Raw: ${rawPercentage}% -> Mapped: ${result}%`);
+  return result;
+});
+
 const roundedResumePercentage = computed(() => {
-  const rawResumePercentage = resumePercentage.value
-  const rounded = Math.round(rawResumePercentage)
-  console.log(`[AppContent] *** DISPLAYED RESUME %: ${rounded}% *** (from composable: ${rawResumePercentage})`)
-  console.log(`[AppContent] scenePercentage: ${scenePercentage.value}, should be: ${100 - scenePercentage.value}`)
-  return rounded
-})
+  return 100 - roundedScenePercentage.value;
+});
 
 // =============================================================================
 // EVENT HANDLERS
@@ -166,52 +209,47 @@ const handleSceneContainerClick = (event) => {
 // =============================================================================
 
 onMounted(async () => {
-  console.log('🔵 [AppContent] MOUNTED - SHOULD LOAD SCENECONTAINER 🔵')
-  console.log('[AppContent] 🚀 Starting app-level initialization...')
+  console.log('🚀 [AppContent] Vue 3 App Initialization Started')
   
   try {
-    // PHASE 1: Load AppState (app-level state management)
-    console.log('[AppContent] 📄 Loading AppState...')
+    // PHASE 1: Load AppState from server FIRST
+    console.log('[AppContent] 📊 Loading AppState from server...')
+    const { loadAppState } = useAppState()
     await loadAppState()
+    console.log('[AppContent] ✅ AppState loaded successfully')
     
-    // PHASE 2: Initialize app-level systems
-    console.log('[AppContent] ⚙️ Initializing app-level systems...')
+    // PHASE 2: Initialize app store
+    console.log('[AppContent] 📊 Initializing app store...')
+    storeActions.initialize()
     
-    // Wait for next tick to ensure DOM is fully rendered
+    // Wait for DOM to be ready
     await nextTick()
     
-    // Initialize color palette system (app-wide)
-    console.log('[AppContent] About to call loadPalettes()...')
+    // PHASE 3: Initialize color palette system (now AppState is available)
+    console.log('[AppContent] 🎨 Loading color palettes...')
     try {
       await loadPalettes()
-      console.log('[AppContent] ✅ loadPalettes() completed successfully')
+      console.log('[AppContent] ✅ Color palettes loaded successfully')
     } catch (error) {
-      console.error('[AppContent] ❌ loadPalettes() failed:', error)
+      console.error('[AppContent] ❌ Color palette loading failed:', error)
     }
     
-    // Initialize app-level positioning systems
-    setFocalPointElement(focalPointRef.value)
-    setAimPointElement(aimPointRef.value)
+    // PHASE 4: Critical positioning systems now handled by reactive watchers
+    console.log('[AppContent] 🎯 Critical positioning systems handled by reactive watchers')
     
-    // BullsEye needs reference to scene container (get from SceneContainer component)
-    const sceneContainerElement = sceneContainerRef.value?.$refs?.sceneContainerRef
-    if (sceneContainerElement) {
-      bullsEye.initialize(bullsEyeRef.value, sceneContainerElement)
-    }
-    
-    // Initialize resume system (make controllers globally available)
+    // PHASE 5: Resume system (legacy during migration)
     console.log('[AppContent] 📋 Initializing resume system...')
     await initializeResumeSystem()
     
-    // Make test functions available for browser console testing
+    // Make debugging functions available
     window.testResumeSystem = testResumeSystem
     window.checkResumeDivs = checkResumeDivs
     window.testScrolling = testScrolling
     
-    // Setup keyboard event handling (app-level)
+    // PHASE 6: Global event handlers
     document.addEventListener('keydown', handleKeyDown)
     
-    console.log('[AppContent] ✅ App-level initialization complete!')
+    console.log('[AppContent] ✅ Vue 3 app initialization complete!')
     
   } catch (error) {
     console.error('[AppContent] ❌ App initialization failed:', error)
@@ -235,46 +273,10 @@ onUnmounted(() => {
 // REACTIVE UPDATES - Vue's native reactivity
 // =============================================================================
 
-// Watch for layout changes and update accordingly
+// Watch for layout changes via store
 watch(orientation, (newOrientation) => {
-  console.log(`[AppContent] Layout changed to: ${newOrientation}`)
-  console.log(`[AppContent] appContainerClass: ${appContainerClass.value}`)
-  console.log(`[AppContent] firstContainer: ${firstContainer.value}`)
-  console.log(`[AppContent] secondContainer: ${secondContainer.value}`)
-  console.log(`[AppContent] scenePercentage: ${scenePercentage.value}%`)
-  console.log(`[AppContent] resumePercentage: ${resumePercentage.value}%`)
-  
-  // Debug the DOM structure
-  setTimeout(() => {
-    const appContainer = document.getElementById('app-container');
-    const sceneContainer = document.getElementById('scene-container');
-    const resumeContainer = document.getElementById('resume-container');
-    const resizeHandle = document.getElementById('resize-handle');
-    
-    console.log('[AppContent] DOM DEBUG:');
-    console.log('  app-container classes:', appContainer?.className);
-    console.log('  scene-container classes:', sceneContainer?.className);
-    console.log('  scene-container computed order:', getComputedStyle(sceneContainer)?.order);
-    console.log('  resume-container classes:', resumeContainer?.className);
-    console.log('  resume-container computed order:', getComputedStyle(resumeContainer)?.order);
-    console.log('  resize-handle computed order:', getComputedStyle(resizeHandle)?.order);
-    
-    // Expected orders for scene-left: scene=1, handle=2, resume=3
-    // Expected orders for scene-right: resume=1, handle=2, scene=3
-    const expectedSceneOrder = newOrientation === 'scene-left' ? '1' : '3';
-    const expectedResumeOrder = newOrientation === 'scene-left' ? '3' : '1';
-    console.log(`[AppContent] Expected scene order: ${expectedSceneOrder}, actual: ${getComputedStyle(sceneContainer)?.order}`);
-    console.log(`[AppContent] Expected resume order: ${expectedResumeOrder}, actual: ${getComputedStyle(resumeContainer)?.order}`);
-  }, 100);
+  // Layout change handling without excessive logging
 }, { immediate: true })
-
-// Watch for AppState changes
-watch(appState, (newState) => {
-  if (newState) {
-    console.log('[AppContent] AppState updated:', newState.version)
-    // React to AppState changes
-  }
-}, { deep: true })
 
 </script>
 
@@ -291,14 +293,17 @@ watch(appState, (newState) => {
   position: relative;
 }
 
-/* Scene layout variations */
-#app-container.scene-left {
+/* =============================================================================
+   APP CONTAINER LAYOUT VARIATIONS
+   ============================================================================= */
+
+/* Common app-container styling regardless of orientation */
+#app-container {
   flex-direction: row !important;
+  /* Both scene-left and scene-right use same flex direction */
 }
 
-#app-container.scene-right {
-  flex-direction: row !important;
-}
+/* Orientation-specific container ordering is handled by individual components */
 
 /* Debug borders removed per user request */
 
@@ -348,16 +353,6 @@ watch(appState, (newState) => {
    CONTROL ELEMENTS STYLES
    ============================================================================= */
 
-#aim-point {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background: rgba(255, 0, 0, 0.8);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: var(--z-aim-point, 101);
-  transform: translate(-50%, -50%);
-}
 
 #bulls-eye {
   position: absolute;
@@ -394,11 +389,55 @@ watch(appState, (newState) => {
    VIEWER LABELS
    ============================================================================= */
 
-#resume-view-label {
+
+.viewer-label-div {
+  top: 461px;
   position: absolute;
   bottom: 9px;
   background: transparent;
-  color: black;
+  padding: 6px 10px;
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* =============================================================================
+   VIEWER LABEL CONSOLIDATED STYLING
+   ============================================================================= */
+
+/* Common base styling for all viewer labels */
+.viewer-label,
+.resume-viewer-label,
+.scene-viewer-label {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Resume viewer label (dark text with white drop shadow for light backgrounds) */
+.resume-viewer-label,
+.viewer-label.resume-viewer-label {
+  color: black !important;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9);
+}
+
+/* Scene viewer label (light text with dark shadow for dark backgrounds) */
+.scene-viewer-label,
+.viewer-label.scene-viewer-label {
+  color: white !important;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* Resume viewer label positioning - matches Scene viewer exactly */
+#resume-view-label {
+  position: absolute;
+  bottom: 5px;
+  background: transparent;
   padding: 6px 10px;
   border-radius: 6px;
   font-family: sans-serif;
@@ -406,24 +445,17 @@ watch(appState, (newState) => {
   font-weight: 600;
   pointer-events: none;
   z-index: 1000;
-  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.8);
+  color: black;
+  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9);
 }
 
-/* Position mirrored based on layout orientation */
-#app-container.scene-left #resume-view-label {
-  left: 10px; /* Resume on right when scene on left, label on left side */
+/* Position mirrored based on layout - opposite sides */
+.container-first #resume-view-label {
+  right: 10px; /* Resume on left, label on right side */
 }
 
-#app-container.scene-right #resume-view-label {
-  right: 10px; /* Resume on left when scene on right, label on right side */
-}
-
-.viewer-label {
-  font-family: sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.8);
-  white-space: nowrap;
+.container-second #resume-view-label {
+  left: 10px; /* Resume on right, label on left side */
 }
 
 /* =============================================================================
@@ -472,9 +504,6 @@ watch(appState, (newState) => {
     border-left-color: #fff;
   }
   
-  #aim-point {
-    background: #ff0000;
-  }
   
   #bulls-eye {
     color: #00ffff;

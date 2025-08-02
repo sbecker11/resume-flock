@@ -17,7 +17,7 @@ import { jobs } from '../../static_content/jobs/jobs.mjs';
 // Import fundamental components to ensure they're registered with IM
 // import '../core/jobsDataManager.mjs'; // No longer exists - using Vue composables
 // import '../core/colorPaletteManager.mjs'; // No longer exists - using Vue composables
-import { badgeManager } from '../core/badgeManager.mjs';
+// Badge manager removed - badges now handled per-cDiv in useCardsController
 // import * as BizDetailsDivModule from '../scene/bizDetailsDivModule.mjs'; // Module doesn't exist - needs to be recreated
 import * as utils from '../utils/utils.mjs';
 
@@ -1583,7 +1583,7 @@ class ResumeListController extends BaseComponent {
    * Set up badge mode listener
    */
   _setupBadgeModeListener() {
-    badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged.bind(this));
+    // Badge manager removed - badges now handled per-cDiv in useCardsController
   }
   
   /**

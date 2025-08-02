@@ -13,9 +13,8 @@
         <Timeline :alignment="timelineAlignment" />
         <!-- BizCardDivs will be dynamically appended here by CardsController -->
       </div>
-      <!-- Skill badges and connection lines overlays -->
-      <!-- <SkillBadges /> DISABLED - using per-cDiv badges instead -->
-      <ConnectionLines />
+      <!-- Skill badges are now created per-cDiv in useCardsController -->
+      <!-- ConnectionLines removed during Vue 3 migration cleanup -->
     </div>
     <div id="scene-view-label">
       <span class="viewer-label">Scene Viewer ({{ roundedScenePercentage }}%)</span>
@@ -24,23 +23,23 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 
 // Vue components
 import Timeline from './Timeline.vue'
-// import SkillBadges from './SkillBadges.vue' // DISABLED - using per-cDiv badges
-import ConnectionLines from './ConnectionLines.vue'
+// SkillBadges removed - badges now created per-cDiv in useCardsController
+// ConnectionLines removed during Vue 3 migration cleanup
 
 // Scene-specific composables
 import { useCardsController } from '../composables/useCardsController.mjs'
 import { useTimeline } from '../composables/useTimeline.mjs'
-import { useFocalPoint } from '../composables/useFocalPoint.mjs'
-import { useAimPoint } from '../composables/useAimPoint.mjs'
+import { useFocalPoint } from '../composables/useFocalPointVue3.mjs'
+// useAimPoint removed during Vue 3 migration cleanup
 import { useViewport } from '../composables/useViewport.mjs'
 
-// Core functionality
-import { bullsEye } from '../core/bullsEye.mjs'
-import * as scenePlaneModule from '../scene/scenePlaneModule.mjs'
+// Legacy imports removed - now using Vue 3 composables
+// import { bullsEye } from '../core/bullsEye.mjs' - replaced by useBullsEyeVue3
+// import * as scenePlaneModule from '../scene/scenePlaneModule.mjs' - integrated into Vue composables
 
 // Props from parent AppContent
 const props = defineProps({
@@ -52,20 +51,46 @@ const props = defineProps({
 })
 
 // Computed properties
-const roundedScenePercentage = computed(() => Math.round(props.scenePercentage))
+const roundedScenePercentage = computed(() => {
+  const rounded = Math.round(props.scenePercentage)
+  return rounded
+})
 
-// Template refs
+// Template refs with reactive watchers
 const sceneContainerRef = ref(null)
 const sceneContentRef = ref(null)
 const scenePlaneRef = ref(null)
+
+// Make template refs reactive - watch for changes and update dependents
+watch(sceneContainerRef, (newRef) => {
+  if (newRef) {
+    console.log('[SceneContainer] sceneContainerRef became available')
+    initializeViewport(newRef)
+  }
+}, { immediate: true })
+
+watch(sceneContentRef, (newRef) => {
+  if (newRef) {
+    console.log('[SceneContainer] sceneContentRef became available')
+    // Notify other systems that scene-content is available
+    window.dispatchEvent(new CustomEvent('scene-content-ready', { detail: { element: newRef } }))
+  }
+}, { immediate: true })
+
+watch(scenePlaneRef, (newRef) => {
+  if (newRef) {
+    console.log('[SceneContainer] scenePlaneRef became available')
+    // Notify cards controller that scene-plane is available
+    window.dispatchEvent(new CustomEvent('scene-plane-ready', { detail: { element: newRef } }))
+  }
+}, { immediate: true })
 
 // Scene-specific composables
 const { timelineHeight } = useTimeline()
 const { initializeCardsController } = useCardsController()
 
-// Focal point and aim point systems
+// Focal point system (aim point removed)
 const { setFocalPointElement } = useFocalPoint()
-const { setAimPointElement } = useAimPoint()
 const { initializeViewport } = useViewport()
 
 // Event handlers
@@ -87,14 +112,13 @@ onMounted(async () => {
       document.documentElement.style.setProperty('--timeline-height', `${timelineHeight.value}px`)
     }
     
-    // Initialize scene-specific systems (these will get refs from parent)
-    initializeViewport(sceneContainerRef.value)
+    // Viewport initialization now handled by reactive watcher
     
     // Initialize business cards controller
     await initializeCardsController()
     
-    // Initialize scene plane click handling for selection clearing
-    await scenePlaneModule.initialize()
+    // Scene plane initialization now handled by Vue composables
+    // await scenePlaneModule.initialize() - replaced by Vue 3 composables
     
     console.log('[SceneContainer] ✅ Scene initialization complete!')
     
@@ -274,11 +298,5 @@ defineExpose({
   left: 10px; /* Scene on right, label on left side */
 }
 
-.viewer-label {
-  font-family: sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
-}
+/* .viewer-label styling consolidated in AppContent.vue */
 </style>

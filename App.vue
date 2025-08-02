@@ -12,17 +12,14 @@
   </Suspense>
 </template>
 
-<script>
-import AppContent from '@/modules/components/AppContent.vue';
+<script setup>
+import AppContent from '@/modules/components/AppContent.vue'
+import { provideAppContext } from '@/modules/composables/useAppContext.mjs'
 
-// Vue composables are imported where needed - no global registration required
+// Provide app-wide context at the root level
+const { appContext } = provideAppContext()
 
-export default {
-  name: 'App',
-  components: {
-    AppContent
-  }
-};
+console.log('[App] Vue 3 app context provided')
 </script>
 
 <style>

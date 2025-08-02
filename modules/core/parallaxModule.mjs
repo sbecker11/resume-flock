@@ -109,7 +109,14 @@ function getViewportOrigin() {
 }
 
 function getFocalPointPosition() {
-  return useFocalPoint().position.value;
+  // Access focal point position from global window object instead of composable
+  // This avoids calling Vue composable outside of setup context
+  if (window.focalPoint && window.focalPoint.getPosition) {
+    return window.focalPoint.getPosition();
+  }
+  
+  // Fallback: get from global state or use default
+  return window.appState?.focalPoint || { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 }
 
 function calculateParallaxDisplacements() {

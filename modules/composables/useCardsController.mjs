@@ -1,8 +1,9 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { jobs } from '@/static_content/jobs/jobs.mjs'
 import { selectionManager } from '@/modules/core/selectionManager.mjs'
 import { useTimeline, initialize } from '@/modules/composables/useTimeline.mjs'
 import { useColorPalette, applyPaletteToElement, readyPromise } from '@/modules/composables/useColorPalette.mjs'
+import { useBadgeToggle } from '@/modules/composables/useBadgeToggle.mjs'
 import * as dateUtils from '@/modules/utils/dateUtils.mjs'
 import { createBizCardDivId } from '@/modules/utils/bizCardUtils.mjs'
 import { linearInterp } from '@/modules/utils/mathUtils.mjs'
@@ -23,6 +24,9 @@ export function useCardsController() {
     
     // Get color palette functions
     const { colorPalettes, currentPaletteFilename } = useColorPalette()
+    
+    // Get badge toggle state
+    const { isBadgesVisible } = useBadgeToggle()
 
     async function initializeCardsController() {
         console.log('[DEBUG] initializeCardsController called, isInitialized:', isInitialized.value)
@@ -60,22 +64,34 @@ export function useCardsController() {
             
             // Create business cards for each job
             const cards = []
+            console.log(`[CardsController] Creating ${jobs.length} business cards...`)
             for (let index = 0; index < jobs.length; index++) {
                 const job = jobs[index]
+                console.log(`[CardsController] Creating card ${index} for ${job.employer}`)
                 const card = createBizCardDiv(job, index, scenePlaneElement)
                 if (card) {
                     scenePlaneElement.appendChild(card)
                     cards.push(card)
+                    console.log(`[CardsController] Card ${index} created and appended - position: ${card.style.left}, ${card.style.top}`)
                     
                     // Apply color palette to the card
                     try {
+                        console.log(`[CardsController] About to apply palette to card ${index} with data-color-index: ${card.getAttribute('data-color-index')}`)
                         await applyPaletteToElement(card)
-                        // console.log(`[CardsController] Applied palette to job ${index}`)
+                        console.log(`[CardsController] ✅ Successfully applied palette to job ${index}`)
                     } catch (error) {
-                        console.warn(`[CardsController] Could not apply palette to job ${index}:`, error)
+                        console.warn(`[CardsController] ❌ Could not apply palette to job ${index}:`, error)
+                        // Apply fallback styling so card is still visible
+                        card.style.backgroundColor = '#f0f0f0';
+                        card.style.color = '#333';
+                        card.style.border = '1px solid #ccc';
+                        console.log(`[CardsController] Applied fallback styling to card ${index}`)
                     }
+                } else {
+                    console.warn(`[CardsController] Card creation failed for job ${index}`)
                 }
             }
+            console.log(`[CardsController] Total cards created: ${cards.length}`)
 
             bizCardDivs.value = cards
             
@@ -159,6 +175,7 @@ export function useCardsController() {
         // Position only - styling is handled by CSS
         card.style.left = `${x}px`
         card.style.top = `${y}px`
+        console.log(`[CardsController] Card ${jobNumber} positioned at x:${x}, y:${y}. Timeline initialized: ${timelineInitialized.value}`)
         
         // Calculate duration-based height (equivalent to setGeometry)
         try {
@@ -534,7 +551,7 @@ export function useCardsController() {
     
     function handleJobHovered(event) {
         const { jobNumber } = event.detail
-        console.log(`[useCardsController] Job hovered: ${jobNumber}`)
+        // console.log(`[useCardsController] Job hovered: ${jobNumber}`)
         
         // Clear previous hover states
         clearAllCardHovers()
@@ -544,12 +561,12 @@ export function useCardsController() {
         const card = document.getElementById(cardId)
         if (card && !card.classList.contains('selected')) {
             card.classList.add('hovered')
-            console.log(`[useCardsController] Applied hover to card: ${cardId}`)
+            // console.log(`[useCardsController] Applied hover to card: ${cardId}`)
         }
     }
     
     function handleHoverCleared(event) {
-        console.log('[useCardsController] Hover cleared, removing hover from all cards...')
+        // console.log('[useCardsController] Hover cleared, removing hover from all cards...')
         clearAllCardHovers()
     }
     
@@ -895,7 +912,7 @@ export function useCardsController() {
             bizCardBadgesDiv.style.top = `${relativeTop}px`
             bizCardBadgesDiv.style.marginLeft = '0px' // Reset since we're using absolute positioning
             
-            console.log(`📍 Positioned badges for job ${jobNumber} next to ${cloneElement ? 'clone' : 'original'} at (${relativeLeft}, ${relativeTop})`)
+            // console.log(`📍 Positioned badges for job ${jobNumber} next to ${cloneElement ? 'clone' : 'original'} at (${relativeLeft}, ${relativeTop})`)
         }
         
         // Add bizCardBadgesDiv container to scene-plane (not card) to avoid hiding when card is hidden
@@ -910,7 +927,14 @@ export function useCardsController() {
         // Show badges when card is selected, hide when not
         const showBadges = () => {
             console.log(`🟢 SHOWING badges for job ${jobNumber}`)
-            bizCardBadgesDiv.style.display = 'block'
+            // Respect global badge toggle state
+            if (isBadgesVisible.value) {
+                bizCardBadgesDiv.style.display = 'block'
+                console.log(`✅ Badges shown for job ${jobNumber} (global toggle: ON)`)
+            } else {
+                bizCardBadgesDiv.style.display = 'none'
+                console.log(`❌ Badges hidden for job ${jobNumber} (global toggle: OFF)`)
+            }
             
             // Update position to follow the card (especially important for clones)
             updateBadgePosition()
@@ -1019,10 +1043,24 @@ export function useCardsController() {
             hideBadgesWithObserver()
         })
         
+        // Watch for badge toggle changes - apply to currently selected card
+        watch(isBadgesVisible, (newValue) => {
+            console.log(`🔄 Badge toggle changed for job ${jobNumber}: ${newValue}`)
+            const isCurrentlySelected = selectionManager.getSelectedJobNumber() === jobNumber
+            if (isCurrentlySelected) {
+                console.log(`📋 Job ${jobNumber} is selected - ${newValue ? 'showing' : 'hiding'} badges`)
+                if (newValue) {
+                    showBadgesWithObserver()
+                } else {
+                    hideBadgesWithObserver()
+                }
+            }
+        })
+        
         // Add resize listeners to maintain badge position relative to clone
         const handleResize = () => {
             if (bizCardBadgesDiv.style.display === 'block') {
-                console.log(`📐 Resize detected - updating badge position for job ${jobNumber}`)
+                // console.log(`📐 Resize detected - updating badge position for job ${jobNumber}`)
                 updateBadgePosition()
             }
         }

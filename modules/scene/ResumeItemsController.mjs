@@ -6,7 +6,7 @@ import { selectionManager } from '../core/selectionManager.mjs';
 // import { cardsController } from './CardsController.mjs'; // Now using Vue composable approach
 import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 // import { initializationManager } from '../core/initializationManager.mjs'; // IM framework no longer used
-import { badgeManager } from '../core/badgeManager.mjs';
+// Badge manager removed - badges now handled per-cDiv in useCardsController
 import { jobs } from '../../static_content/jobs/jobs.mjs';
 // No longer directly manipulating other managers
 // import { bizCardDivManager } from './bizCardDivManager.mjs';
@@ -310,7 +310,7 @@ class ResumeItemsController {
     }
 
     _setupBadgeModeListener() {
-        badgeManager.addEventListener('badgeModeChanged', this.handleBadgeModeChanged.bind(this));
+        // Badge manager removed - badges now handled per-cDiv in useCardsController
     }
 
     _setupColorPaletteListener() {
@@ -492,7 +492,7 @@ class ResumeItemsController {
             selectionManager.removeEventListener('selectionCleared', instance.handleSelectionCleared.bind(instance));
             selectionManager.removeEventListener('hoverChanged', instance.handleHoverChanged.bind(instance));
             selectionManager.removeEventListener('hoverCleared', instance.handleHoverCleared.bind(instance));
-            badgeManager.removeEventListener('badgeModeChanged', instance.handleBadgeModeChanged.bind(instance));
+            // Badge manager removed - no longer need to remove event listener
             window.removeEventListener('color-palette-changed', instance.handleColorPaletteChanged.bind(instance));
             
             // Clean up other resources

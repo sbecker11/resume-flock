@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue';
-import { useAppState } from './useAppState.mjs';
+import { useAppState } from './useAppState.ts';
+import { useAppStore } from '../stores/appStore.mjs';
 
 /**
  * Programmatic soft refresh - mimics what Cmd+R does
@@ -60,18 +61,20 @@ export function useLayoutToggle() {
   }
 
   console.log('[useLayoutToggle] *** CREATING NEW INSTANCE ***');
-  // Access centralized app state
+  // Access centralized app state and Vue store
   const { appState, updateAppState } = useAppState();
+  const { store, actions: storeActions } = useAppStore();
 
   // Add watcher to log when appState changes
   watch(() => appState.value?.layout?.scenePercentage, (newValue, oldValue) => {
     console.log(`[useLayoutToggle] *** appState.layout.scenePercentage changed: ${oldValue} -> ${newValue} ***`);
   }, { immediate: true });
 
-  // Reactive state - safely access appState with fallback
-  const storedOrientation = appState.value?.layout?.orientation;
-  
-  const orientation = ref(storedOrientation || 'scene-left');
+  // Get orientation from Vue store (this is what AppContent uses for rendering)
+  const orientation = computed({
+    get: () => store.orientation,
+    set: (value) => storeActions.setOrientation(value)
+  });
 
   // Computed properties
   const isSceneLeft = computed(() => orientation.value === 'scene-left');
@@ -101,12 +104,15 @@ export function useLayoutToggle() {
     const oldOrientation = orientation.value;
     const newOrientation = orientation.value === 'scene-left' ? 'scene-right' : 'scene-left';
     
+    console.log(`[useLayoutToggle] Toggling orientation: ${oldOrientation} -> ${newOrientation}`);
+    
     // Set transitioning state to prevent scene operations during layout change
     window.isLayoutTransitioning = true;
     
+    // Update Vue store (this will trigger AppContent re-render)
     orientation.value = newOrientation;
     
-    // Update appState
+    // Also update persistent AppState
     await updateAppState({
       layout: {
         orientation: newOrientation
