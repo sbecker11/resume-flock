@@ -19,6 +19,8 @@ const TIMELINE_PADDING_TOP = 0;
 export function useCardsController() {
     const isInitialized = ref(false)
     const bizCardDivs = ref([])
+    // Declare early to avoid TDZ when effects call functions that reference this variable
+    let scenePlaneElement = null
     
     // CRITICAL: Inject services - throw error if not provided (no fallbacks)
     const bullsEyeService = inject('bullsEyeService')
@@ -74,7 +76,7 @@ export function useCardsController() {
     const elementRegistry = injectGlobalElementRegistry()
     
     // Try to get scene-plane element via provide/inject or template refs
-    const scenePlaneElement = inject('scenePlaneElement', null)
+    scenePlaneElement = inject('scenePlaneElement', null)
 
     async function initializeCardsController() {
         console.log('[DEBUG] initializeCardsController called, isInitialized:', isInitialized.value)
