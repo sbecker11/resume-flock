@@ -21,7 +21,16 @@ const currentPaletteFilename = ref(null);
 export function useColorPalette() {
     // Access centralized app state
     const { appState, updateAppState } = useAppState();
-    const elementRegistry = injectGlobalElementRegistry();
+    
+    // DEFERRED: Inject when actually needed, not during setup
+    let elementRegistry = null;
+    
+    function getElementRegistry() {
+        if (!elementRegistry) {
+            elementRegistry = injectGlobalElementRegistry();
+        }
+        return elementRegistry;
+    }
 
     async function loadPalettes() {
         if (isLoading.value) return; // Don't reload if already loading
@@ -152,23 +161,24 @@ export function useColorPalette() {
                 }
             });
             
-            elementRegistry.clearAllCache();
+            getElementRegistry()?.clearAllCache();
             
             // Reapply palette to all elements using optimized element registry
-            const elements = elementRegistry.getAllElementsWithColorIndex();
+            const registry = getElementRegistry();
+            const elements = (registry && registry.getAllElementsWithColorIndex) ? registry.getAllElementsWithColorIndex() : [];
             for (const element of elements) {
                 await applyPaletteToElement(element);
             }
             
             // Apply palette to ALL rDivs and cDivs (including clones) using optimized queries
-            const allRDivs = elementRegistry.getAllBizResumeDivs();
+            const allRDivs = (registry && registry.getAllBizResumeDivs) ? registry.getAllBizResumeDivs() : [];
             for (const rDiv of allRDivs) {
                 if (rDiv.hasAttribute('data-color-index')) {
                     await applyPaletteToElement(rDiv);
                 }
             }
             
-            const allCDivs = elementRegistry.getAllBizCardDivs();
+            const allCDivs = (registry && registry.getAllBizCardDivs) ? registry.getAllBizCardDivs() : [];
             const clones = allCDivs.filter(cDiv => cDiv.id.includes('-clone'));
             console.log(`[ColorPalette] 🔍 Found ${allCDivs.length} total cDivs, ${clones.length} are clones`);
             if (clones.length > 0) {
@@ -225,23 +235,24 @@ export function useColorPalette() {
             });
         }
         
-        elementRegistry.clearAllCache();
+        const registry = getElementRegistry();
+        registry?.clearAllCache?.();
         
         // Reapply palette to all elements using optimized element registry
-        const elements = elementRegistry.getAllElementsWithColorIndex();
+        const elements = registry?.getAllElementsWithColorIndex?.() || [];
         for (const element of elements) {
             await applyPaletteToElement(element);
         }
         
         // Apply palette to ALL rDivs and cDivs (including clones) using optimized queries
-        const allRDivs = elementRegistry.getAllBizResumeDivs();
+        const allRDivs = registry?.getAllBizResumeDivs?.() || [];
         for (const rDiv of allRDivs) {
             if (rDiv.hasAttribute('data-color-index')) {
                 await applyPaletteToElement(rDiv);
             }
         }
         
-        const allCDivs = elementRegistry.getAllBizCardDivs();
+        const allCDivs = registry?.getAllBizCardDivs?.() || [];
         for (const cDiv of allCDivs) {
             if (cDiv.hasAttribute('data-color-index')) {
                 await applyPaletteToElement(cDiv);
@@ -261,23 +272,24 @@ export function useColorPalette() {
             });
         }
         
-        elementRegistry.clearAllCache();
+        const registry = getElementRegistry();
+        registry?.clearAllCache?.();
         
         // Reapply palette to all elements using optimized element registry
-        const elements = elementRegistry.getAllElementsWithColorIndex();
+        const elements = registry?.getAllElementsWithColorIndex?.() || [];
         for (const element of elements) {
             await applyPaletteToElement(element);
         }
         
         // Apply palette to ALL rDivs and cDivs (including clones) using optimized queries
-        const allRDivs = elementRegistry.getAllBizResumeDivs();
+        const allRDivs = registry?.getAllBizResumeDivs?.() || [];
         for (const rDiv of allRDivs) {
             if (rDiv.hasAttribute('data-color-index')) {
                 await applyPaletteToElement(rDiv);
             }
         }
         
-        const allCDivs = elementRegistry.getAllBizCardDivs();
+        const allCDivs = registry?.getAllBizCardDivs?.() || [];
         for (const cDiv of allCDivs) {
             if (cDiv.hasAttribute('data-color-index')) {
                 await applyPaletteToElement(cDiv);
@@ -321,10 +333,11 @@ export function useColorPalette() {
         root.style.setProperty('--background-light', darkerRgba);
         root.style.setProperty('--background-dark', darkestRgba);
 
-        elementRegistry.clearAllCache();
+        const registry = getElementRegistry();
+        registry?.clearAllCache?.();
         
         // Update elements with data-color-index using optimized element registry
-        const elements = elementRegistry.getAllElementsWithColorIndex();
+        const elements = registry?.getAllElementsWithColorIndex?.() || [];
         window.CONSOLE_LOG_IGNORE(`[ColorPalette] Found ${elements.length} elements with data-color-index to update`);
         
         for (const element of elements) {
@@ -342,7 +355,7 @@ export function useColorPalette() {
         }
         
         // Apply palette to ALL rDivs and cDivs (including clones) using optimized queries
-        const allRDivs = elementRegistry.getAllBizResumeDivs();
+        const allRDivs = registry?.getAllBizResumeDivs?.() || [];
         window.CONSOLE_LOG_IGNORE(`[ColorPalette] Found ${allRDivs.length} rDivs to check for color updates`);
         for (const rDiv of allRDivs) {
             if (rDiv.hasAttribute('data-color-index')) {
@@ -351,7 +364,7 @@ export function useColorPalette() {
             }
         }
         
-        const allCDivs = elementRegistry.getAllBizCardDivs();
+        const allCDivs = registry?.getAllBizCardDivs?.() || [];
         window.CONSOLE_LOG_IGNORE(`[ColorPalette] Found ${allCDivs.length} cDivs to check for color updates`);
         for (const cDiv of allCDivs) {
             if (cDiv.hasAttribute('data-color-index')) {
@@ -458,6 +471,7 @@ export async function applyPaletteToElement(element) {
     // Calculate base colors
     const backgroundColor = colorPalette[paletteColorIndex % colorPalette.length];
     const foregroundColor = colorUtils.getContrastingColor(backgroundColor);
+    
 
     // Get brightness factors from global state
     const systemConstants = appState.value["system-constants"];
@@ -594,7 +608,9 @@ export async function applyPaletteToElement(element) {
     element.style.setProperty('--data-selected-border-radius', borderSettings.selected.borderRadius);
 
 
-    // Don't apply inline styles - let CSS variables handle the styling
+    // Apply inline styles directly to ensure they work
+    element.style.backgroundColor = backgroundColor;
+    element.style.color = foregroundColor;
     // The normal state will be applied when needed by the state system
 }
 

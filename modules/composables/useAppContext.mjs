@@ -58,7 +58,11 @@ export function provideAppContext() {
   
   // Get a dependency (replaces IM getComponent)
   function getDependency(key) {
-    return appContext.dependencies.get(key)
+    const dependency = appContext.dependencies.get(key)
+    if (!dependency) {
+      throw new Error(`[AppContext] Dependency not found: ${key.description}`)
+    }
+    return dependency
   }
   
   // Initialize app context

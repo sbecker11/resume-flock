@@ -350,6 +350,220 @@ export function useBadgeToggle() {
 
 **Key insight**: This application's complexity emerges from the **interaction between systems**, not individual components. Understanding these critical dependencies is essential for maintaining system stability and implementing new features successfully.
 
+## 🚨 Fail-Fast Dependency Initialization Strategies
+
+The application implements a **multi-layered "Fail Fast" approach** with different strategies for different types of dependencies, ensuring that dependency problems are caught early in development while maintaining robustness in production.
+
+### **🚨 1. Immediate Fail-Fast Validation (Development Safety)**
+
+**Strategy**: Throw errors immediately when critical dependencies are missing
+**Location**: `modules/composables/useCardsController.mjs` lines 32-35
+
+```javascript
+// Fail fast - no fallbacks allowed per user requirement
+if (!bullsEyeService) throw new Error('[useCardsController] bullsEyeService not provided')
+if (!timelineService) throw new Error('[useCardsController] timelineService not provided')
+if (!colorPaletteService) throw new Error('[useCardsController] colorPaletteService not provided')
+if (!sceneContainerService) throw new Error('[useCardsController] sceneContainerService not provided')
+```
+
+**Benefits**:
+- ✅ **Immediate detection** of missing Vue Provide/Inject services
+- ✅ **Clear error messages** indicating exactly what's missing
+- ✅ **No silent failures** - problems surface immediately during development
+- ✅ **Forces proper dependency setup** in parent components
+
+### **🎯 2. Reactive Readiness Tracking (Smart Waiting)**
+
+**Strategy**: Reactive computed properties that track when dependencies are truly ready
+**Location**: `modules/composables/useCardsController.mjs` lines 38-50
+
+```javascript
+// CRITICAL: Reactive computed that tracks when dependencies are ready
+const allDependenciesReady = computed(() => {
+    const ready = bullsEyeService.isReady?.value && 
+                 timelineService.isReady?.value && 
+                 colorPaletteService.isReady?.value &&
+                 sceneContainerService.isReady?.value
+    
+    console.log('[useCardsController] Dependencies ready:', {
+        bullsEye: bullsEyeService.isReady?.value,
+        timeline: timelineService.isReady?.value,
+        colorPalette: colorPaletteService.isReady?.value,
+        sceneContainer: sceneContainerService.isReady?.value,
+        overall: ready
+    })
+    
+    return ready
+})
+```
+
+**Benefits**:
+- ✅ **Real-time readiness monitoring** with detailed logging
+- ✅ **Granular visibility** into which specific dependencies are/aren't ready
+- ✅ **Reactive coordination** - automatically proceeds when all deps are ready
+- ✅ **Debug-friendly** with comprehensive logging
+
+### **🏗️ 3. Service Readiness Declaration (Provider Contracts)**
+
+**Strategy**: Services declare their readiness state through standardized `isReady` properties
+**Location**: `modules/components/AppContent.vue` lines 139-163
+
+```javascript
+const bullsEyeService = {
+  isReady: computed(() => true), // Bulls-eye composable is ready when imported
+  setBullsEyeElement,
+  setSceneContainerElement
+}
+
+const timelineService = {
+  isReady: ref(true), // Mark ready immediately; CardsController will initialize timeline if needed
+}
+
+const colorPaletteService = {
+  isReady: computed(() => true), // Color palette composable is ready when loaded
+}
+
+const sceneContainerService = {
+  isReady: ref(true), // Mark ready immediately; CardsController retries if scene-plane isn't yet available
+}
+```
+
+**Benefits**:
+- ✅ **Standardized readiness interface** across all services
+- ✅ **Provider responsibility** - services control their own readiness declaration
+- ✅ **Vue reactivity integration** - uses computed/ref for automatic updates
+- ✅ **Consumer simplicity** - consumers just check `service.isReady.value`
+
+### **⏰ 4. Idempotent Initialization with Promises (Async Coordination)**
+
+**Strategy**: Single initialization with promise-based coordination
+**Location**: `modules/core/stateManager.mjs` lines 319-331
+
+```javascript
+let initStatePromise = null;
+
+export function initializeState() {
+    if (!initStatePromise) {  // Only initialize once
+        initStatePromise = loadState().then(state => {
+            AppState = state;
+            // ... initialization code
+        });
+    }
+    return initStatePromise;  // Return same promise for subsequent calls
+}
+```
+
+**Benefits**:
+- ✅ **Single initialization guarantee** - prevents double-initialization bugs
+- ✅ **Promise-based coordination** - multiple consumers can await readiness
+- ✅ **Race condition protection** - safe for concurrent access
+- ✅ **Predictable timing** - always returns the same promise
+
+### **🔄 5. Retry with Timeout (Graceful Recovery)**
+
+**Strategy**: Retry initialization if dependencies aren't ready, with timeout
+**Location**: `modules/composables/useCardsController.mjs` line 104
+
+```javascript
+let scenePlaneEl = scenePlaneElement || (elementRegistry && elementRegistry.getScenePlane && elementRegistry.getScenePlane())
+if (!scenePlaneEl) {
+    console.warn('[CardsController] scene-plane element not found, retrying...')
+    setTimeout(initializeCardsController, 500)  // Retry in 500ms
+    return
+}
+```
+
+**Benefits**:
+- ✅ **Handles timing edge cases** - DOM elements that aren't ready yet
+- ✅ **Automatic recovery** - doesn't require manual intervention
+- ✅ **Bounded retries** - prevents infinite loops
+- ✅ **Visible debugging** - logs retry attempts
+
+### **🛡️ 6. Safe Access Patterns (Runtime Protection)**
+
+**Strategy**: Null-safe access to dependencies that might not be initialized
+**Location**: Throughout `modules/composables/useCardsController.mjs`
+
+```javascript
+// Safe access with comprehensive null checking
+let scenePlaneEl = scenePlaneElement || (elementRegistry && elementRegistry.getScenePlane && elementRegistry.getScenePlane())
+
+// Safe method calls with existence checking  
+if (elementRegistry && elementRegistry.clearAllCache) elementRegistry.clearAllCache()
+```
+
+**Benefits**:
+- ✅ **Runtime robustness** - prevents crashes from timing issues
+- ✅ **Graceful degradation** - continues functioning with reduced capabilities
+- ✅ **Development safety** - won't crash during rapid development changes
+- ✅ **Production reliability** - handles edge cases in production
+
+### **👁️ 7. Template Ref Watchers (DOM Readiness)**
+
+**Strategy**: Watch for DOM element availability and register when ready
+**Location**: `modules/components/AppContent.vue` lines 216-237
+
+```javascript
+watch(focalPointRef, (newRef) => {
+  if (newRef) {
+    setFocalPointElement(newRef)
+    globalElementRegistry.registerElement('focal-point', newRef)
+  }
+}, { immediate: true })
+```
+
+**Benefits**:
+- ✅ **DOM timing coordination** - automatically detects when elements are mounted
+- ✅ **Immediate execution** - `{ immediate: true }` catches already-available refs
+- ✅ **Reactive registration** - automatically updates when refs change
+- ✅ **Centralized registry** - makes elements available to other components
+
+### **🎪 8. Global Singleton Coordination (Legacy Bridge)**
+
+**Strategy**: Store critical singletons globally for cross-component access
+**Location**: Throughout codebase
+
+```javascript
+// Store singleton instances globally
+window.selectionManager = selectionManager;
+window.resumeListController = this;
+
+// Access with fail-fast validation
+const globalSelectionManager = window.selectionManager
+if (!globalSelectionManager) {
+    console.error('❌ CRITICAL: window.selectionManager not available!')
+    return false  // or throw error in development
+}
+```
+
+**Benefits**:
+- ✅ **Cross-cutting coordination** - bridges Vue and legacy systems
+- ✅ **Explicit error messages** - clear debugging when singletons are missing
+- ✅ **Development visibility** - easy to inspect global state in dev tools
+- ✅ **Fallback coordination** - provides alternative access path
+
+### **📊 Strategy Summary by Use Case**
+
+| **Use Case** | **Strategy** | **When to Use** | **Fail-Fast Level** |
+|---|---|---|---|
+| **Critical Vue Services** | Immediate Throw + Reactive Tracking | Vue Provide/Inject dependencies | 🚨 **IMMEDIATE** |
+| **Async Resources** | Promise-based + Idempotent | File loading, network requests | ⏰ **COORDINATED** |
+| **DOM Elements** | Template Ref Watchers | When elements must exist before use | 👁️ **REACTIVE** |
+| **Timing Edge Cases** | Retry with Timeout | DOM not ready, race conditions | 🔄 **RECOVERY** |
+| **Legacy Integration** | Global Singletons + Validation | Cross-system communication | 🎪 **BRIDGED** |
+| **Runtime Safety** | Safe Access Patterns | Production robustness | 🛡️ **GRACEFUL** |
+
+### **🎯 Development vs Production Balance**
+
+The application cleverly balances **"Fail Fast" development** with **production robustness**:
+
+- **Development**: Immediate errors with detailed logging expose problems early
+- **Production**: Safe access patterns and retries prevent crashes from timing issues
+- **Both**: Reactive readiness tracking provides real-time visibility into system state
+
+This **layered approach** ensures that dependency problems are caught early in development while maintaining robustness in production, providing multiple fallback strategies for different types of initialization dependencies.
+
 ## Application Overview
 
 ![The flock](/static_content/graphics/version-0.6-50.gif)

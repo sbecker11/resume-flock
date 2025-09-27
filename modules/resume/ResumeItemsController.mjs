@@ -310,6 +310,8 @@ class ResumeItemsController {
         globalSelectionManager.addEventListener('selectionCleared', this.handleSelectionCleared.bind(this));
         globalSelectionManager.addEventListener('hoverChanged', this.handleHoverChanged.bind(this));
         globalSelectionManager.addEventListener('hoverCleared', this.handleHoverCleared.bind(this));
+        globalSelectionManager.addEventListener('resume-unhover', this.handleResumeUnhover.bind(this));
+        globalSelectionManager.addEventListener('resume-scrollIntoView', this.handleResumeScrollIntoView.bind(this));
         
         console.log(`[ResumeItemsController] ✅ Selection event listeners registered`);
     }
@@ -333,55 +335,247 @@ class ResumeItemsController {
         if (isSelected) {
             selectionManager.clearSelection('ResumeItemsController.handleBizResumeDivClickEvent');
         } else {
+            // Select the job
             selectionManager.selectJobNumber(jobNumber, 'ResumeItemsController.handleBizResumeDivClickEvent');
+            
+            // Scroll the rDiv into view in its parent container
+            this._scrollRDivIntoView(bizResumeDiv, jobNumber);
         }
     }
 
     handleMouseEnterEvent(bizResumeDiv) {
         if (!bizResumeDiv) return;
         const jobNumber = parseInt(bizResumeDiv.getAttribute('data-job-number'), 10);
+        console.log(`🖱️ [ResumeItemsController] MOUSE ENTER: job ${jobNumber}`);
         
-        
+        // Use SelectionManager for synchronized hover
         selectionManager.hoverJobNumber(jobNumber, 'ResumeItemsController.handleMouseEnterEvent');
     }
 
     handleMouseLeaveEvent(bizResumeDiv) {
         if (!bizResumeDiv) return;
+        const jobNumber = parseInt(bizResumeDiv.getAttribute('data-job-number'), 10);
+        console.log(`🖱️ [ResumeItemsController] MOUSE LEAVE: job ${jobNumber}`);
+        
+        // Use SelectionManager for synchronized hover
         selectionManager.clearHover('ResumeItemsController.handleMouseLeaveEvent');
+    }
+
+    /**
+     * Scroll the rDiv (BizResumeDiv) into view within its parent container
+     * Ensures all header fields of the bizResumeDetailsDiv are visible with comfortable spacing from top
+     * @param {HTMLElement} bizResumeDiv - The resume div element to scroll into view
+     * @param {number} jobNumber - The job number for logging/debugging
+     */
+    _scrollRDivIntoView(bizResumeDiv, jobNumber) {
+        if (!bizResumeDiv) {
+            console.warn(`[ResumeItemsController] Cannot scroll rDiv into view - element not found for job ${jobNumber}`);
+            return;
+        }
+
+        console.log(`[ResumeItemsController] Scrolling rDiv header into view for job ${jobNumber}`);
+
+        // Find the header section within the rDiv
+        const headerDiv = bizResumeDiv.querySelector('.resume-header');
+        if (!headerDiv) {
+            console.warn(`[ResumeItemsController] No header found in rDiv for job ${jobNumber}, using fallback scroll`);
+            this._fallbackScrollIntoView(bizResumeDiv, jobNumber);
+            return;
+        }
+
+        // Find the scrollable container (infinite scroll container or parent)
+        const scrollContainer = this._findScrollContainer(bizResumeDiv);
+        if (!scrollContainer) {
+            console.warn(`[ResumeItemsController] No scroll container found for job ${jobNumber}, using fallback scroll`);
+            this._fallbackScrollIntoView(bizResumeDiv, jobNumber);
+            return;
+        }
+
+        // Calculate optimal scroll position to show header with comfortable spacing
+        const COMFORTABLE_TOP_SPACING = 20; // pixels from top edge
+        
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const headerRect = headerDiv.getBoundingClientRect();
+        
+        // Calculate how much we need to scroll to position header properly
+        const currentScrollTop = scrollContainer.scrollTop;
+        const headerOffsetFromContainerTop = headerRect.top - containerRect.top;
+        const targetScrollTop = currentScrollTop + headerOffsetFromContainerTop - COMFORTABLE_TOP_SPACING;
+
+        // Smooth scroll to the calculated position
+        scrollContainer.scrollTo({
+            top: Math.max(0, targetScrollTop), // Don't scroll negative
+            behavior: 'smooth'
+        });
+
+        console.log(`[ResumeItemsController] Scrolled to position ${Math.round(targetScrollTop)} to show header for job ${jobNumber}`);
+    }
+
+    /**
+     * Find the scrollable container for the rDiv
+     * @param {HTMLElement} bizResumeDiv - The resume div element
+     * @returns {HTMLElement|null} The scrollable container
+     */
+    _findScrollContainer(bizResumeDiv) {
+        // First try to find the infinite scroller's scrollport
+        let current = bizResumeDiv.parentElement;
+        while (current) {
+            if (current.classList.contains('infinite-scroll-container') || 
+                current.style.overflowY === 'auto' || 
+                current.style.overflowY === 'scroll' ||
+                current.id === 'resume-container') {
+                return current;
+            }
+            current = current.parentElement;
+        }
+        
+        // Fallback to resume container or document element
+        return document.getElementById('resume-container') || document.documentElement;
+    }
+
+    /**
+     * Fallback scrolling method using standard scrollIntoView
+     * @param {HTMLElement} bizResumeDiv - The resume div element
+     * @param {number} jobNumber - The job number for logging
+     */
+    _fallbackScrollIntoView(bizResumeDiv, jobNumber) {
+        try {
+            bizResumeDiv.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start', // Position at start with some natural spacing
+                inline: 'nearest'
+            });
+            console.log(`[ResumeItemsController] Fallback scroll successful for job ${jobNumber}`);
+        } catch (error) {
+            console.error(`[ResumeItemsController] Failed to scroll rDiv into view for job ${jobNumber}:`, error);
+        }
     }
 
     handleHoverChanged(event) {
         const { hoveredJobNumber, caller } = event.detail;
-
-        // Clear previous hovers first (always, even for selected items to maintain coordination)
-        this.handleHoverCleared({ detail: { caller: 'handleHoverChanged' } });
+        console.log(`🖱️ [ResumeItemsController] handleHoverChanged: job ${hoveredJobNumber}, caller: ${caller}`);
 
         // Skip applying hover styling to selected items, but allow event coordination to proceed
         if (selectionManager.getSelectedJobNumber() === hoveredJobNumber) {
-            window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController: Skipping hover styling for selected item ${hoveredJobNumber}, but allowing coordination`);
+            console.log(`🖱️ [ResumeItemsController] Skipping hover styling for selected item ${hoveredJobNumber}`);
             return;
         }
 
-        const bizResumeDiv = this.getBizResumeDivByJobNumber(hoveredJobNumber);
-        if (bizResumeDiv) {
-            bizResumeDiv.classList.add('hovered');
-            
-            // Apply hover state styling using the new system
-            bizResumeDiv.classList.add('hovered');
-            
+        // Clear previous hovers first (but don't trigger events to avoid loops)
+        this.bizResumeDivs.forEach(div => {
+            this._clearHoverStyles(div);
+        });
 
+        const bizResumeDiv = this.getBizResumeDivByJobNumber(hoveredJobNumber);
+        console.log(`🖱️ [ResumeItemsController] Found rDiv for job ${hoveredJobNumber}:`, !!bizResumeDiv);
+        if (bizResumeDiv) {
+            this._applyHoverStyles(bizResumeDiv);
+            console.log(`🖱️ [ResumeItemsController] Applied hover styles to rDiv for job ${hoveredJobNumber}`);
+            
+            // Debug: Check computed styles
+            const computedStyle = window.getComputedStyle(bizResumeDiv);
+            console.log(`🖱️ [ResumeItemsController] rDiv computed background-color:`, computedStyle.backgroundColor);
+        } else {
+            console.error(`❌ [ResumeItemsController] Could not find rDiv for job ${hoveredJobNumber}`);
         }
+    }
+    
+    _applyHoverStyles(bizResumeDiv) {
+        // Apply hover styles using CSS custom properties
+        const hoveredBgColor = bizResumeDiv.getAttribute('data-background-color-hovered');
+        const hoveredFgColor = bizResumeDiv.getAttribute('data-foreground-color-hovered');
+        const hoveredPadding = bizResumeDiv.getAttribute('data-hovered-padding');
+        const hoveredInnerBorderWidth = bizResumeDiv.getAttribute('data-hovered-inner-border-width');
+        const hoveredInnerBorderColor = bizResumeDiv.getAttribute('data-hovered-inner-border-color');
+        const hoveredOuterBorderWidth = bizResumeDiv.getAttribute('data-hovered-outer-border-width');
+        const hoveredOuterBorderColor = bizResumeDiv.getAttribute('data-hovered-outer-border-color');
+        const hoveredBorderRadius = bizResumeDiv.getAttribute('data-hovered-border-radius');
+        
+        if (hoveredBgColor) {
+            bizResumeDiv.style.setProperty('--data-background-color-hovered', hoveredBgColor);
+        }
+        if (hoveredFgColor) {
+            bizResumeDiv.style.setProperty('--data-foreground-color-hovered', hoveredFgColor);
+        }
+        if (hoveredPadding) {
+            bizResumeDiv.style.setProperty('--data-hovered-padding', hoveredPadding);
+        }
+        if (hoveredInnerBorderWidth) {
+            bizResumeDiv.style.setProperty('--data-hovered-inner-border-width', hoveredInnerBorderWidth);
+        }
+        if (hoveredInnerBorderColor) {
+            bizResumeDiv.style.setProperty('--data-hovered-inner-border-color', hoveredInnerBorderColor);
+        }
+        if (hoveredOuterBorderWidth) {
+            bizResumeDiv.style.setProperty('--data-hovered-outer-border-width', hoveredOuterBorderWidth);
+        }
+        if (hoveredOuterBorderColor) {
+            bizResumeDiv.style.setProperty('--data-hovered-outer-border-color', hoveredOuterBorderColor);
+        }
+        if (hoveredBorderRadius) {
+            bizResumeDiv.style.setProperty('--data-hovered-border-radius', hoveredBorderRadius);
+        }
+        
+        // Add hovered class for CSS rule to apply
+        bizResumeDiv.classList.add('hovered');
+    }
+    
+    _clearHoverStyles(bizResumeDiv) {
+        // Restore normal styles using CSS custom properties
+        const normalBgColor = bizResumeDiv.getAttribute('data-background-color');
+        const normalFgColor = bizResumeDiv.getAttribute('data-foreground-color');
+        const normalPadding = bizResumeDiv.getAttribute('data-normal-padding');
+        const normalInnerBorderWidth = bizResumeDiv.getAttribute('data-normal-inner-border-width');
+        const normalInnerBorderColor = bizResumeDiv.getAttribute('data-normal-inner-border-color');
+        const normalOuterBorderWidth = bizResumeDiv.getAttribute('data-normal-outer-border-width');
+        const normalOuterBorderColor = bizResumeDiv.getAttribute('data-normal-outer-border-color');
+        const normalBorderRadius = bizResumeDiv.getAttribute('data-normal-border-radius');
+        
+        if (normalBgColor) {
+            bizResumeDiv.style.setProperty('--data-background-color', normalBgColor);
+        }
+        if (normalFgColor) {
+            bizResumeDiv.style.setProperty('--data-foreground-color', normalFgColor);
+        }
+        if (normalPadding) {
+            bizResumeDiv.style.setProperty('--data-normal-padding', normalPadding);
+        }
+        if (normalInnerBorderWidth) {
+            bizResumeDiv.style.setProperty('--data-normal-inner-border-width', normalInnerBorderWidth);
+        }
+        if (normalInnerBorderColor) {
+            bizResumeDiv.style.setProperty('--data-normal-inner-border-color', normalInnerBorderColor);
+        }
+        if (normalOuterBorderWidth) {
+            bizResumeDiv.style.setProperty('--data-normal-outer-border-width', normalOuterBorderWidth);
+        }
+        if (normalOuterBorderColor) {
+            bizResumeDiv.style.setProperty('--data-normal-outer-border-color', normalOuterBorderColor);
+        }
+        if (normalBorderRadius) {
+            bizResumeDiv.style.setProperty('--data-normal-border-radius', normalBorderRadius);
+        }
+        
+        // Remove hovered class
+        bizResumeDiv.classList.remove('hovered');
     }
 
     handleHoverCleared(event) {
         const { caller } = event.detail;
         this.bizResumeDivs.forEach(div => {
-            div.classList.remove('hovered');
-            // Reset to normal state (only if not selected)
-            if (!div.classList.contains('selected')) {
-                div.classList.remove('hovered', 'selected');
-            }
+            this._clearHoverStyles(div);
         });
+    }
+
+    handleResumeUnhover(event) {
+        const { jobNumber } = event.detail;
+        console.log(`🖱️ [ResumeItemsController] handleResumeUnhover: job ${jobNumber}`);
+        
+        const bizResumeDiv = this.getBizResumeDivByJobNumber(jobNumber);
+        if (bizResumeDiv) {
+            this._clearHoverStyles(bizResumeDiv);
+            console.log(`🖱️ [ResumeItemsController] Cleared hover styles from rDiv for job ${jobNumber}`);
+        }
     }
 
     handleSelectionChanged(event) {
@@ -479,18 +673,42 @@ class ResumeItemsController {
         this._triggerHeightRecalculation('[DEBUG] ResumeItemsController.handleSelectionCleared: Triggered height recalculation');
     }
 
+    /**
+     * Handle resume-scrollIntoView command events from SelectionManager
+     * This is triggered when a cDiv clone is clicked and needs to scroll the corresponding rDiv
+     */
+    handleResumeScrollIntoView(event) {
+        const { jobNumber } = event.detail;
+        console.log(`🖱️ [ResumeItemsController] RECEIVED resume-scrollIntoView command for job ${jobNumber}`);
+        
+        // Find the rDiv for this job
+        const rDiv = this.bizResumeDivs.find(div => {
+            const divJobNumber = parseInt(div.getAttribute('data-job-number'));
+            return divJobNumber === jobNumber;
+        });
+        
+        if (rDiv) {
+            console.log(`🖱️ [ResumeItemsController] Found rDiv for job ${jobNumber}, calling scroll`);
+            this._scrollRDivIntoView(rDiv, jobNumber);
+        } else {
+            console.error(`❌ [ResumeItemsController] Could not find rDiv for job ${jobNumber}`);
+        }
+    }
+
     handleColorPaletteChanged(event) {
         const { filename, paletteName, previousFilename } = event.detail;
         
         window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleColorPaletteChanged: Palette changed from ${previousFilename} to ${filename} (${paletteName})`);
         
         // Apply new palette to all resume divs and their children
-        this.bizResumeDivs.forEach(div => {
+        this.bizResumeDivs.forEach(async (div) => {
             if (div) {
                 // Apply palette to the div itself and all elements with data-color-index within it
-                applyPaletteToElement(div);
+                await applyPaletteToElement(div);
                 const colorElements = div.querySelectorAll('[data-color-index]');
-                colorElements.forEach(applyPaletteToElement);
+                for (const element of colorElements) {
+                    await applyPaletteToElement(element);
+                }
             }
         });
         
@@ -509,6 +727,7 @@ class ResumeItemsController {
             globalSelectionManager.removeEventListener('selectionCleared', instance.handleSelectionCleared.bind(instance));
             globalSelectionManager.removeEventListener('hoverChanged', instance.handleHoverChanged.bind(instance));
             globalSelectionManager.removeEventListener('hoverCleared', instance.handleHoverCleared.bind(instance));
+            globalSelectionManager.removeEventListener('resume-unhover', instance.handleResumeUnhover.bind(instance));
             window.removeEventListener('color-palette-changed', instance.handleColorPaletteChanged.bind(instance));
             
             // Clean up other resources

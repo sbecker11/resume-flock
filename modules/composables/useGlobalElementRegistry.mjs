@@ -261,19 +261,37 @@ export function useGlobalElementRegistry() {
   }
 }
 
-// Provider function for dependency injection
+// Create global registry instance (called from main.ts)
+export function createGlobalElementRegistry() {
+  return useGlobalElementRegistry()
+}
+
+// Provider function for dependency injection (now uses global instance)
 export function provideGlobalElementRegistry() {
+  // Check if global registry exists first
+  if (typeof window !== 'undefined' && window.globalElementRegistry) {
+    provide(GLOBAL_ELEMENT_REGISTRY_KEY, window.globalElementRegistry)
+    return window.globalElementRegistry
+  }
+  
+  // Fallback: create new instance (shouldn't happen after main.ts setup)
   const registry = useGlobalElementRegistry()
   provide(GLOBAL_ELEMENT_REGISTRY_KEY, registry)
   return registry
 }
 
-// Injector function for dependency injection
+// Injector function for dependency injection (now uses global instance as fallback)
 export function injectGlobalElementRegistry() {
+  // First try Vue's inject system
   const registry = inject(GLOBAL_ELEMENT_REGISTRY_KEY, null)
-  if (!registry) {
-    console.warn('[GlobalElementRegistry] ⚠️ Registry not provided, creating fallback instance')
-    return useGlobalElementRegistry()
+  if (registry) {
+    return registry
   }
-  return registry
+  
+  // Fallback to global window instance (eliminates timing issues)
+  if (typeof window !== 'undefined' && window.globalElementRegistry) {
+    return window.globalElementRegistry
+  }
+  
+  throw new Error('[GlobalElementRegistry] Registry not available! Ensure main.ts creates global registry.')
 }

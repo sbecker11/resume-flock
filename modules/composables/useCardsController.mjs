@@ -56,14 +56,23 @@ export function useCardsController() {
     const timelineComposable = useTimeline()
     const { getPositionForDate, getDateForPosition, isInitialized: timelineInitialized } = timelineComposable
 
-    // CRITICAL: Auto-initialize when all dependencies become ready
-    watchEffect(() => {
-        if (allDependenciesReady.value && !isInitialized.value) {
-            console.log('[useCardsController] All dependencies ready, initializing cards...')
-            
-            // Initialize cards controller
-            initializeCardsController()
+    // EVENT-DRIVEN: Auto-initialize when scene-plane is ready (proper dependency order)
+    onMounted(() => {
+        // Listen for scene-plane-ready event to initialize when ScenePlane dependency is satisfied
+        const handleScenePlaneReady = () => {
+            if (!isInitialized.value && allDependenciesReady.value) {
+                console.log('[useCardsController] Scene-plane ready and all dependencies ready, initializing cards...')
+                initializeCardsController()
+            }
         }
+        
+        // Wait for scene-plane-ready event (proper dependency ordering)
+        window.addEventListener('scene-plane-ready', handleScenePlaneReady)
+        
+        // Cleanup listener on unmount
+        onUnmounted(() => {
+            window.removeEventListener('scene-plane-ready', handleScenePlaneReady)
+        })
     })
     
     // Get color palette functions
@@ -72,16 +81,15 @@ export function useCardsController() {
     // Optimized card registry (replaces document.getElementById calls)
     const cardRegistry = useCardRegistry()
     
-    // Global element registry for optimized DOM access
-    const elementRegistry = injectGlobalElementRegistry()
+    // Element registry - now globally available from main.ts
+    const elementRegistry = injectGlobalElementRegistry();
     
     // Try to get scene-plane element via provide/inject or template refs
     scenePlaneElement = inject('scenePlaneElement', null)
 
     async function initializeCardsController() {
-        console.log('[DEBUG] initializeCardsController called, isInitialized:', isInitialized.value)
         if (isInitialized.value) {
-            console.log('[DEBUG] Already initialized, returning early')
+            console.log('[CardsController] Already initialized, skipping')
             return
         }
 
@@ -97,18 +105,12 @@ export function useCardsController() {
             // Get the scene plane element via optimized registry
             let scenePlaneEl = scenePlaneElement || elementRegistry.getScenePlane()
             if (!scenePlaneEl) {
-                // Last resort fallback
-                console.warn('[CardsController] Scene plane not available in registry, retrying...')
-                if (!scenePlaneEl) {
-                    console.warn('[CardsController] scene-plane element not found, retrying...')
-                    setTimeout(initializeCardsController, 500)
-                    return
-                }
+                console.error('[CardsController] Scene plane not available - this should not happen with event-driven initialization')
+                return
             }
 
             // Clear any existing cards
             const existingCards = scenePlaneEl.querySelectorAll('.biz-card-div')
-            console.log(`[DEBUG] Found ${existingCards.length} existing cards to remove`)
             existingCards.forEach(card => card.remove())
 
             // Wait for palettes to be ready before applying colors
@@ -536,11 +538,17 @@ export function useCardsController() {
             return false
         }
         
-        // Listen for selection events to handle clone creation
+        // Listen for selection events to handle clone creation (legacy)
         try {
             selectionManager.addEventListener('job-selected', handleJobSelected)
             selectionManager.addEventListener('selection-cleared', handleSelectionCleared)
             console.log('[useCardsController] ✅ Added job-selected and selection-cleared listeners')
+            
+            // Listen for new command-based events
+            selectionManager.addEventListener('cards-select', handleCardsSelect)
+            selectionManager.addEventListener('cards-unselect', handleCardsUnselect)
+            selectionManager.addEventListener('cards-scrollIntoView', handleCardsScrollIntoView)
+            console.log('[useCardsController] ✅ Added command-based event listeners')
             console.log('[useCardsController] handleJobSelected type:', typeof handleJobSelected)
             
             // Listen for hover events to handle cDiv visual feedback
@@ -660,11 +668,11 @@ export function useCardsController() {
         let scenePlaneEl = scenePlaneElement || elementRegistry.getScenePlane()
         if (!scenePlaneEl) return
         
-        // Add a test element to verify this function ran
-        const testEl = document.createElement('div')
-        testEl.id = 'pre-creation-test'
-        testEl.textContent = 'Pre-creation ran'
-        document.body.appendChild(testEl)
+        // // Add a debug element to verify this function ran
+        // const debugEl = document.createElement('div')
+        // debugEl.id = 'pre-creation-debug'
+        // debugEl.textContent = 'Pre-creation ran'
+        // document.body.appendChild(debugEl)
         
         // Pre-create clones for all jobs
         for (let jobNumber = 0; jobNumber < jobs.length; jobNumber++) {
@@ -752,11 +760,11 @@ export function useCardsController() {
                 console.warn(`[preCreateAllClones] ❌ Failed to apply palette to clone ${jobNumber}:`, error)
             }
             
-            // Add click handler for deselection
+            // Add click handler to select this job (triggers rDiv scroll)
             clone.addEventListener('click', (event) => {
                 event.stopPropagation()
                 if (selectionManager) {
-                    selectionManager.clearSelection('Clone.click')
+                    selectionManager.selectJobNumber(jobNumber, 'Clone.click')
                 }
             })
             
@@ -765,15 +773,16 @@ export function useCardsController() {
         
         // Clones pre-created
         
-        // Clear element registry cache
+        // Clear element registry cache  
         elementRegistry.clearAllCache()
     }
 
     // Clone management functions
     function handleJobSelected(event) {
-        console.log(`[CardsController] 🎯 handleJobSelected CALLED!`, event.detail)
+        console.log(`[CardsController] 🎯 handleJobSelected RECEIVED EVENT!`, event.detail)
         const { jobNumber, previousSelection, source } = event.detail
         console.log(`[CardsController] Processing selection for job ${jobNumber} from source: ${source}`)
+        console.log(`[CardsController] Event received at:`, new Date().toISOString())
         
         // Hide previous selection if exists
         if (previousSelection !== null && previousSelection !== jobNumber) {
@@ -781,32 +790,67 @@ export function useCardsController() {
             showJobOriginal(previousSelection)
         }
         
-        // Show current selection (cDiv clone)
+        // Show current selection (cDiv clone) - create if doesn't exist
         hideJobOriginal(jobNumber)
-        showJobClone(jobNumber)
         
-        // Implement bidirectional scrolling with header targeting
-        if (source && source.includes('ResumeListController')) {
-            // rDiv was selected → scroll cDiv header into view
-            console.log(`[CardsController] 📜 rDiv selected → scrolling cDiv header for job ${jobNumber}`)
-            setTimeout(() => {
-                scrollCDivHeaderIntoView(jobNumber)
-            }, 100)
-        } else if (source && source.includes('CardsController')) {
-            // cDiv was selected → scroll rDiv header into view
-            console.log(`[CardsController] 📜 cDiv selected → scrolling rDiv header for job ${jobNumber}`)
-            setTimeout(() => {
-                scrollRDivHeaderIntoView(jobNumber)
-            }, 100)
-        } else if (source && source !== 'CardsController') {
-            // Other source → scroll cDiv (backward compatibility)
-            console.log(`[CardsController] 📜 Other source → scrolling cDiv header for job ${jobNumber}`)
-            setTimeout(() => {
-                scrollCDivHeaderIntoView(jobNumber)
-            }, 100)
+        // Check if clone exists, create if needed
+        const cloneId = `biz-card-div-${jobNumber}-clone`
+        if (!document.getElementById(cloneId)) {
+            console.log(`[CardsController] Creating clone for job ${jobNumber}`)
+            // Create clone and scroll after it's created
+            createSelectedClone(jobNumber).then(() => {
+                console.log(`[CardsController] 📜 Scrolling cDiv header for newly created clone ${jobNumber}`)
+                setTimeout(() => {
+                    scrollCDivHeaderIntoView(jobNumber)
+                }, 100)
+            })
         } else {
-            console.log(`[CardsController] 📜 No scroll needed - source: ${source}`)
+            console.log(`[CardsController] Showing existing clone for job ${jobNumber}`)
+            showJobClone(jobNumber)
+            
+            // Scroll existing clone into view
+            console.log(`[CardsController] 📜 Scrolling existing cDiv header for job ${jobNumber}`)
+            setTimeout(() => {
+                scrollCDivHeaderIntoView(jobNumber)
+            }, 100)
         }
+        
+        // OLD CODE (commented out to prevent conflicts):
+        // const { jobNumber, previousSelection, source } = event.detail
+        // console.log(`[CardsController] Processing selection for job ${jobNumber} from source: ${source}`)
+        // 
+        // // Hide previous selection if exists
+        // if (previousSelection !== null && previousSelection !== jobNumber) {
+        //     hideJobClone(previousSelection)
+        //     showJobOriginal(previousSelection)
+        // }
+        // 
+        // // Show current selection (cDiv clone)
+        // hideJobOriginal(jobNumber)
+        // showJobClone(jobNumber)
+        // 
+        // // Implement bidirectional scrolling with header targeting
+        // if (source && source.includes('ResumeListController')) {
+        //     // rDiv was selected → scroll cDiv header into view
+        //     console.log(`[CardsController] 📜 rDiv selected → scrolling cDiv header for job ${jobNumber}`)
+        //     setTimeout(() => {
+        //         scrollCDivHeaderIntoView(jobNumber)
+        //     }, 100)
+        // } else if (source && source.includes('CardsController')) {
+        //     // cDiv was selected → scroll rDiv header into view
+        //     console.log(`[CardsController] 📜 cDiv selected → scrolling rDiv header for job ${jobNumber}`)
+        //     setTimeout(() => {
+        //         scrollRDivHeaderIntoView(jobNumber)
+        //     }, 100)
+        // } else if (source && source !== 'CardsController') {
+        //     // Other source → scroll cDiv (backward compatibility)
+        //     console.log(`[CardsController] 📜 Other source → scrolling cDiv header for job ${jobNumber}`)
+        //     setTimeout(() => {
+        //         scrollCDivHeaderIntoView(jobNumber)
+        //     }, 100)
+        // } else {
+        //     console.log(`[CardsController] 📜 No scroll needed - source: ${source}`)
+        // }
     }
     
     function handleSelectionCleared(event) {
@@ -818,12 +862,12 @@ export function useCardsController() {
     
     function handleJobHovered(event) {
         const { jobNumber } = event.detail
-        // console.log(`[useCardsController] Job hovered: ${jobNumber}`)
+        console.log(`🖱️ [useCardsController] Job hovered: ${jobNumber}`)
         
         // Clear previous hover states
         clearAllCardHovers()
         
-        // Apply hover class to the corresponding cDiv using card registry
+        // Apply hover styles to the corresponding cDiv using card registry
         let card = cardRegistry.getCardElement(jobNumber)
         if (!card) {
             // Fallback to DOM query during migration period
@@ -831,9 +875,89 @@ export function useCardsController() {
             card = document.getElementById(cardId)
         }
         if (card && !card.classList.contains('selected')) {
-            card.classList.add('hovered')
-            // console.log(`[useCardsController] Applied hover to card: ${card.id}`)
+            applyHoverStylesToCard(card)
+            console.log(`🖱️ [useCardsController] Applied hover styles to card: ${card.id}`)
         }
+    }
+    
+    function applyHoverStylesToCard(card) {
+        // Apply hover styles using CSS custom properties (same approach as rDiv)
+        const hoveredBgColor = card.getAttribute('data-background-color-hovered');
+        const hoveredFgColor = card.getAttribute('data-foreground-color-hovered');
+        const hoveredPadding = card.getAttribute('data-hovered-padding');
+        const hoveredInnerBorderWidth = card.getAttribute('data-hovered-inner-border-width');
+        const hoveredInnerBorderColor = card.getAttribute('data-hovered-inner-border-color');
+        const hoveredOuterBorderWidth = card.getAttribute('data-hovered-outer-border-width');
+        const hoveredOuterBorderColor = card.getAttribute('data-hovered-outer-border-color');
+        const hoveredBorderRadius = card.getAttribute('data-hovered-border-radius');
+        
+        if (hoveredBgColor) {
+            card.style.setProperty('--data-background-color-hovered', hoveredBgColor);
+        }
+        if (hoveredFgColor) {
+            card.style.setProperty('--data-foreground-color-hovered', hoveredFgColor);
+        }
+        if (hoveredPadding) {
+            card.style.setProperty('--data-hovered-padding', hoveredPadding);
+        }
+        if (hoveredInnerBorderWidth) {
+            card.style.setProperty('--data-hovered-inner-border-width', hoveredInnerBorderWidth);
+        }
+        if (hoveredInnerBorderColor) {
+            card.style.setProperty('--data-hovered-inner-border-color', hoveredInnerBorderColor);
+        }
+        if (hoveredOuterBorderWidth) {
+            card.style.setProperty('--data-hovered-outer-border-width', hoveredOuterBorderWidth);
+        }
+        if (hoveredOuterBorderColor) {
+            card.style.setProperty('--data-hovered-outer-border-color', hoveredOuterBorderColor);
+        }
+        if (hoveredBorderRadius) {
+            card.style.setProperty('--data-hovered-border-radius', hoveredBorderRadius);
+        }
+        
+        // Add hovered class for CSS rule to apply
+        card.classList.add('hovered');
+    }
+    
+    function clearHoverStylesFromCard(card) {
+        // Restore normal styles using CSS custom properties
+        const normalBgColor = card.getAttribute('data-background-color');
+        const normalFgColor = card.getAttribute('data-foreground-color');
+        const normalPadding = card.getAttribute('data-normal-padding');
+        const normalInnerBorderWidth = card.getAttribute('data-normal-inner-border-width');
+        const normalInnerBorderColor = card.getAttribute('data-normal-inner-border-color');
+        const normalOuterBorderWidth = card.getAttribute('data-normal-outer-border-width');
+        const normalOuterBorderColor = card.getAttribute('data-normal-outer-border-color');
+        const normalBorderRadius = card.getAttribute('data-normal-border-radius');
+        
+        if (normalBgColor) {
+            card.style.setProperty('--data-background-color', normalBgColor);
+        }
+        if (normalFgColor) {
+            card.style.setProperty('--data-foreground-color', normalFgColor);
+        }
+        if (normalPadding) {
+            card.style.setProperty('--data-normal-padding', normalPadding);
+        }
+        if (normalInnerBorderWidth) {
+            card.style.setProperty('--data-normal-inner-border-width', normalInnerBorderWidth);
+        }
+        if (normalInnerBorderColor) {
+            card.style.setProperty('--data-normal-inner-border-color', normalInnerBorderColor);
+        }
+        if (normalOuterBorderWidth) {
+            card.style.setProperty('--data-normal-outer-border-width', normalOuterBorderWidth);
+        }
+        if (normalOuterBorderColor) {
+            card.style.setProperty('--data-normal-outer-border-color', normalOuterBorderColor);
+        }
+        if (normalBorderRadius) {
+            card.style.setProperty('--data-normal-border-radius', normalBorderRadius);
+        }
+        
+        // Remove hovered class
+        card.classList.remove('hovered');
     }
     
     function handleHoverCleared(event) {
@@ -845,10 +969,10 @@ export function useCardsController() {
         let scenePlaneEl = scenePlaneElement || elementRegistry.getScenePlane()
         if (!scenePlaneEl) return
         
-        // Remove hover class from all cards
+        // Clear hover styles from all cards
         const allCards = scenePlaneEl.querySelectorAll('.biz-card-div')
         allCards.forEach(card => {
-            card.classList.remove('hovered')
+            clearHoverStylesFromCard(card)
         })
     }
     
@@ -956,13 +1080,21 @@ export function useCardsController() {
         const cardId = createBizCardDivId(jobNumber)
         console.log(`[useCardsController] SCROLL: Looking for card with ID: ${cardId}`)
         
-        // Always scroll to the original card's timeline position, not the clone
-        let card = cardRegistry.getCardElement(jobNumber)
-        if (!card) {
-            card = document.getElementById(cardId)
-            console.log(`[useCardsController] SCROLL: Card not in registry, found via getElementById:`, !!card)
+        // Check if there's a selected clone first, otherwise use original
+        const cloneId = `${cardId}-clone`
+        let card = document.getElementById(cloneId)
+        
+        if (card) {
+            console.log(`[useCardsController] SCROLL: Found CLONE for scrolling:`, cloneId)
         } else {
-            console.log(`[useCardsController] SCROLL: Card found in registry:`, !!card)
+            // No clone, use original card
+            card = cardRegistry.getCardElement(jobNumber)
+            if (!card) {
+                card = document.getElementById(cardId)
+                console.log(`[useCardsController] SCROLL: No clone, using original via getElementById:`, !!card)
+            } else {
+                console.log(`[useCardsController] SCROLL: No clone, using original from registry:`, !!card)
+            }
         }
         
         if (!card) {
@@ -1431,13 +1563,11 @@ export function useCardsController() {
             }
         }, 10) // Small delay to ensure DOM updates are complete
         
-        // Add click handler to clone for deselection
+        // Add click handler to clone to select this job (triggers rDiv scroll)
         clone.addEventListener('click', (event) => {
-            console.log(`🖱️ [useCardsController] Clone clicked: clearing selection`)
-            console.log(`🖱️ Clone click event:`, event)
             event.stopPropagation() // Prevent bubbling to scene-plane
             if (selectionManager) {
-                selectionManager.clearSelection('Clone.click')
+                selectionManager.selectJobNumber(jobNumber, 'Clone.click')
             }
         })
         

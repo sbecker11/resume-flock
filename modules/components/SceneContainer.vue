@@ -52,8 +52,15 @@ const props = defineProps({
   timelineAlignment: String
 })
 
-// Global element registry for optimized DOM access
-const globalElementRegistry = injectGlobalElementRegistry()
+// Global element registry for optimized DOM access (deferred)
+let globalElementRegistry = null;
+
+function getElementRegistry() {
+  if (!globalElementRegistry) {
+    globalElementRegistry = injectGlobalElementRegistry();
+  }
+  return globalElementRegistry;
+}
 
 // Computed properties - use direct percentage values like AppContent.vue
 const roundedScenePercentage = computed(() => {
@@ -86,8 +93,12 @@ watch(sceneContainerRef, (newRef) => {
     // Integration with optimized scene plane system
     setSceneContainerElement(newRef)
     
-    // Register in global element registry
-    globalElementRegistry.registerElement('scene-container', newRef)
+    // Register in global element registry (safely)
+    try {
+      getElementRegistry().registerElement('scene-container', newRef)
+    } catch (error) {
+      console.log('[SceneContainer] Registry not ready yet for scene-container, will register later')
+    }
   }
 }, { immediate: true })
 
@@ -100,8 +111,12 @@ watch(sceneContentRef, (newRef) => {
     // Integration with optimized scene plane system
     setSceneContentElement(newRef)
     
-    // Register in global element registry
-    globalElementRegistry.registerElement('scene-content', newRef)
+    // Register in global element registry (safely)
+    try {
+      getElementRegistry().registerElement('scene-content', newRef)
+    } catch (error) {
+      console.log('[SceneContainer] Registry not ready yet for scene-content, will register later')
+    }
   }
 }, { immediate: true })
 
@@ -114,8 +129,12 @@ watch(scenePlaneRef, (newRef) => {
     // Integration with optimized scene plane system (already handled by useScenePlaneOptimized)
     setScenePlaneElement(newRef)
     
-    // Register in global element registry
-    globalElementRegistry.registerElement('scene-plane', newRef)
+    // Register in global element registry (safely)
+    try {
+      getElementRegistry().registerElement('scene-plane', newRef)
+    } catch (error) {
+      console.log('[SceneContainer] Registry not ready yet for scene-plane, will register later')
+    }
   }
 }, { immediate: true })
 
@@ -130,6 +149,7 @@ watch(elementCounts, (newCounts) => {
 
 // Scene-specific composables
 const { timelineHeight } = useTimeline()
+// Cards controller will auto-initialize when scene-plane-ready event fires
 const { initializeCardsController } = useCardsController()
 
 // Focal point system (aim point removed)
@@ -148,6 +168,11 @@ const handleScenePlaneClick = (event) => {
     selectionManager.clearSelection("SceneContainer.handleScenePlaneClick")
   } else {
     console.log('[SceneContainer] Scene plane child element clicked:', event.target.id)
+    // If it's a clone, don't interfere - let the clone handle its own click
+    if (event.target.id.includes('-clone')) {
+      console.log('[SceneContainer] Clone detected - NOT interfering with click')
+      return // Let the clone handle the click
+    }
   }
 }
 
@@ -167,8 +192,8 @@ onMounted(async () => {
     
     // Viewport initialization now handled by reactive watcher
     
-    // Initialize business cards controller
-    await initializeCardsController()
+    // Cards controller will auto-initialize when scene-plane-ready event fires
+    // No manual initialization needed here
     
     // Scene plane initialization now handled by Vue composables
     // await scenePlaneModule.initialize() - replaced by Vue 3 composables

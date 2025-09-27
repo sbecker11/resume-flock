@@ -302,8 +302,8 @@ function selectPrevious() {
     overflow-x: hidden; /* Prevent horizontal scrolling on individual rDivs */
     
     /* Default state styling using CSS variables */
-    background-color: var(--data-background-color, #666666) !important;
-    color: var(--data-foreground-color, #ffffff) !important;
+    background-color: var(--data-background-color) !important;
+    color: var(--data-foreground-color) !important;
     padding: var(--data-normal-padding);
     border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
     outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);

@@ -47,6 +47,8 @@ import SceneContainer from './SceneContainer.vue'
 import ResizeHandle from './ResizeHandle.vue'
 import ResumeContainer from './ResumeContainer.vue'
 
+// Global element registry now provided from main.ts - no need to provide again
+
 // Vue 3 architecture - pure Vue patterns with critical systems preserved
 import { useAppContext } from '../composables/useAppContext.mjs'
 import { useAppStore } from '../stores/appStore.mjs'
@@ -123,13 +125,11 @@ const {
 // Vue 3 keyboard navigation (replaces legacy keyDownModule)
 const keyboardNavigation = useKeyboardNavigation()
 
+// Global element registry already provided above
+
 // Optimized card registry system (replaces DOM queries)
 import { useCardRegistry } from '../composables/useCardRegistry.mjs'
 const cardRegistry = useCardRegistry()
-
-// Global element registry for optimized DOM access
-import { provideGlobalElementRegistry } from '../composables/useGlobalElementRegistry.mjs'
-const globalElementRegistry = provideGlobalElementRegistry()
 
 // CRITICAL: Provide Vue 3 services required by useCardsController reactive dependencies
 console.log('[AppContent] 📦 Providing Vue 3 services for reactive dependencies...')
@@ -216,14 +216,14 @@ const focalPointRef = ref(null)
 watch(focalPointRef, (newRef) => {
   if (newRef) {
     setFocalPointElement(newRef)
-    globalElementRegistry.registerElement('focal-point', newRef)
+    window.globalElementRegistry.registerElement('focal-point', newRef)
   }
 }, { immediate: true })
 
 watch(bullsEyeRef, (newRef) => {
   if (newRef) {
     setBullsEyeElement(newRef)
-    globalElementRegistry.registerElement('bulls-eye', newRef)
+    window.globalElementRegistry.registerElement('bulls-eye', newRef)
   }
 }, { immediate: true })
 
@@ -298,7 +298,7 @@ onMounted(async () => {
     await nextTick() // Wait for DOM to be ready
     const appContainer = document.getElementById('app-container')
     if (appContainer) {
-      globalElementRegistry.registerElement('app-container', appContainer)
+      window.globalElementRegistry.registerElement('app-container', appContainer)
       console.log('[AppContent] 📋 Registered app-container in global element registry')
     }
     

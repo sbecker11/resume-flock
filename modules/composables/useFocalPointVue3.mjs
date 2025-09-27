@@ -20,7 +20,20 @@ const CROSSHAIR_CURSOR = 'url(\'/static_content/icons/x-hairs/icons8-accuracy-32
 export function useFocalPoint() {
   const { store, actions } = useAppStore()
   const appContext = useAppContext()
-  const elementRegistry = injectGlobalElementRegistry()
+  
+  // Lazy-initialize elementRegistry to avoid hard refresh timing issues
+  let elementRegistry = null;
+  const getElementRegistry = () => {
+    if (!elementRegistry) {
+      try {
+        elementRegistry = injectGlobalElementRegistry();
+      } catch (error) {
+        console.warn('[useFocalPoint] Element registry not available yet, using null');
+        return null;
+      }
+    }
+    return elementRegistry;
+  };
   
   // Use provide/inject for bulls-eye service
   const bullsEye = useBullsEyeService()
@@ -188,7 +201,8 @@ export function useFocalPoint() {
   
   // Cursor management for drag mode
   function applyCrosshairCursor() {
-    const sceneContainer = elementRegistry.getSceneContainer()
+    const registry = getElementRegistry();
+    const sceneContainer = (registry && registry.getSceneContainer) ? registry.getSceneContainer() : null
     if (sceneContainer) {
       sceneContainer.style.setProperty('cursor', CROSSHAIR_CURSOR, 'important')
       const elements = sceneContainer.querySelectorAll('*')
@@ -199,7 +213,8 @@ export function useFocalPoint() {
   }
   
   function removeCrosshairCursor() {
-    const sceneContainer = elementRegistry.getSceneContainer()
+    const registry = getElementRegistry();
+    const sceneContainer = (registry && registry.getSceneContainer) ? registry.getSceneContainer() : null
     if (sceneContainer) {
       sceneContainer.style.removeProperty('cursor')
       const elements = sceneContainer.querySelectorAll('*')

@@ -225,6 +225,19 @@ window.LOG_JOB(2, 'test log on startup');
 import './styles/core.css'; // Import core styles for BullsEye and other components
 // Debug scripts moved to /tmp during Vue 3 migration cleanup
 
+// Create global element registry BEFORE anything else
+import { createGlobalElementRegistry } from './modules/composables/useGlobalElementRegistry.mjs';
+
+// TypeScript declaration for global registry
+declare global {
+  interface Window {
+    globalElementRegistry: ReturnType<typeof createGlobalElementRegistry>;
+  }
+}
+
+window.globalElementRegistry = createGlobalElementRegistry();
+console.log('[main.ts] ✅ Global element registry created and attached to window');
+
 import { createApp } from 'vue';
 // @ts-ignore
 import App from './App.vue';

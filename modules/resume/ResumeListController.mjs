@@ -219,16 +219,8 @@ class ResumeListController extends BaseComponent {
 
         // Visual selection is now handled by SelectionManager - no need to call deprecated method
         
-        // Handle scrolling - this is the single scroll operation
-        if (caller.includes('initialize')) {
-            // During initialization, allow delayed scroll for proper setup
-            setTimeout(() => {
-                this.scrollToJobNumberWithSpacing(selectedJobNumber, `ResumeListController.handleSelectionChanged from ${caller}`);
-            }, 500);
-        } else {
-            // For direct selections (like clicking a cDiv), scroll immediately
-            this.scrollToJobNumberWithSpacing(selectedJobNumber, `ResumeListController.handleSelectionChanged from ${caller}`);
-        }
+        // Scrolling is now handled by individual components (ResumeItemsController for rDiv clicks)
+        // No centralized scrolling needed here as click events handle their own scroll-into-view
     }
 
     handleSelectionCleared(event) {
@@ -248,50 +240,11 @@ class ResumeListController extends BaseComponent {
         console.log(`[DEBUG] ResumeListController.handleJobSelected: jobNumber=${jobNumber}, source=${source}`);
         console.log(`[DEBUG] About to call enhanced scrolling for job ${jobNumber}`);
         
-        // Handle rDiv scrolling for bidirectional scrolling with proper header positioning
-        if (jobNumber !== null && jobNumber !== undefined) {
-            this.scrollToJobNumberWithSpacing(jobNumber, `ResumeListController.handleJobSelected from ${source}`);
-        } else {
-            console.log(`[DEBUG] jobNumber is null/undefined, not scrolling`);
-        }
+        // rDiv scrolling is now handled by ResumeItemsController when rDivs are clicked
+        // No centralized scrolling needed here
     }
 
-    /**
-     * Enhanced scroll method with comfortable spacing for header visibility
-     */
-    scrollToJobNumberWithSpacing(jobNumber, caller = '') {
-        console.log(`[DEBUG] scrollToJobNumberWithSpacing: jobNumber=${jobNumber} from: ${caller}`);
-        
-        // Find the rDiv for this job number
-        const targetDiv = this.bizResumeDivs?.find(div => {
-            const divJobNumber = parseInt(div.getAttribute('data-job-number'), 10);
-            return divJobNumber === jobNumber;
-        });
 
-        if (targetDiv) {
-            console.log(`[DEBUG] Found target rDiv for job ${jobNumber}`);
-            
-            const scrollContainer = this.resumeContentWrapper;
-            const targetRect = targetDiv.getBoundingClientRect();
-            const containerRect = scrollContainer.getBoundingClientRect();
-            
-            console.log(`[DEBUG] Target top: ${targetRect.top}, Container top: ${containerRect.top}, Current scroll: ${scrollContainer.scrollTop}`);
-            
-            // Calculate position to place rDiv 20px from container top for optimal header visibility
-            const desiredPosition = scrollContainer.scrollTop + (targetRect.top - containerRect.top) - 20;
-            
-            console.log(`[DEBUG] Desired scroll position: ${desiredPosition}`);
-            
-            scrollContainer.scrollTo({
-                top: desiredPosition,
-                behavior: 'smooth'
-            });
-            
-            console.log(`[DEBUG] Scroll command executed for job ${jobNumber}`);
-        } else {
-            console.warn(`[ResumeListController] Could not find rDiv for job number ${jobNumber}`);
-        }
-    }
 
     /**
      * Handle new selection-cleared events for bidirectional scrolling  
