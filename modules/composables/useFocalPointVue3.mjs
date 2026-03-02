@@ -21,19 +21,16 @@ export function useFocalPoint() {
   const { store, actions } = useAppStore()
   const appContext = useAppContext()
   
-  // Lazy-initialize elementRegistry to avoid hard refresh timing issues
+  // Resolve registry once during setup (inject() only valid here); use in nextTick/callbacks
   let elementRegistry = null;
-  const getElementRegistry = () => {
-    if (!elementRegistry) {
-      try {
-        elementRegistry = injectGlobalElementRegistry();
-      } catch (error) {
-        console.warn('[useFocalPoint] Element registry not available yet, using null');
-        return null;
-      }
+  try {
+    elementRegistry = injectGlobalElementRegistry();
+  } catch (e) {
+    if (typeof window !== 'undefined' && window.globalElementRegistry) {
+      elementRegistry = window.globalElementRegistry;
     }
-    return elementRegistry;
-  };
+  }
+  const getElementRegistry = () => elementRegistry;
   
   // Use provide/inject for bulls-eye service
   const bullsEye = useBullsEyeService()
@@ -85,10 +82,11 @@ export function useFocalPoint() {
     element.style.visibility = (store.focalPoint.x > 0 && store.focalPoint.y > 0) ? 'visible' : 'hidden'
   }
   
-  // Set focal point position
+  // Set focal point position (floor at 0 to prevent negative coords)
   function setPosition(x, y, source = 'api') {
-    actions.setFocalPoint(x, y)
-    // console.log(`[FocalPoint] Position set to (${x}, ${y}) from ${source}`)
+    const safeX = Math.max(0, x)
+    const safeY = Math.max(0, y)
+    actions.setFocalPoint(safeX, safeY)
   }
   
   // Set target position with easing
@@ -141,22 +139,52 @@ export function useFocalPoint() {
     animate()
   }
   
+  const FOCAL_POINT_EDGE_MARGIN = 30
+
+  /** Clamp point to stay within left column (scene) bounds, >= 10px from edges */
+  function clampToLeftColumn(mouseX, mouseY) {
+    const leftColumn = typeof document !== 'undefined' && document.getElementById('scene-container')
+    if (!leftColumn) {
+      const w = typeof window !== 'undefined' ? window.innerWidth : 0
+      const h = typeof window !== 'undefined' ? window.innerHeight : 0
+      const m = FOCAL_POINT_EDGE_MARGIN
+      return {
+        x: Math.max(m, Math.min(w - m, mouseX)),
+        y: Math.max(m, Math.min(h - m, mouseY))
+      }
+    }
+    const rect = leftColumn.getBoundingClientRect()
+    const m = FOCAL_POINT_EDGE_MARGIN
+    const minX = Math.min(rect.left + m, rect.right - m)
+    const maxX = Math.max(rect.left + m, rect.right - m)
+    const minY = Math.min(rect.top + m, rect.bottom - m)
+    const maxY = Math.max(rect.top + m, rect.bottom - m)
+    const x = Math.max(minX, Math.min(maxX, mouseX))
+    const y = Math.max(minY, Math.min(maxY, mouseY))
+    return {
+      x: Math.max(0, x),
+      y: Math.max(0, y)
+    }
+  }
+
   // Pure vanilla JS handler for buttery smooth follow mode (same as drag)
   function createVanillaFollowHandler() {
     return (event) => {
       if (!focalPointElement.value) return
-      
+
+      const { x, y } = clampToLeftColumn(event.clientX, event.clientY)
+
       // PURE VANILLA JS: Direct DOM manipulation for maximum performance
       const element = focalPointElement.value
-      element.style.left = `${event.clientX}px`
-      element.style.top = `${event.clientY}px`
-      
+      element.style.left = `${x}px`
+      element.style.top = `${y}px`
+
       // Update store values for parallax system (minimal overhead)
-      actions.setFocalPoint(event.clientX, event.clientY)
-      
+      actions.setFocalPoint(x, y)
+
       // Dispatch event for parallax system
       window.dispatchEvent(new CustomEvent('focal-point-changed', {
-        detail: { x: event.clientX, y: event.clientY }
+        detail: { x, y }
       }))
     }
   }
@@ -165,7 +193,8 @@ export function useFocalPoint() {
   function createMouseHandler() {
     return (event) => {
       if (isDragging.value) {
-        setPosition(event.clientX, event.clientY, 'mouse-dragging')
+        const { x, y } = clampToLeftColumn(event.clientX, event.clientY)
+        setPosition(x, y, 'mouse-dragging')
         updateElementPosition()
       }
     }
@@ -242,45 +271,34 @@ export function useFocalPoint() {
     }
   }
   
-  // Watch for mode changes - restored tri-state functionality
+  // Watch for mode changes - restored tri-state functionality (defer DOM work so scene-container can exist)
   watch(mode, (newMode, oldMode) => {
     console.log(`[FocalPoint] Mode changed: ${oldMode} -> ${newMode}`)
-    
-    // Remove existing mouse listener
     removeMouseListener()
-    
-    if (newMode === FOCALPOINT_MODES.DRAGGING) {
-      // DRAG MODE: Hide focal point element, show crosshair cursor
-      if (focalPointElement.value) {
-        focalPointElement.value.style.display = 'none'
-      }
-      applyCrosshairCursor()
-      addMouseListener()
-      
-    } else if (newMode === FOCALPOINT_MODES.FOLLOWING) {
-      // FOLLOW MODE: Show focal point element, add vanilla JS mouse listener
-      if (focalPointElement.value) {
-        focalPointElement.value.style.display = 'flex'
-      }
-      removeCrosshairCursor()
-      addMouseListener() // Uses vanilla JS handler for buttery smoothness
-      
-    } else { // LOCKED MODE
-      // LOCKED MODE: Show focal point element, no mouse listener
-      if (focalPointElement.value) {
-        focalPointElement.value.style.display = 'flex'
-      }
-      removeCrosshairCursor()
-      
-      // Move focal point to current bulls-eye position immediately using provide/inject
-      if (bullsEye && bullsEye.isReady()) {
-        const bullsEyePos = bullsEye.getPosition()
-        console.log(`[FocalPoint] Locked mode activated - moving to bulls-eye at (${bullsEyePos.x}, ${bullsEyePos.y})`)
-        setTarget(bullsEyePos.x, bullsEyePos.y, 'mode-locked')
+
+    function runModeActions() {
+      if (newMode === FOCALPOINT_MODES.DRAGGING) {
+        if (focalPointElement.value) focalPointElement.value.style.display = 'none'
+        applyCrosshairCursor()
+        addMouseListener()
+      } else if (newMode === FOCALPOINT_MODES.FOLLOWING) {
+        if (focalPointElement.value) focalPointElement.value.style.display = 'flex'
+        removeCrosshairCursor()
+        addMouseListener()
       } else {
-        console.warn('[FocalPoint] Bulls-eye service not available via provide/inject')
+        if (focalPointElement.value) focalPointElement.value.style.display = 'flex'
+        removeCrosshairCursor()
+        const ready = bullsEye && (typeof bullsEye.isReady === 'function' ? bullsEye.isReady() : (bullsEye.isReady?.value ?? false))
+        const pos = bullsEye && (typeof bullsEye.getPosition === 'function' ? bullsEye.getPosition() : (bullsEye.x != null && bullsEye.y != null ? { x: bullsEye.x, y: bullsEye.y } : null))
+        if (ready && pos) {
+          setTarget(pos.x, pos.y, 'mode-locked')
+        } else if (newMode === FOCALPOINT_MODES.LOCKED && !ready) {
+          console.warn('[FocalPoint] Bulls-eye service not available via provide/inject')
+        }
       }
     }
+
+    nextTick(runModeActions)
   }, { immediate: true })
   
   // Watch for position changes to update DOM
