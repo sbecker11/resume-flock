@@ -95,6 +95,7 @@ export function useJobsDependency() {
           console.log(`[useJobsDependency] ✅ Controller ${controller.name} initialized`)
         } catch (error) {
           console.error(`[useJobsDependency] ❌ Failed to initialize controller ${controller.name}:`, error)
+          throw error
         }
       }
     }

@@ -29,6 +29,7 @@ export function useFocalPoint() {
     if (typeof window !== 'undefined' && window.globalElementRegistry) {
       elementRegistry = window.globalElementRegistry;
     }
+    if (!elementRegistry) throw e;
   }
   const getElementRegistry = () => elementRegistry;
   

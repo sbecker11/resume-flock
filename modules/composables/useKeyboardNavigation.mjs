@@ -62,6 +62,7 @@ export function useKeyboardNavigation() {
       }
     } catch (error) {
       console.error('[KeyboardNavigation] Navigation error:', error)
+      throw error
     }
   }
   

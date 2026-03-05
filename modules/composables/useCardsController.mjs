@@ -160,12 +160,8 @@ export function useCardsController() {
                         await applyPaletteToElement(card)
                         console.log(`[CardsController] ✅ Successfully applied palette to job ${index}`)
                     } catch (error) {
-                        console.warn(`[CardsController] ❌ Could not apply palette to job ${index}:`, error)
-                        // Apply fallback styling so card is still visible
-                        card.style.backgroundColor = '#f0f0f0';
-                        card.style.color = '#333';
-                        card.style.border = '1px solid #ccc';
-                        console.log(`[CardsController] Applied fallback styling to card ${index}`)
+                        console.error(`[CardsController] ❌ Could not apply palette to job ${index}:`, error)
+                        throw error
                     }
                 } else {
                     console.warn(`[CardsController] Card creation failed for job ${index}`)
@@ -197,7 +193,8 @@ export function useCardsController() {
                     try {
                         await applyPaletteToElement(skillCard)
                     } catch (e) {
-                        console.warn(`[CardsController] Palette for skill card:`, e)
+                        console.error(`[CardsController] Palette for skill card:`, e)
+                        throw e
                     }
                     skillCardIdsBySkillName[skillName] = skillCard.id
                 }
@@ -243,7 +240,7 @@ export function useCardsController() {
         } catch (error) {
             console.error('[CardsController] Initialization failed:', error)
             isInitialized.value = false
-            // Don't retry automatically - let reactive dependencies handle it
+            throw error
         }
     }
 
@@ -298,6 +295,7 @@ export function useCardsController() {
             }
         } catch (error) {
             console.error(`[CardsController] Error positioning job ${jobNumber}:`, error)
+            throw error
         }
         
         // Store scene positions as data attributes (for original CardsController compatibility)
@@ -408,6 +406,7 @@ export function useCardsController() {
             }
         } catch (error) {
             console.error(`[CardsController] Error calculating height for job ${jobNumber}:`, error)
+            throw error
         }
 
         // Add comprehensive content including job number and description
@@ -515,7 +514,8 @@ export function useCardsController() {
                 }
             }
         } catch (error) {
-            console.warn(`[CardsController] Could not calculate reverse dates for job ${jobNumber}:`, error)
+            console.error(`[CardsController] Could not calculate reverse dates for job ${jobNumber}:`, error)
+            throw error
         }
         
         card.innerHTML = `
@@ -527,7 +527,7 @@ export function useCardsController() {
             </div>
             <div class="biz-details-dates" style="font-weight: bold; padding: 2px; display: flex; justify-content: space-between;">
                 <span>${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A'}</span>
-                <span> #${jobNumber} z:${sceneZ}</span>
+                <span class="biz-details-id-and-hex"> #${jobNumber} z:${sceneZ} <span class="hex-normal"></span> <span class="hex-highlighted"></span></span>
             </div>
             <div class="job-stats" style="font-size: 10px; color: #666; margin-top: 4px;">
                 Skills: ${skillCount} | References: ${job.references ? job.references.length : 0}
@@ -804,9 +804,8 @@ export function useCardsController() {
                 clone.style.left = `${newCloneLeft}px`
                 
             } catch (error) {
-                console.warn('[handleViewportChangedForClones] Error repositioning clone:', error)
-                // Fallback positioning
-                clone.style.left = '250px'
+                console.error('[handleViewportChangedForClones] Error repositioning clone:', error)
+                throw error
             }
         })
         
@@ -822,8 +821,7 @@ export function useCardsController() {
         console.log('[useCardsController] selectionManager instanceId:', selectionManager?.instanceId)
         
         if (!selectionManager) {
-            console.error('[useCardsController] ❌ CRITICAL: selectionManager not available!')
-            return false
+            throw new Error('[useCardsController] selectionManager not available')
         }
         
         // Test a simple event to verify event system works
@@ -835,7 +833,7 @@ export function useCardsController() {
             selectionManager.eventTarget.dispatchEvent(new CustomEvent('test-event'))
         } catch (error) {
             console.error('[useCardsController] ❌ Event system test failed:', error)
-            return false
+            throw error
         }
         
         // Listen for selection events to handle clone creation (legacy)
@@ -870,7 +868,7 @@ export function useCardsController() {
             return true
         } catch (error) {
             console.error('[useCardsController] ❌ Failed to set up event listeners:', error)
-            return false
+            throw error
         }
     }
     
@@ -898,7 +896,7 @@ export function useCardsController() {
             globalSelectionManager.eventTarget.dispatchEvent(new CustomEvent('test-event-fixed'))
         } catch (error) {
             console.error('[useCardsController] ❌ Global event system test failed:', error)
-            return false
+            throw error
         }
         
         // Listen for selection events to handle clone creation
@@ -1062,7 +1060,8 @@ export function useCardsController() {
             try {
                 await applyPaletteToElement(clone)
                 } catch (error) {
-                console.warn(`[preCreateAllClones] ❌ Failed to apply palette to clone ${jobNumber}:`, error)
+                console.error(`[preCreateAllClones] ❌ Failed to apply palette to clone ${jobNumber}:`, error)
+                throw error
             }
             
             // Add click handler: deselect if this clone is selected, else select (unified selectedCard)
@@ -1160,6 +1159,11 @@ export function useCardsController() {
         // Clear previous hover states
         clearAllCardHovers()
         
+        // Keep selected cDiv in selected color (match rDiv: no hover styling when selected)
+        if (selectionManager.getSelectedJobNumber() === jobNumber) {
+            return
+        }
+        
         // Apply hover styles to the corresponding cDiv using card registry
         let card = cardRegistry.getCardElement(jobNumber)
         if (!card) {
@@ -1209,6 +1213,8 @@ export function useCardsController() {
             card.style.setProperty('--data-hovered-border-radius', hoveredBorderRadius);
         }
         
+        // Remove Z-based filter so hovered background matches rDiv (no darkening)
+        card.style.setProperty('filter', 'none', 'important');
         // Add hovered class for CSS rule to apply
         card.classList.add('hovered');
     }
@@ -1249,6 +1255,14 @@ export function useCardsController() {
             card.style.setProperty('--data-normal-border-radius', normalBorderRadius);
         }
         
+        // Restore Z-based filter for normal (non-hovered) state
+        const sceneZ = card.getAttribute('data-sceneZ');
+        if (sceneZ !== null && sceneZ !== '') {
+            const z = parseInt(sceneZ, 10);
+            if (!Number.isNaN(z)) {
+                card.style.setProperty('filter', filters.get_filterStr_from_z(z));
+            }
+        }
         // Remove hovered class
         card.classList.remove('hovered');
     }
@@ -1598,8 +1612,8 @@ export function useCardsController() {
                 height: cardRect.height
             })
         } catch (error) {
-            console.warn(`[useCardsController] Error getting card position for job ${jobNumber}:`, error)
-            return false
+            console.error(`[useCardsController] Error getting card position for job ${jobNumber}:`, error)
+            throw error
         }
         
         // Check if card is already visible
@@ -1611,7 +1625,8 @@ export function useCardsController() {
                                  cardRect.bottom <= containerRect.bottom
                 console.log(`[useCardsController] DEBUGGING: Card visible before scroll:`, isVisible)
             } catch (error) {
-                console.warn(`[useCardsController] Error checking card visibility for job ${jobNumber}:`, error)
+                console.error(`[useCardsController] Error checking card visibility for job ${jobNumber}:`, error)
+                throw error
             }
         }
         
@@ -1628,7 +1643,7 @@ export function useCardsController() {
             console.log(`[useCardsController] DEBUGGING: scrollIntoView called successfully`)
         } catch (error) {
             console.error(`[useCardsController] DEBUGGING: scrollIntoView failed:`, error)
-            return false
+            throw error
         }
         */
         
@@ -1878,7 +1893,8 @@ export function useCardsController() {
         try {
             applyPaletteToElement(clone)
         } catch (error) {
-            console.warn(`[useCardsController] Could not apply palette to clone:`, error)
+            console.error(`[useCardsController] Could not apply palette to clone:`, error)
+            throw error
         }
         
         console.log(`[useCardsController] ✅ Created clone for job ${jobNumber}`)

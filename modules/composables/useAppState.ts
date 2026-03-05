@@ -11,6 +11,8 @@
 import { ref, readonly, type Ref } from 'vue'
 // @ts-ignore - Legacy module imports with type declarations
 import { deepMerge } from '../utils/utils.mjs'
+// @ts-ignore - Legacy module
+import { reportError } from '../utils/errorReporting.mjs'
 // @ts-ignore - Legacy module imports with type declarations
 import type { AppState, UseAppStateReturn } from '../types/index'
 
@@ -322,20 +324,17 @@ async function loadStateFromServer(): Promise<AppState> {
             return finalState
             
         } catch (error: unknown) {
-            console.log(`[AppState] Attempt ${attempt} failed:`, error instanceof Error ? error.message : String(error))
-            
-            if (attempt === maxRetries) {
-                console.error('[AppState] All retry attempts failed, using default state')
-                return getDefaultState()
-            }
-            
-            console.log(`[AppState] Retrying in ${retryDelay}ms...`)
+            const remedy = attempt < maxRetries
+                ? `Retrying in ${retryDelay}ms (attempt ${attempt + 1}/${maxRetries})`
+                : ''
+            reportError(error, `[AppState] Load attempt ${attempt} failed`, remedy)
+            if (attempt === maxRetries) throw error
             await new Promise(resolve => setTimeout(resolve, retryDelay))
         }
     }
     
     // This should never be reached due to the loop logic above
-    return getDefaultState()
+    throw new Error('[AppState] loadStateFromServer: unreachable')
 }
 
 /**
@@ -353,7 +352,8 @@ async function saveStateToServer(state: AppState): Promise<void> {
         })
         // console.log("Saved state to server:", state)
     } catch (error) {
-        console.log('Failed to save state to server.', error)
+        reportError(error, '[AppState] Failed to save state to server', '')
+        throw error
     }
 }
 
@@ -435,7 +435,8 @@ export function useAppState(): UseAppStateReturn {
                     await saveAppState()
                     hasPendingUpdates = false
                 } catch (error) {
-                    console.error('[AppState] Auto-save failed:', error)
+                    reportError(error, '[AppState] Auto-save failed', '')
+                    throw error
                 }
             }
         }, AUTO_SAVE_INTERVAL)

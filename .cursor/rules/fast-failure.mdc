@@ -1,0 +1,54 @@
+---
+description: Fast-failure and error reporting — validate at boundaries, always report errors and remedies
+alwaysApply: true
+---
+
+# Fast Failure & Error Reporting
+
+This project uses **fast failure** in development and **always reports errors**; when a remedy is applied, that must be reported too.
+
+## Error reporting (required)
+
+1. **Every error must be reported**  
+   - In catch blocks (or any error path), always log the error with enough context to find the call site (e.g. module name and operation).  
+   - Prefer `reportError(error, context, remedy)` from `@/modules/utils/errorReporting.mjs` so reporting is consistent.
+
+2. **Remedy must be reported**  
+   - If you apply a remedy (retry, revert, fallback, recovery step), log it explicitly (e.g. "Remedy: Reverting to previous value" or "Remedy: Retrying in 1s").  
+   - Use the third argument of `reportError` or a clear `console.log('Remedy: ...')` after reporting the error.
+
+3. **Then fail or continue**  
+   - After reporting (and optional remedy), either **rethrow** (fast-fail) or continue only if the remedy fully recovers.
+
+## Fast failure
+
+- **Startup and load**: Validate at boundaries; invalid data → throw; do not return default or skip.
+- **Required dependencies**: Missing required value → throw.
+- **Catch blocks**: Do not swallow. Report error (and remedy if any), then rethrow unless the path is documented as optional.
+
+## Examples
+
+```javascript
+import { reportError } from '@/modules/utils/errorReporting.mjs';
+
+// BAD: error not reported
+catch (e) { throw e; }
+
+// BAD: remedy not reported
+catch (e) { console.error(e); stepCount.value = prev; throw e; }
+
+// GOOD: error and remedy reported, then rethrow
+catch (e) {
+  reportError(e, '[ResizeHandle] Failed to update step count', 'Reverting step count to previous value');
+  stepCount.value = currentSteps;
+  throw e;
+}
+
+// GOOD: error reported, no remedy, rethrow
+catch (e) {
+  reportError(e, '[ColorPalette] Failed to load palettes');
+  throw e;
+}
+```
+
+See `docs/FAST-FAILURE.md` for the full strategy.

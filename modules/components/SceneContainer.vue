@@ -60,6 +60,7 @@ try {
   if (typeof window !== 'undefined' && window.globalElementRegistry) {
     globalElementRegistry = window.globalElementRegistry;
   }
+  if (!globalElementRegistry) throw e;
 }
 function getElementRegistry() {
   return globalElementRegistry;
@@ -100,7 +101,8 @@ watch(sceneContainerRef, (newRef) => {
     try {
       getElementRegistry().registerElement('scene-container', newRef)
     } catch (error) {
-      console.log('[SceneContainer] Registry not ready yet for scene-container, will register later')
+      console.error('[SceneContainer] Registry not ready for scene-container:', error)
+      throw error
     }
   }
 }, { immediate: true })
@@ -136,7 +138,8 @@ watch(scenePlaneRef, (newRef) => {
     try {
       getElementRegistry().registerElement('scene-plane', newRef)
     } catch (error) {
-      console.log('[SceneContainer] Registry not ready yet for scene-plane, will register later')
+      console.error('[SceneContainer] Registry not ready for scene-plane:', error)
+      throw error
     }
   }
 }, { immediate: true })
@@ -197,6 +200,7 @@ onMounted(async () => {
     
   } catch (error) {
     console.error('[SceneContainer] ❌ Scene initialization failed:', error)
+    throw error
   }
 })
 

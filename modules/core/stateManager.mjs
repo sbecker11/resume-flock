@@ -1,4 +1,5 @@
 import { deepMerge } from '../utils/utils.mjs';
+import { reportError } from '../utils/errorReporting.mjs';
 
 const STORAGE_KEY = 'flockOfPostcards_appState';
 
@@ -278,8 +279,8 @@ export async function loadState() {
         window.CONSOLE_LOG_IGNORE("Final state after migration and merge:", finalState);
         return finalState;
     } catch (e) {
-        window.CONSOLE_LOG_IGNORE('Error fetching state from server, using default state.', e);
-        return getDefaultState();
+        reportError(e, '[stateManager] Error fetching state from server', '');
+        throw e;
     }
 }
 
@@ -299,7 +300,8 @@ export async function saveState(state) {
         });
         window.CONSOLE_LOG_IGNORE("Saved state to server:", state); // This can be noisy
     } catch (e) {
-        window.CONSOLE_LOG_IGNORE('Failed to save state to server.', e);
+        reportError(e, '[stateManager] Failed to save state to server', '');
+        throw e;
     }
 }
 

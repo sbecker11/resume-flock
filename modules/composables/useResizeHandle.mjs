@@ -335,6 +335,7 @@ function createResizeHandleState() {
         // Log completion - no logAndReset method exists
     } catch (error) {
         console.error('ResizeHandle updateLayout error:', error);
+        throw error;
     } finally {
     }
   }

@@ -506,8 +506,9 @@ class InfiniteScrollingContainer {
   _applyPaletteToClone(clone) {
     try {
       applyPaletteToElement(clone);
-    } catch (error) {
-      console.warn('Failed to apply palette to infinite scroll clone:', error);
+      } catch (error) {
+      console.error('Failed to apply palette to infinite scroll clone:', error);
+      throw error;
     }
   }
 
@@ -613,6 +614,7 @@ class InfiniteScrollingContainer {
         this.options.onItemChange(index, item);
       } catch (error) {
         console.error('[InfiniteScrollingContainer] Error in onItemChange callback:', error);
+        throw error;
       }
     }
   }

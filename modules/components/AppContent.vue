@@ -333,6 +333,7 @@ onMounted(async () => {
       console.log('[AppContent] ✅ Color palettes loaded successfully')
     } catch (error) {
       console.error('[AppContent] ❌ Color palette loading failed:', error)
+      throw error
     }
     
     // PHASE 4: Critical positioning systems now handled by reactive watchers
@@ -389,6 +390,7 @@ onMounted(async () => {
     
   } catch (error) {
     console.error('[AppContent] ❌ App initialization failed:', error)
+    throw error
   }
 })
 

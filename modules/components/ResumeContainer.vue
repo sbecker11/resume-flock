@@ -280,46 +280,28 @@ function selectPrevious() {
 
 <style>
 /* Global styles for rDivs - not scoped to ensure they apply to dynamically created elements */
+/* Normal border/padding/outline/radius come from scene.css (shared .biz-card-div, .biz-resume-div rule). */
 
-/* Base rDiv styling with proper flexbox auto-sizing */
+/* Base rDiv layout and sizing only - do not duplicate border styling */
 .biz-resume-div {
-    /* Flexbox container that sizes to fit content */
     display: flex !important;
     flex-direction: column;
-    align-items: stretch; /* Fill width of container */
-    justify-content: flex-start; /* Start from top */
-    
-    /* Auto-sizing properties */
+    align-items: stretch;
+    justify-content: flex-start;
     width: 100%;
-    height: auto !important; /* Allow height to grow with content */
+    height: auto !important;
     min-height: fit-content;
-    max-height: none; /* No height restrictions */
-    
-    /* Flexbox child behavior */
-    flex-shrink: 0; /* Don't shrink smaller than content */
-    flex-grow: 0; /* Don't grow beyond content */
-    flex-basis: auto; /* Use content size as basis */
-    
-    /* Layout properties */
+    max-height: none;
+    flex-shrink: 0;
+    flex-grow: 0;
+    flex-basis: auto;
     position: relative !important;
-    box-sizing: border-box;
-    border-bottom: 1px solid #eee;
-    overflow-x: hidden; /* Prevent horizontal scrolling on individual rDivs */
-    
-    /* Default state styling using CSS variables */
+    overflow-x: hidden;
+    margin-top: var(--data-normal-margin-top);
     background-color: var(--data-background-color) !important;
     color: var(--data-foreground-color) !important;
-    padding: var(--data-normal-padding);
-    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
-    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);
-    border-radius: var(--data-normal-border-radius) !important;
-    margin-top: var(--data-normal-margin-top);
-    
-    /* Smooth transitions */
-    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s, height 0.2s;
-    
-    /* Override any filter interference */
     filter: none !important;
+    transition: height 0.2s;
 }
 
 /* 
@@ -366,7 +348,7 @@ function selectPrevious() {
     overflow: visible; /* Show all content */
 }
 
-/* Hovered state */
+/* Hovered state - identical to .biz-card-div.hovered (same vars) */
 .biz-resume-div.hovered {
     background-color: var(--data-background-color-hovered) !important;
     color: var(--data-foreground-color-hovered) !important;

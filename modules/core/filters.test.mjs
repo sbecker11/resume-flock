@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   MIN_BRIGHTNESS_PERCENT,
-  BLUR_Z_SCALE_FACTOR,
   CARD_MIN_Z,
   CARD_MAX_Z,
   get_brightness_value_from_z,
@@ -15,7 +14,6 @@ import {
 describe('core/filters', () => {
   it('exports constants', () => {
     expect(MIN_BRIGHTNESS_PERCENT).toBe(75);
-    expect(BLUR_Z_SCALE_FACTOR).toBe(4);
     expect(CARD_MIN_Z).toBe(1);
     expect(CARD_MAX_Z).toBe(14);
   });
@@ -43,11 +41,11 @@ describe('core/filters', () => {
     expect(get_saturation_str_from_z(7)).toMatch(/^saturate\(/);
   });
 
-  it('get_filterStr_from_z returns combined filter', () => {
+  it('get_filterStr_from_z returns combined filter (no contrast)', () => {
     const s = get_filterStr_from_z(7);
     expect(s).toMatch(/brightness/);
     expect(s).toMatch(/blur/);
-    expect(s).toMatch(/contrast/);
+    expect(s).not.toMatch(/contrast/);
     expect(s).toMatch(/saturate/);
   });
 });

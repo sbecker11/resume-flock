@@ -409,7 +409,7 @@ class ResumeListController {
         return sortedIndex;
     } catch (error) {
         console.error(`ResumeListController: Error in getSortedIndexFromOriginal:`, error);
-        return -1;
+        throw error;
     }
   }
 
@@ -442,6 +442,7 @@ class ResumeListController {
         }
     } catch (error) {
         console.error(`ResumeListController: Error in addClassItem:`, error);
+        throw error;
     }
   }
 
@@ -467,6 +468,7 @@ class ResumeListController {
         }
     } catch (error) {
         console.error(`ResumeListController: Error in removeClassItem:`, error);
+        throw error;
     }
   }
 
@@ -496,7 +498,7 @@ class ResumeListController {
       return true;
     } catch (error) {
       console.error(`ResumeListController: Error scrolling bizResumeDiv ${bizResumeDiv.id} into view:`, error);
-      return false;
+      throw error;
     }
   }
 }

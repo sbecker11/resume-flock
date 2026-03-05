@@ -98,7 +98,7 @@ class ResumeItemsController {
                 this.bizResumeDivs.push(resumeDiv);
             } catch (error) {
                 console.error(`[ResumeItemsController] Failed to create resume div for card ${i}:`, error);
-                // Continue with other cards instead of failing completely
+                throw error;
             }
         }
         return this.bizResumeDivs;
@@ -185,13 +185,24 @@ class ResumeItemsController {
         dateRange.textContent = `${startDate} - ${endDate}`;
         datesDiv.appendChild(dateRange);
         
-        // Right side: job number
-        const jobNumberSpan = document.createElement('span');
-        jobNumberSpan.className = 'job-number';
-        jobNumberSpan.textContent = `#${jobNumber}`;
-        jobNumberSpan.style.fontWeight = 'bold';
-        jobNumberSpan.style.opacity = '0.8';
-        datesDiv.appendChild(jobNumberSpan);
+        // Right side: job number and hex colors (unhighlighted, highlighted; bold = currently visible)
+        const idAndHexSpan = document.createElement('span');
+        idAndHexSpan.className = 'biz-details-id-and-hex';
+        const jobNumPart = document.createElement('span');
+        jobNumPart.className = 'job-number';
+        jobNumPart.textContent = `#${jobNumber}`;
+        jobNumPart.style.fontWeight = 'bold';
+        jobNumPart.style.opacity = '0.8';
+        idAndHexSpan.appendChild(jobNumPart);
+        idAndHexSpan.appendChild(document.createTextNode(' '));
+        const hexNormalSpan = document.createElement('span');
+        hexNormalSpan.className = 'hex-normal';
+        idAndHexSpan.appendChild(hexNormalSpan);
+        idAndHexSpan.appendChild(document.createTextNode(' '));
+        const hexHighlightedSpan = document.createElement('span');
+        hexHighlightedSpan.className = 'hex-highlighted';
+        idAndHexSpan.appendChild(hexHighlightedSpan);
+        datesDiv.appendChild(idAndHexSpan);
         
         headerDiv.appendChild(datesDiv);
 
@@ -448,6 +459,7 @@ class ResumeItemsController {
             console.log(`[ResumeItemsController] Fallback scroll successful for job ${jobNumber}`);
         } catch (error) {
             console.error(`[ResumeItemsController] Failed to scroll rDiv into view for job ${jobNumber}:`, error);
+            throw error;
         }
     }
 

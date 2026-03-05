@@ -1,6 +1,6 @@
 import { ref, watch, computed, getCurrentInstance } from 'vue';
 import { useAppState } from './useAppState.ts';
-import { parsePaletteJson, normalizePaletteColors, getHighContrastMono, getHighlightColor, getContrastIconSet, hexToRgb } from 'color-palette-utils-ts';
+import { parsePaletteJson, normalizePaletteColors, getHighContrastMono, getHighlightColor, getContrastIconSet, hexToRgb, rgbToHex } from 'color-palette-utils-ts';
 import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 
@@ -35,6 +35,7 @@ export function useColorPalette() {
         if (typeof window !== 'undefined' && window.globalElementRegistry) {
             elementRegistry = window.globalElementRegistry;
         }
+        if (!elementRegistry) throw e;
     }
     function getElementRegistry() {
         return elementRegistry;
@@ -71,26 +72,34 @@ export function useColorPalette() {
             const tempOrderedNames = [];
 
             for (const filename of manifestData) {
-                try {
-                    const filePath = PALETTE_DIR + filename;
-                    const paletteResponse = await fetch(filePath);
-                    if (!paletteResponse.ok) continue;
-                    const raw = await paletteResponse.text();
-                    const paletteData = parsePaletteJson(raw);
-                    if (paletteData) {
-                        normalizePaletteColors(paletteData.colors);
-                        tempLoadedColorPalettes[paletteData.name] = paletteData.colors;
-                        if (paletteData.backgroundSwatchIndex != null) {
-                            tempBackgroundSwatchIndexByPalette[paletteData.name] = Math.max(0, Math.floor(paletteData.backgroundSwatchIndex)) % paletteData.colors.length;
-                        }
-                        tempFilenameToNameMap[filename] = paletteData.name;
-                        tempOrderedNames.push(paletteData.name);
+                const filePath = PALETTE_DIR + filename;
+                const paletteResponse = await fetch(filePath);
+                if (!paletteResponse.ok) {
+                    throw new Error(`Palette fetch failed: ${filePath} (${paletteResponse.status})`);
+                }
+                const raw = await paletteResponse.text();
+                const paletteData = parsePaletteJson(raw);
+                if (!paletteData) {
+                    throw new Error(`Invalid palette JSON: ${filename}`);
+                }
+                normalizePaletteColors(paletteData.colors);
+                tempLoadedColorPalettes[paletteData.name] = paletteData.colors;
+                if (paletteData.backgroundSwatchIndex != null) {
+                    tempBackgroundSwatchIndexByPalette[paletteData.name] = Math.max(0, Math.floor(paletteData.backgroundSwatchIndex)) % paletteData.colors.length;
+                }
+                tempFilenameToNameMap[filename] = paletteData.name;
+                tempOrderedNames.push(paletteData.name);
+            }
+
+            // Fast-fail: validate every palette color at startup; invalid hex fails entire startup.
+            for (const [paletteName, colors] of Object.entries(tempLoadedColorPalettes)) {
+                for (let i = 0; i < colors.length; i++) {
+                    if (!hexToRgb(colors[i])) {
+                        throw new Error(`Invalid hex in palette "${paletteName}" at index ${i}: "${colors[i]}"`);
                     }
-                } catch (err) {
-                    // skip invalid or failed palette files
                 }
             }
-            
+
             colorPalettes.value = tempLoadedColorPalettes;
             backgroundSwatchIndexByPalette.value = tempBackgroundSwatchIndexByPalette;
             filenameToNameMap.value = tempFilenameToNameMap;
@@ -122,7 +131,7 @@ export function useColorPalette() {
 
         } catch (error) {
             console.error("[ColorPalette] Failed to load color palettes:", error);
-            // Handle error case, maybe set a default palette
+            throw error;
         } finally {
             isLoading.value = false;
             if (resolveReady) resolveReady();
@@ -418,7 +427,7 @@ export function useColorPalette() {
  * @param {HTMLElement} element The element to apply the palette colors to.
  */
 export async function applyPaletteToElement(element) {
-    if (!element) return;
+    if (!element) throw new Error('applyPaletteToElement: element is required');
 
     // Access the centralized app state
     const { appState } = useAppState();
@@ -451,14 +460,12 @@ export async function applyPaletteToElement(element) {
 
     // Get the palette name from the filename
     if (!currentPaletteFilename.value) {
-        console.warn('No palette filename set, skipping palette application');
-        return;
+        throw new Error('No palette filename set; cannot apply palette');
     }
     
     const paletteName = filenameToNameMap.value[currentPaletteFilename.value];
     if (!paletteName) {
-        console.warn(`Palette name not found for filename: ${currentPaletteFilename.value}`);
-        return;
+        throw new Error(`Palette name not found for filename: ${currentPaletteFilename.value}`);
     }
 
     // Get palette from the reactive colorPalettes (loaded dynamically, not stored in appState)
@@ -475,17 +482,30 @@ export async function applyPaletteToElement(element) {
     const foregroundColor = getHighContrastMono(backgroundColor);
 
     const systemConstants = appState.value["system-constants"];
-    const brightnessFactorSelected = systemConstants?.theme?.brightnessFactorSelected ?? 2.0;
-    const brightnessFactorHovered = systemConstants?.theme?.brightnessFactorHovered ?? 1.5;
-    const highlightPercentSelected = Math.round(brightnessFactorSelected * 100);
-    const highlightPercentHovered = Math.round(brightnessFactorHovered * 100);
+    // Selected: single knob 135 → L >= floor(100/1.35) darken (L'=L/1.35), else brighten (L'=L*1.35).
+    const selectedHighlightPercent = systemConstants?.theme?.selectedHighlightPercent ?? 135;
+    const selectedBrightenFactor = selectedHighlightPercent / 100;
+    const highLuminosityThreshold = Math.floor(100 / selectedBrightenFactor);
 
-    const selectedBackgroundColor = getHighlightColor(backgroundColor, { highlightPercent: highlightPercentSelected });
+    const selectedBackgroundColor = getHighlightColor(backgroundColor, {
+        highlightPercent: selectedHighlightPercent,
+        nearlyWhiteL: highLuminosityThreshold
+    });
     // Secondary colors for highlighted (selected): white on dark background, black on light (palette-utils)
     const highlightedTextColor = getHighContrastMono(selectedBackgroundColor);
     const highlightedIconSet = getContrastIconSet(selectedBackgroundColor, { iconBase: ICON_BASE }); /* usage: see docs/CONTRAST-ICONS-FLOCK-OF-POSTCARDS.md */
 
-    const hoveredBackgroundColor = getHighlightColor(backgroundColor, { highlightPercent: highlightPercentHovered });
+    // Hover = (unselected + selected) / 2 in RGB — no brightness factor. Palette colors are validated at startup.
+    const rgbNorm = hexToRgb(backgroundColor);
+    const rgbSel = hexToRgb(selectedBackgroundColor);
+    if (!rgbNorm || !rgbSel) {
+        throw new Error(`Invalid color in palette (startup validation should have caught this): normal=${!!rgbNorm} selected=${!!rgbSel}`);
+    }
+    const hoveredBackgroundColor = rgbToHex(
+        Math.round((rgbNorm.r + rgbSel.r) / 2),
+        Math.round((rgbNorm.g + rgbSel.g) / 2),
+        Math.round((rgbNorm.b + rgbSel.b) / 2)
+    );
     const hoveredForegroundColor = getHighContrastMono(hoveredBackgroundColor);
     const hoveredIconSet = getContrastIconSet(hoveredBackgroundColor, { iconBase: ICON_BASE });
 
@@ -532,21 +552,7 @@ export async function applyPaletteToElement(element) {
         selected: { ...systemConstants.theme.borderSettings.selected }
     } : defaultBorderSettings;
 
-    // BizCard (cDiv) and bizCardLineItem (rDiv) border styling must always be identical. rDiv uses override when set.
-    if ( element.classList.contains('biz-resume-div') ) {
-        const rDivBorderOverrideSettings = systemConstants?.theme?.rDivBorderOverrideSettings;
-        if (rDivBorderOverrideSettings) {
-            borderSettings.normal.padding = rDivBorderOverrideSettings.normal.padding;
-            borderSettings.normal.innerBorderWidth = rDivBorderOverrideSettings.normal.innerBorderWidth;
-            borderSettings.normal.marginTop = rDivBorderOverrideSettings.normal.marginTop;
-            borderSettings.hovered.padding = rDivBorderOverrideSettings.hovered.padding;
-            borderSettings.hovered.innerBorderWidth = rDivBorderOverrideSettings.hovered.innerBorderWidth;
-            borderSettings.hovered.marginTop = rDivBorderOverrideSettings.hovered.marginTop;
-            borderSettings.selected.padding = rDivBorderOverrideSettings.selected.padding;
-            borderSettings.selected.innerBorderWidth = rDivBorderOverrideSettings.selected.innerBorderWidth;
-            borderSettings.selected.marginTop = rDivBorderOverrideSettings.selected.marginTop;
-        }
-    }
+    // BizCard (cDiv) and bizCardLineItem (rDiv) border styling must always be identical — same theme borderSettings for both.
 
     // Set data attributes for all modes of the element
     element.setAttribute('data-background-color', backgroundColor);
@@ -636,11 +642,19 @@ export async function applyPaletteToElement(element) {
     element.style.setProperty('--data-selected-margin-top', borderSettings.selected.marginTop);
     element.style.setProperty('--data-selected-border-radius', borderSettings.selected.borderRadius);
 
+    // Fill hex debug spans if present (biz-card-div / biz-resume-div): unhighlighted and highlighted; CSS bolds the visible one
+    const hexNormalEl = element.querySelector('.hex-normal');
+    const hexHighlightedEl = element.querySelector('.hex-highlighted');
+    if (hexNormalEl) hexNormalEl.textContent = backgroundColor;
+    if (hexHighlightedEl) hexHighlightedEl.textContent = selectedBackgroundColor;
 
-    // Apply inline styles directly to ensure they work
-    element.style.backgroundColor = backgroundColor;
-    element.style.color = foregroundColor;
-    // The normal state will be applied when needed by the state system
+    // Apply inline styles. cDiv, clone, and rDiv use CSS vars only so normal/hovered/selected control both background and text (no inline background or color).
+    const useCssVarsOnly = element.classList.contains('biz-card-div') || element.classList.contains('biz-resume-div');
+    if (!useCssVarsOnly) {
+        element.style.backgroundColor = backgroundColor;
+        element.style.color = foregroundColor;
+    }
+    // For useCssVarsOnly, color comes from CSS (var(--data-foreground-color), -hovered, -selected) so clone and rDiv selected states match
 }
 
 export function applySelectedStateColorsToElement(element) {

@@ -132,6 +132,7 @@ export function useParallaxEnhanced() {
       }
     } catch (error) {
       console.error('[ParallaxEnhanced] Render error:', error)
+      throw error
     }
   }
   

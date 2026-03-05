@@ -88,6 +88,7 @@ onMounted(async () => {
     document.addEventListener('click', handleClickOutside)
   } catch (error) {
     console.error('[ColorPaletteSelector] Failed to load palettes:', error)
+    throw error
   }
 })
 

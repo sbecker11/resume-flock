@@ -55,12 +55,11 @@ async function createBasicResumeDivs(resumeListController, resumeItemsController
             
             return true;
         } else {
-            console.error('[ResumeSystemInitializer] resumeContentDiv not available or no resume divs created');
-            return false;
+            throw new Error('[ResumeSystemInitializer] resumeContentDiv not available or no resume divs created');
         }
     } catch (error) {
         console.error('[ResumeSystemInitializer] Failed to create resume divs:', error);
-        return false;
+        throw error;
     }
 }
 
@@ -132,8 +131,7 @@ export async function initializeResumeSystem() {
                 }
             }
             
-            console.log('[ResumeSystemInitializer] DOM elements not available after retries - setup will be completed later');
-            return false;
+            throw new Error('[ResumeSystemInitializer] DOM elements not available after retries');
         };
         
         await waitForDOMElements();
@@ -161,7 +159,7 @@ export async function initializeResumeSystem() {
         return true;
     } catch (error) {
         console.error('[ResumeSystemInitializer] ❌ Failed to initialize resume system:', error);
-        return false;
+        throw error;
     }
 }
 
@@ -214,6 +212,7 @@ export function testResumeSystem() {
         console.log('- getSelectedJobNumber method exists:', typeof window.selectionManager?.getSelectedJobNumber === 'function');
     } catch (error) {
         console.error('SelectionManager API test failed:', error);
+        throw error;
     }
     
     console.log('=== END RESUME SYSTEM TEST ===');

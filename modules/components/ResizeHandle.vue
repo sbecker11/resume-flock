@@ -7,6 +7,7 @@ import { useLayoutToggle } from '@/modules/composables/useLayoutToggle.mjs';
 import { useAppState } from '@/modules/composables/useAppState';
 import type { ResizeHandleProps, ResizeHandleEmits } from '@/modules/types/components';
 import { useBullsEyeService } from '@/modules/core/globalServices';
+import { reportError } from '@/modules/utils/errorReporting.mjs';
 
 // Local type definitions
 interface StepButton {
@@ -303,9 +304,9 @@ async function handleSteppingClick(event: MouseEvent): Promise<void> {
     
     console.log(`[ResizeHandle] Step count changed: ${currentSteps} -> ${nextSteps}`);
   } catch (error) {
-    console.error('[ResizeHandle] Failed to update step count:', error);
-    // Revert on error
+    reportError(error, '[ResizeHandle] Failed to update step count', 'Reverting step count to previous value');
     stepCount.value = currentSteps;
+    throw error;
   }
   
   // Reset hover state when step changes to prevent immediate hover preview

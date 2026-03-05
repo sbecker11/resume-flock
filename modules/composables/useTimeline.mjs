@@ -32,7 +32,8 @@ function initialize(jobsData) {
                 earliestStartDate = startDate;
             }
         } catch (error) {
-            console.warn('Error parsing job start date:', job.start, error);
+            console.error('Error parsing job start date:', job.start, error);
+            throw error;
         }
     });
     

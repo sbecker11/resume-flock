@@ -75,28 +75,29 @@ html[native-dark-active] #scene-container,
     
 /* scene/scene.css */
 
-/* CONVENTION: Border styling for bizCard (.biz-card-div) and bizCardLineItem (.biz-resume-div) must always be identical (normal, hovered, selected). Keep the same vars and values in both blocks below. */
-.biz-card-div {
-    position: absolute; /* Position relative to scene-plane like timeline */
-    font-size: 12px;
+/* CONVENTION: Border styling for bizCard (.biz-card-div) and bizCardLineItem (.biz-resume-div) must always be identical (normal, hovered, selected). */
+/* Normal state: single rule so cDiv and rDiv cannot diverge */
+.biz-card-div,
+.biz-resume-div,
+body .biz-resume-div,
+#resume-container .biz-resume-div,
+#resume-content-div-wrapper .biz-resume-div {
     box-sizing: border-box;
-    cursor: pointer;
-    /* z-index set by JS to 1–3 so biz cards stay BELOW skill cards (4–9); no base here */
-    pointer-events: auto;
-    /* Allow cards to extend beyond parent boundaries like timeline */
-    font-family: Arial, sans-serif !important; /* Override any other font-family rules */
-
-    /* Default state: padding compensates for hover border growth so text doesn't shift on hover */
     background-color: var(--data-background-color);
     color: var(--data-foreground-color);
-    padding: calc(
-        var(--data-hovered-padding)
-        + (var(--data-hovered-inner-border-width) - var(--data-normal-inner-border-width))
-    );
+    padding: var(--data-normal-padding);
     border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
     outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);
     border-radius: var(--data-normal-border-radius);
     transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s, padding 0.2s, filter 0.3s ease-out;
+}
+/* cDiv-only layout (position, font, cursor) - border already set above */
+.biz-card-div {
+    position: absolute;
+    font-size: 12px;
+    cursor: pointer;
+    pointer-events: auto;
+    font-family: Arial, sans-serif !important;
 }
 /* Contrast icons in card descriptions: white on dark, black on light (normal state). */
 .biz-card-div[data-icon-set-variant="white"] .url-icon,
@@ -105,14 +106,15 @@ html[native-dark-active] #scene-container,
     filter: invert(1);
 }
 
-/* Hovered state - visual only; no z-index change. No blur on hover so text stays sharp. */
+/* Hovered state - identical to .biz-resume-div.hovered (same vars). No blur on hover. */
 .biz-card-div.hovered {
-    background-color: var(--data-background-color-hovered);
-    color: var(--data-foreground-color);
+    background-color: var(--data-background-color-hovered) !important;
+    color: var(--data-foreground-color-hovered) !important;
     padding: var(--data-hovered-padding);
     border: var(--data-hovered-inner-border-width) solid var(--data-hovered-inner-border-color);
     outline: var(--data-hovered-outer-border-width) solid var(--data-hovered-outer-border-color);
     border-radius: var(--data-hovered-border-radius);
+    box-shadow: none !important;
     filter: none !important; /* Override Z-based filter so text has no blur on hover */
 }
 .biz-card-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
@@ -123,8 +125,8 @@ html[native-dark-active] #scene-container,
 
 /* Clone = selected card. Border must match .biz-resume-div.selected. All colors except the white layer come from palette-utils (selected border purple). */
 .biz-card-div.clone {
-    background-color: var(--data-background-color-selected);
-    color: var(--data-foreground-color-selected);
+    background-color: var(--data-background-color-selected) !important;
+    color: var(--data-foreground-color-selected) !important;
     padding: var(--data-selected-padding);
     
     /* Purple (#801a81) from palette-utils; white ring (#ffffff) is fixed */
@@ -192,22 +194,16 @@ body .biz-resume-div[data-icon-set-variant="white"] .img-icon,
 #resume-container .biz-resume-div[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
-/* Base styling for resume divs - using CSS custom properties from color palette */
+/* rDiv layout (position, display, etc.) - border already set in shared normal block above */
 .biz-resume-div,
 body .biz-resume-div,
 #resume-container .biz-resume-div,
 #resume-content-div-wrapper .biz-resume-div {
-    /* Apply colors from CSS custom properties set by applyPaletteToElement */
     background-color: var(--data-background-color) !important;
     color: var(--data-foreground-color) !important;
-    padding: var(--data-normal-padding);
-    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color);
-    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color);
-    border-radius: var(--data-normal-border-radius);
-    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s;
 }
 
-/* Hovered state for resume divs - matching cDiv styling */
+/* Hovered state for resume divs - identical to .biz-card-div.hovered (same vars) */
 .biz-resume-div.hovered,
 body .biz-resume-div.hovered,
 #resume-container .biz-resume-div.hovered,
@@ -218,11 +214,9 @@ body .biz-resume-div.hovered,
     border: var(--data-hovered-inner-border-width) solid var(--data-hovered-inner-border-color);
     outline: var(--data-hovered-outer-border-width) solid var(--data-hovered-outer-border-color);
     border-radius: var(--data-hovered-border-radius);
-    filter: none !important; /* Override parallax filter */
-    z-index: 98; /* Bring just below selected card */
-    
-    /* Explicitly remove any white ring effects */
     box-shadow: none !important;
+    filter: none !important;
+    z-index: 98; /* Bring just below selected card */
     text-shadow: none !important;
 }
 .biz-resume-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
@@ -242,8 +236,8 @@ body .biz-resume-div.hovered[data-icon-set-hovered-variant="white"] .img-icon,
 body .biz-resume-div.selected,
 #resume-container .biz-resume-div.selected,
 #resume-content-div-wrapper .biz-resume-div.selected {
-    background-color: var(--data-background-color-selected);
-    color: var(--data-foreground-color-selected);
+    background-color: var(--data-background-color-selected) !important;
+    color: var(--data-foreground-color-selected) !important;
     padding: var(--data-selected-padding);
     
     /* Purple (#801a81) from palette-utils; white ring (#ffffff) is fixed */
@@ -317,6 +311,20 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
     display: block;
     margin: 0 0 6px 0;
     line-height: 1.2;
+}
+
+/* Hex debug: unhighlighted and highlighted; underline = currently visible background */
+.biz-details-id-and-hex .hex-normal,
+.biz-details-id-and-hex .hex-highlighted {
+    text-decoration: none;
+}
+.biz-card-div:not(.clone) .hex-normal,
+.biz-resume-div:not(.selected) .hex-normal {
+    text-decoration: underline;
+}
+.biz-card-div.clone .hex-highlighted,
+.biz-resume-div.selected .hex-highlighted {
+    text-decoration: underline;
 }
 
 /* Show specific header elements in card view */

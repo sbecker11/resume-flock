@@ -43,7 +43,8 @@ class DragStateManager {
                     try {
                         calculation()
                     } catch (error) {
-                        console.warn('[DragState] Error executing pending calculation:', error)
+                        console.error('[DragState] Error executing pending calculation:', error)
+                        throw error
                     }
                 })
                 this.pendingCalculations.clear()
@@ -109,7 +110,8 @@ class DragStateManager {
             try {
                 listener(event, data)
             } catch (error) {
-                console.warn('[DragState] Error in listener:', error)
+                console.error('[DragState] Error in listener:', error)
+                throw error
             }
         })
     }

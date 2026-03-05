@@ -149,8 +149,10 @@ function lchToLab(L: number, C: number, H: number): { L: number; a: number; b: n
 }
 
 /**
- * Perceptually distinct highlight: brighter for most colors; for nearly white,
- * darker. Use with getHighContrastMono(highlightColor) for text on the highlight.
+ * Perceptually distinct highlight. When L >= nearlyWhiteL (e.g. 85): darken (L2 = L / multiplier).
+ * When L < nearlyWhiteL: brighten (L2 = L * multiplier, capped at 100).
+ * E.g. highlightPercent 135 (1.35): L>=85 → L/1.35; L<85 → L*1.35.
+ * Use with getHighContrastMono(highlightColor) for text on the highlight.
  */
 export function getHighlightColor(
   hex: string,

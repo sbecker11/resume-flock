@@ -799,7 +799,8 @@ class ResumeListController extends BaseComponent {
                 console.warn('[DEBUG] AppState or AppState.resume is null, cannot save sort rule');
             }
         } catch (error) {
-            console.warn('[DEBUG] Error saving sort rule to AppState:', error);
+            console.error('[DEBUG] Error saving sort rule to AppState:', error);
+            throw error;
         }
     }
 
@@ -1203,8 +1204,8 @@ class ResumeListController extends BaseComponent {
         
         return sortedIndex;
     } catch (error) {
-        console.log(`ResumeListController: Error in getSortedIndexFromOriginal:`, error);
-        return -1;
+        console.error(`ResumeListController: Error in getSortedIndexFromOriginal:`, error);
+        throw error;
     }
   }
 
@@ -1253,7 +1254,8 @@ class ResumeListController extends BaseComponent {
             console.log(`ResumeListController: Could not find item at sorted index ${sortedIndex}`);
         }
     } catch (error) {
-        console.log(`ResumeListController: Error in addClassItem:`, error);
+        console.error(`ResumeListController: Error in addClassItem:`, error);
+        throw error;
     }
   }
 
@@ -1278,7 +1280,8 @@ class ResumeListController extends BaseComponent {
             console.log(`ResumeListController: Could not find item at sorted index ${sortedIndex}`);
         }
     } catch (error) {
-        console.log(`ResumeListController: Error in removeClassItem:`, error);
+        console.error(`ResumeListController: Error in removeClassItem:`, error);
+        throw error;
     }
   }
 
@@ -1315,8 +1318,8 @@ class ResumeListController extends BaseComponent {
         return true;
       }
     } catch (error) {
-      console.log(`ResumeListController: Error scrolling bizResumeDiv ${bizResumeDiv.id} into view:`, error);
-      return false;
+      console.error(`ResumeListController: Error scrolling bizResumeDiv ${bizResumeDiv.id} into view:`, error);
+      throw error;
     }
   }
 
@@ -1434,6 +1437,7 @@ class ResumeListController extends BaseComponent {
         bizResumeDivs.push(resumeDiv);
       } catch (error) {
         console.error(`[ResumeListController] Failed to create resume div for card ${i}:`, error);
+        throw error;
       }
     }
     
