@@ -64,3 +64,9 @@ export interface GetHighlightColorOptions {
 export interface GetContrastIconSetOptions {
   iconBase?: string;
 }
+
+/** Result of getHighContrastForBackground: text color and icon set from a single light/dark decision. */
+export interface HighContrastForBackground {
+  textColor: '#000000' | '#ffffff';
+  iconSet: ContrastIconSet;
+}

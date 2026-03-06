@@ -1,0 +1,23 @@
+---
+description: Resume Flock project context — recent behavior and where to find full history
+alwaysApply: true
+---
+
+# Resume Flock — Project Context
+
+Use this for continuity when starting a new session. Full session history and architecture notes live in **CLAUDE.local.md** at the project root.
+
+## Recent behavior (current codebase)
+
+- **Motion parallax** runs only when (1) the scene is ready (`#scene-container`, `#scene-plane`, and at least one `.biz-card-div` or `.skill-card-div`), and (2) focal point or layout changes. Triggers: `focal-point-changed`, `bulls-eye-moved`, `scene-width-changed`, `resize`. No document/scene mousemove listeners. Effective focal position is read from the `#focal-point` DOM element. See `modules/composables/useParallaxVue3Enhanced.mjs`.
+
+- **rDiv remove (×)**  
+  All rDivs (originals and infinite-scroll clones) are deleteable. Originals get the close handler in `ResumeItemsController.createBizResumeDiv`. Clones get it re-attached in `InfiniteScrollingContainer._attachRDivCloseHandler` (because `cloneNode(true)` does not copy event listeners). Remove persists via `ResumeListController.removedJobNumbers`; `ensureJobInListing` / `scrollToElementId` re-add when needed.
+
+- **Resume list**  
+  Single list: job rDivs + appended skill card copies. Scroll by DOM id: `scrollToElementId('resume-' + jobNumber)`. List position/length shown in debug row. High-contrast text uses luminance threshold 0.35 in `palette-utils-ts/src/colors.ts`.
+
+## Conventions
+
+- Prefer short, direct responses unless the task needs a long plan.
+- Follow fast-failure and error reporting: see `.cursor/rules/fast-failure.mdc` and `docs/FAST-FAILURE.md`.

@@ -41,7 +41,10 @@ function getLuminance(hex) {
     });
     return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs;
 }
-/** Perceptual lightness (LAB L*) 0–100. Use for “is this background light?” */
+/**
+ * Perceptual lightness (LAB L*) in 0–100. Used for "is this background light?" so text/icon
+ * contrast matches human perception. Replaces the previous rule (bright if HSV.V >= 0.5).
+ */
 function getLightnessLab(hex) {
     const rgb = hexToRgb(hex);
     if (!rgb)
@@ -49,25 +52,48 @@ function getLightnessLab(hex) {
     const lab = rgbToLab(rgb.r, rgb.g, rgb.b);
     return lab.L;
 }
-/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses LAB L* (perceptual lightness) so mid tones like #cb937f get black text. */
+/**
+ * Threshold for "bright background → use black text/icons": when LAB L* >= this, use black.
+ * Rule changed from: bright if HSV.V >= 0.5 → bright if LAB L* >= this (perceptual).
+ * 23 keeps very dark colors (L* < 23) with white text; everything else gets black.
+ */
+/** L* >= this → light (black text); L* < this → dark (white text). Set so #61478e (L* ≈ 36) is dark. */
+const LAB_LIGHT_THRESHOLD = 37;
+/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses LAB L* (perceptual lightness); bright when L* >= LAB_LIGHT_THRESHOLD → black text/icons. */
 export function getHighContrastMono(hex) {
     const L = getLightnessLab(hex);
-    return L > 50 ? '#000000' : '#ffffff';
+    return L >= LAB_LIGHT_THRESHOLD ? '#000000' : '#ffffff';
 }
 /**
- * Returns paths for url, back, and img icons. Uses black PNGs only.
- * variant is 'black' on light backgrounds, 'white' on dark; when variant is 'white',
- * apply CSS filter: invert(1) so icons render white on dark background.
+ * Returns high-contrast text color and icon set for a given background in one call, so text and
+ * icons always use the same light/dark decision. Prefer this over separate getHighContrastMono
+ * and getIconSetForBackgroundColor to avoid mismatches.
  */
-export function getContrastIconSet(hex, options = {}) {
+export function getHighContrastForBackground(backgroundColorHex, options = {}) {
+    const L = getLightnessLab(backgroundColorHex);
+    const textColor = L >= LAB_LIGHT_THRESHOLD ? '#000000' : '#ffffff';
+    const variant = textColor === '#000000' ? 'black' : 'white';
     const iconBase = options.iconBase ?? '/palette-utils/icons/anchors';
-    const variant = getHighContrastMono(hex) === '#000000' ? 'black' : 'white';
-    return {
+    const iconSet = {
         url: `${iconBase}/icons8-url-16-black.png`,
         back: `${iconBase}/icons8-back-16-black.png`,
         img: `${iconBase}/icons8-img-16-black.png`,
         variant,
     };
+    return { textColor, iconSet };
+}
+/**
+ * Returns an icon set (url, back, img paths and variant) for a given background color.
+ * Prefer getHighContrastForBackground when you need both text color and icons for the same background.
+ */
+export function getIconSetForBackgroundColor(backgroundColorHex, options = {}) {
+    return getHighContrastForBackground(backgroundColorHex, options).iconSet;
+}
+/**
+ * @deprecated Use getIconSetForBackgroundColor. Returns paths for url, back, and img icons (same behavior).
+ */
+export function getContrastIconSet(hex, options = {}) {
+    return getIconSetForBackgroundColor(hex, options);
 }
 function srgbToLinear(c) {
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);

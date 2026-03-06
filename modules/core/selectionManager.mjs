@@ -81,12 +81,7 @@ class SelectionManager {
             const detail = { skillCardId };
             const ev = new CustomEvent('resume-skill-card-scrollIntoView', { detail });
             this.eventTarget.dispatchEvent(ev);
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(ev);
-                if (typeof window.__resumeAppendSkillCardCopy === 'function') {
-                    window.__resumeAppendSkillCardCopy(skillCardId);
-                }
-            }
+            if (typeof window !== 'undefined') window.dispatchEvent(ev);
             if (typeof document !== 'undefined') document.dispatchEvent(ev);
             console.log('[SkillCard] Selected → resume listing updated', skillCardId);
         }
@@ -203,6 +198,11 @@ class SelectionManager {
 
     getSelectedJobNumber() {
         return this.selectedJobNumber;
+    }
+
+    /** Current selection as card: { type: 'biz', jobNumber } | { type: 'skill', skillCardId } | null. */
+    getSelectedCard() {
+        return this.selectedCard ?? null;
     }
 
     getJobDataByNumber(jobNumber) {
@@ -447,18 +447,16 @@ class SelectionManager {
             div.classList.remove('selected');
         });
         
-        // Hide all clones and show all originals (one selected card at a time; clones are .clone)
+        // Hide all clones and show all originals (class-based; no inline display)
         document.querySelectorAll('.biz-card-div.clone').forEach(clone => {
-            clone.style.setProperty('display', 'none', 'important');
+            clone.classList.add('clone-hidden');
         });
-        
         document.querySelectorAll('.biz-card-div.hasClone').forEach(original => {
-            original.style.removeProperty('display');
-            original.classList.remove('hasClone');
+            original.classList.remove('hasClone', 'force-hidden-for-clone');
         });
         
-        // Clear any hover states
-        document.querySelectorAll('.biz-resume-div.hovered, .biz-card-div.hovered').forEach(div => {
+        // Clear any hover states (scene and resume identical: biz and skill)
+        document.querySelectorAll('.biz-resume-div.hovered, .biz-card-div.hovered, .skill-resume-div.hovered, .skill-card-div.hovered').forEach(div => {
             div.classList.remove('hovered');
         });
         
@@ -519,8 +517,7 @@ class SelectionManager {
 
         const originalCard = document.getElementById(`biz-card-div-${jobNumber}`);
         if (originalCard) {
-            originalCard.style.setProperty('display', 'none', 'important');
-            originalCard.classList.add('hasClone');
+            originalCard.classList.add('hasClone', 'force-hidden-for-clone');
             console.debug('[SelectionManager] original cDiv hidden', jobNumber);
         } else {
             console.error(`[SelectionManager] ❌ Original cDiv not found for job ${jobNumber}`);
@@ -533,8 +530,7 @@ class SelectionManager {
     showJobOriginal(jobNumber) {
         const originalCard = document.getElementById(`biz-card-div-${jobNumber}`);
         if (originalCard) {
-            originalCard.style.removeProperty('display');
-            originalCard.classList.remove('hasClone');
+            originalCard.classList.remove('hasClone', 'force-hidden-for-clone');
             console.debug('[SelectionManager] original cDiv restored', jobNumber);
         }
     }
@@ -545,7 +541,7 @@ class SelectionManager {
     hideJobClone(jobNumber) {
         const clone = document.getElementById(`biz-card-div-${jobNumber}-clone`);
         if (clone) {
-            clone.style.setProperty('display', 'none', 'important');
+            clone.classList.add('clone-hidden');
             console.debug('[SelectionManager] clone hidden', jobNumber);
         }
     }
@@ -564,8 +560,7 @@ class SelectionManager {
         }
         
         if (clone) {
-            clone.style.removeProperty('display');
-            clone.style.setProperty('display', 'block', 'important');
+            clone.classList.remove('clone-hidden');
             console.debug('[SelectionManager] clone shown', jobNumber);
         } else {
             console.error(`[SelectionManager] ❌ Failed to create/show clone for job ${jobNumber}`);

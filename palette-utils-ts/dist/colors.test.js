@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatHexDisplay, rgbToHex, hexToRgb, getHighContrastMono, getContrastIconSet, getHighlightColor, } from './colors.js';
+import { formatHexDisplay, rgbToHex, hexToRgb, getHighContrastMono, getHighContrastForBackground, getContrastIconSet, getHighlightColor, } from './colors.js';
 describe('formatHexDisplay', () => {
     it('returns empty string for null or undefined', () => {
         expect(formatHexDisplay(null)).toBe('');
@@ -61,13 +61,31 @@ describe('getHighContrastMono', () => {
         expect(getHighContrastMono('#ffff00')).toBe('#000000');
         expect(getHighContrastMono('#f0f0f0')).toBe('#000000');
     });
-    it('returns #ffffff for dark backgrounds', () => {
+    it('returns #ffffff for dark backgrounds (LAB L* < 37)', () => {
         expect(getHighContrastMono('#000000')).toBe('#ffffff');
-        expect(getHighContrastMono('#0000ff')).toBe('#ffffff');
-        expect(getHighContrastMono('#333333')).toBe('#ffffff');
+        expect(getHighContrastMono('#333333')).toBe('#ffffff'); // dark grey, L* ~20
+        expect(getHighContrastMono('#61478e')).toBe('#ffffff'); // purple L* ≈ 36, treat as dark
     });
-    it('returns #000000 for mid-light backgrounds (LAB L* > 50)', () => {
+    it('returns #000000 for light backgrounds (LAB L* >= 37)', () => {
+        expect(getHighContrastMono('#ffffff')).toBe('#000000');
         expect(getHighContrastMono('#cb937f')).toBe('#000000'); // tan/salmon
+        expect(getHighContrastMono('#cccccc')).toBe('#000000'); // light grey L* ~82
+    });
+});
+describe('getHighContrastForBackground', () => {
+    it('returns textColor and iconSet from a single light/dark decision', () => {
+        const light = getHighContrastForBackground('#ffffff');
+        expect(light.textColor).toBe('#000000');
+        expect(light.iconSet.variant).toBe('black');
+        const dark = getHighContrastForBackground('#61478e');
+        expect(dark.textColor).toBe('#ffffff');
+        expect(dark.iconSet.variant).toBe('white');
+    });
+    it('matches getHighContrastMono and getIconSetForBackgroundColor', () => {
+        const hex = '#61478e';
+        const unified = getHighContrastForBackground(hex);
+        expect(unified.textColor).toBe(getHighContrastMono(hex));
+        expect(unified.iconSet).toEqual(getContrastIconSet(hex));
     });
 });
 describe('getContrastIconSet', () => {

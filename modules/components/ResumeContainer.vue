@@ -8,7 +8,6 @@ import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useResumeListController } from '@/modules/core/globalServices';
 import { parseFlexibleDateString } from '@/modules/utils/dateUtils.mjs';
 
-
 // Get the same percentage as the resize handle
 const { scenePercentage } = useResizeHandle();
 
@@ -74,6 +73,14 @@ function selectLast() {
     console.error('[ResumeContainer] ResumeListController not available for selectLast!');
   }
 }
+function clearAllResumeDivs() {
+  const controller = resumeListController || window.resumeListController;
+  if (controller && typeof controller.clearAllResumeDivsFromListing === 'function') {
+    controller.clearAllResumeDivsFromListing();
+  } else {
+    console.error('[ResumeContainer] ResumeListController not available for clearAllResumeDivs!');
+  }
+}
 function selectNext() {
   const controller = resumeListController || window.resumeListController;
   if (controller) {
@@ -91,17 +98,31 @@ function selectPrevious() {
   }
 }
 
-// Hint: last-appended skill card id, label, position in central list (0-based index), and total list length
-const skillCardHintInfo = ref({ id: null, label: null, position: null, total: null });
-
 // Resume-view skill card (flock-of-postcards): one card with back links to referencing biz cards and total years (sum of months rounded up)
 const selectedCardSnapshot = ref(null);
 /** When true, the skill card is removed from the resume listing container (hidden) until selection changes. */
 const resumeSkillCardDismissed = ref(false);
 function updateSelectedCardSnapshot() {
   selectedCardSnapshot.value = selectionManager?.selectedCard ?? null;
-  // Show the skill card again when user selects a (possibly different) skill
   resumeSkillCardDismissed.value = false;
+  nextTick(syncSkillResumeDivSelection);
+}
+
+/** Keep skill-resume-div .selected in sync with selection (scene and resume state identical). */
+function syncSkillResumeDivSelection() {
+  const sel = selectionManager?.selectedCard;
+  const selectedSkillId = sel?.type === 'skill' ? sel?.skillCardId : null;
+  const list = document.getElementById('resume-content-div-list') || document.getElementById('resume-content-div');
+  if (!list) return;
+  list.querySelectorAll('.skill-resume-div, .appended-skill-resume-div').forEach((el) => {
+    const id = el.getAttribute('data-skill-card-id') ?? '';
+    if (id === selectedSkillId) {
+      el.classList.add('selected');
+      el.classList.remove('hovered');
+    } else {
+      el.classList.remove('selected');
+    }
+  });
 }
 /** Months of experience for one job (for summing). */
 function getMonthsExperience(job) {
@@ -229,16 +250,9 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     return false;
   }
   const list = (scroller && scroller.contentHolder) ? scroller.contentHolder : appendTarget;
-  const existingCopy = list.querySelector(`.appended-skill-card-copy[data-skill-card-id="${skillCardId}"]`);
+  const existingCopy = list.querySelector(`.appended-skill-resume-div[data-skill-card-id="${skillCardId}"]`);
   if (existingCopy) {
     existingCopy.scrollIntoView({ behavior: 'smooth', block: 'end', inline: 'nearest' });
-    nextTick(() => {
-      const children = Array.from(list.children);
-      const total = children.length;
-      const idx = children.indexOf(existingCopy);
-      const position = idx >= 0 ? idx : total - 1;
-      skillCardHintInfo.value = { id: skillCardId, label: data.skillName ?? '', position, total };
-    });
     return false;
   }
   const now = Date.now();
@@ -252,31 +266,46 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
   const backIconUrl = '/static_content/icons/anchors/icons8-back-16-black.png';
 
   const copy = document.createElement('div');
-  copy.className = 'resume-skill-card appended-skill-card-copy';
+  copy.className = 'skill-resume-div appended-skill-resume-div';
   copy.setAttribute('data-color-index', String(colorIndex));
   if (skillCardId) copy.setAttribute('data-skill-card-id', skillCardId);
   copy.innerHTML = `
-    <button type="button" class="resume-skill-card-close" aria-label="Remove skill card from resume listing">×</button>
-    <span class="resume-skill-card-skill-name">${escapeHtml(data.skillName)}</span>
-    <div class="resume-skill-card-back-links">
+    <span class="skill-resume-div-skill-name">${escapeHtml(data.skillName)}</span>
+    <div class="skill-resume-div-back-links">
       ${(data.referencingJobNumbers || []).map(jobNum => `
-        <button type="button" class="resume-skill-card-back-link" aria-label="Go to job" data-job-number="${jobNum}">
+        <button type="button" class="skill-resume-div-back-link" aria-label="Go to job" data-job-number="${jobNum}">
           <img class="back-icon" src="${escapeHtml(backIconUrl)}" alt="" width="16" height="16" aria-hidden="true" />
         </button>
       `).join('')}
     </div>
-    ${data.totalYearsExperience > 0 ? `<span class="resume-skill-card-years">(${data.totalYearsExperience} year${data.totalYearsExperience !== 1 ? 's' : ''} experience)</span>` : ''}
+    ${data.totalYearsExperience > 0 ? `<span class="skill-resume-div-years">(${data.totalYearsExperience} year${data.totalYearsExperience !== 1 ? 's' : ''} experience)</span>` : ''}
+    <button type="button" class="skill-resume-div-close" aria-label="Remove skill card from resume listing">×</button>
   `;
 
-  const closeBtn = copy.querySelector('.resume-skill-card-close');
+  const closeBtn = copy.querySelector('.skill-resume-div-close');
   if (closeBtn) {
     closeBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
+      const rlc = resumeListController || window.resumeListController;
+      if (rlc && typeof rlc.removeSkillFromResumeListOrder === 'function') {
+        rlc.removeSkillFromResumeListOrder(skillCardId);
+      }
+      const nextSibling = copy.nextElementSibling;
       copy.remove();
+      if (nextSibling) {
+        nextTick(() => {
+          const scrollport = document.getElementById('resume-content-div-wrapper');
+          if (scrollport) {
+            const elTop = nextSibling.getBoundingClientRect().top;
+            const portTop = scrollport.getBoundingClientRect().top;
+            scrollport.scrollTop += elTop - portTop - 5;
+          }
+        });
+      }
     });
   }
-  copy.querySelectorAll('.resume-skill-card-back-link').forEach((btn) => {
+  copy.querySelectorAll('.skill-resume-div-back-link').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -284,9 +313,30 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
       if (!Number.isNaN(jobNum)) selectionManager?.selectCard({ type: 'biz', jobNumber: jobNum }, 'ResumeContainer.appendedCopyBackLink');
     });
   });
+  // Hover: keep scene skill-card-div and resume skill-resume-div in sync (same as biz pair)
+  copy.addEventListener('mouseenter', () => {
+    const sel = selectionManager?.selectedCard;
+    const isSelected = sel?.type === 'skill' && sel?.skillCardId === skillCardId;
+    if (!isSelected) {
+      copy.classList.add('hovered');
+      const sceneCard = document.getElementById(skillCardId) || document.getElementById(`${skillCardId}-clone`);
+      if (sceneCard?.classList.contains('skill-card-div')) sceneCard.classList.add('hovered');
+    }
+  });
+  copy.addEventListener('mouseleave', () => {
+    copy.classList.remove('hovered');
+    const sceneCard = document.getElementById(skillCardId) || document.getElementById(`${skillCardId}-clone`);
+    if (sceneCard?.classList.contains('skill-card-div')) sceneCard.classList.remove('hovered');
+  });
+  // Click: same as biz-resume-div — unselected → select; selected → unselect
   copy.addEventListener('click', (e) => {
-    if (e.target.closest('.resume-skill-card-close') || e.target.closest('.resume-skill-card-back-link')) return;
-    if (skillCardId) {
+    if (e.target.closest('.skill-resume-div-close') || e.target.closest('.skill-resume-div-back-link')) return;
+    if (!skillCardId) return;
+    const sel = selectionManager?.selectedCard;
+    if (sel?.type === 'skill' && sel?.skillCardId === skillCardId) {
+      selectionManager.clearSelection('ResumeContainer.skillResumeDivClick');
+    } else {
+      selectionManager.selectCard({ type: 'skill', skillCardId }, 'ResumeContainer.skillResumeDivClick');
       const sceneEl = document.getElementById(skillCardId);
       if (sceneEl) sceneEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
     }
@@ -298,16 +348,14 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     appendTarget.appendChild(copy);
   }
 
+  const rlc = resumeListController || window.resumeListController;
+  if (rlc && typeof rlc.notifySkillAddedToResumeListing === 'function') {
+    rlc.notifySkillAddedToResumeListing(skillCardId);
+  }
+
   applyPaletteToElement(copy).catch((e) => console.warn('[ResumeContainer] applyPaletteToElement for appended copy:', e));
   nextTick(() => {
-    // Update hint after DOM has the new node: label, id, 0-based position, total length (so position 32 → length 33)
-    const list = (scroller && scroller.contentHolder) ? scroller.contentHolder : appendTarget;
-    const children = Array.from(list.children);
-    const total = children.length;
-    const idx = children.indexOf(copy);
-    const position = idx >= 0 ? idx : total - 1;
-    skillCardHintInfo.value = { id: skillCardId, label: data.skillName ?? '', position, total };
-
+    syncSkillResumeDivSelection();
     const scrollport = document.getElementById('resume-content-div-wrapper');
     if (scrollport && copy.offsetParent) {
       const copyRect = copy.getBoundingClientRect();
@@ -351,18 +399,18 @@ onMounted(() => {
   updateSelectedCardSnapshot();
   selectionManager?.eventTarget?.addEventListener('card-selected', updateSelectedCardSnapshot);
   selectionManager?.eventTarget?.addEventListener('selection-cleared', updateSelectedCardSnapshot);
-  selectionManager?.eventTarget?.addEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
-  window.addEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
-  document.addEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
+  selectionManager?.eventTarget?.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
+  window.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
+  document.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   // Global hook so selection manager can trigger append even if events don't reach this component
   window.__resumeAppendSkillCardCopy = appendSkillCardCopyToResumeListing;
 });
 onUnmounted(() => {
   selectionManager?.eventTarget?.removeEventListener('card-selected', updateSelectedCardSnapshot);
   selectionManager?.eventTarget?.removeEventListener('selection-cleared', updateSelectedCardSnapshot);
-  selectionManager?.eventTarget?.removeEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
-  window.removeEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
-  document.removeEventListener('resume-skill-card-scrollIntoView', onResumeSkillCardScrollIntoView);
+  selectionManager?.eventTarget?.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
+  window.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
+  document.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   delete window.__resumeAppendSkillCardCopy;
 });
 
@@ -373,7 +421,7 @@ function scrollSceneSkillCardIntoView() {
   if (sceneSkillCard) sceneSkillCard.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 }
 function onResumeSkillCardClick(event) {
-  if (event.target.closest('.resume-skill-card-close') || event.target.closest('.resume-skill-card-back-link')) return;
+  if (event.target.closest('.skill-resume-div-close') || event.target.closest('.skill-resume-div-back-link')) return;
   scrollSceneSkillCardIntoView();
 }
 
@@ -394,46 +442,41 @@ function onResumeSkillCardClick(event) {
                     </option>
                 </select>
             </div>
-            <div id="biz-card-sorting-container" tabindex="-1">
-                <select id="biz-resume-div-sorting-selector" v-model="currentSortRule" tabindex="0">
+            <div id="resume-divs-sorting-container" tabindex="-1">
+                <select id="resume-divs-sorting-selector" v-model="currentSortRule" tabindex="0">
                     <option v-for="option in sortOptions" :key="option.text" :value="option.value">
                         {{ option.text }}
                     </option>
                 </select>
             </div>
-            <div id="biz-card-controls">
-                <button @click="selectFirst" class="biz-card-control-button">First</button>
-                <button @click="selectPrevious" class="biz-card-control-button">Prev</button>
-                <button @click="selectNext" class="biz-card-control-button">Next</button>
-                <button @click="selectLast" class="biz-card-control-button">Last</button>
+            <div id="resume-divs-controls">
+                <button @click="selectFirst" class="resume-divs-control-button">First</button>
+                <button @click="selectPrevious" class="resume-divs-control-button">Prev</button>
+                <button @click="selectNext" class="resume-divs-control-button">Next</button>
+                <button @click="selectLast" class="resume-divs-control-button">Last</button>
+                <button @click="clearAllResumeDivs" class="resume-divs-control-button">Clear</button>
             </div>
         </div>
-        <p id="resume-skill-hint" class="resume-skill-hint" aria-live="polite">
-            Click a skill in the <strong>Scene</strong> viewer → a copy is added at the <strong>bottom</strong> of the list below and scrolled into view.
-            <template v-if="skillCardHintInfo.id">
-                <br>Skill card: <strong>{{ skillCardHintInfo.label || skillCardHintInfo.id }}</strong> (id: <strong>{{ skillCardHintInfo.id }}</strong>), position: <strong>{{ skillCardHintInfo.position }}</strong>, list length: <strong>{{ skillCardHintInfo.total }}</strong>.
-            </template>
-        </p>
         <div id="resume-content-div-wrapper" class="scrollable-container">
             <div id="resume-content-div" class="resume-content-div-container">
-                <!-- Single selected-skill panel (stays at top of resume content). -->
-                <div v-if="selectedSkillCard && !resumeSkillCardDismissed" id="resume-skill-cards-panel" class="resume-skill-cards-panel">
-                    <div ref="resumeSkillCardRef" class="resume-skill-card" :data-color-index="selectedSkillCard?.referencingJobNumbers?.[0] ?? 0" @click="onResumeSkillCardClick">
-                        <button type="button" class="resume-skill-card-close" aria-label="Remove skill card from resume listing" @click.prevent="removeSkillCardFromResumeListing">×</button>
-                        <span class="resume-skill-card-skill-name">{{ selectedSkillCard.skillName }}</span>
-                        <div class="resume-skill-card-back-links">
+                <!-- Skill cards only appear as appended copies in the list below; top panel hidden to avoid duplicate. -->
+                <div v-if="false" id="skill-resume-divs-panel" class="skill-resume-divs-panel">
+                    <div ref="resumeSkillCardRef" class="skill-resume-div" :data-color-index="selectedSkillCard?.referencingJobNumbers?.[0] ?? 0" @click="onResumeSkillCardClick">
+                        <span class="skill-resume-div-skill-name">{{ selectedSkillCard.skillName }}</span>
+                        <div class="skill-resume-div-back-links">
                             <button
                                 v-for="jobNum in selectedSkillCard.referencingJobNumbers"
                                 :key="jobNum"
                                 type="button"
-                                class="resume-skill-card-back-link"
+                                class="skill-resume-div-back-link"
                                 aria-label="Go to job"
                                 @click="goToJob(jobNum)"
                             >
                                 <img class="back-icon" src="/static_content/icons/anchors/icons8-back-16-black.png" alt="" width="16" height="16" aria-hidden="true" />
                             </button>
                         </div>
-                        <span v-if="selectedSkillCard.totalYearsExperience > 0" class="resume-skill-card-years">({{ selectedSkillCard.totalYearsExperience }} year{{ selectedSkillCard.totalYearsExperience !== 1 ? 's' : '' }} experience)</span>
+                        <span v-if="selectedSkillCard.totalYearsExperience > 0" class="skill-resume-div-years">({{ selectedSkillCard.totalYearsExperience }} year{{ selectedSkillCard.totalYearsExperience !== 1 ? 's' : '' }} experience)</span>
+                        <button type="button" class="skill-resume-div-close" aria-label="Remove skill card from resume listing" @click.prevent="removeSkillCardFromResumeListing">×</button>
                     </div>
                 </div>
                 <!-- Resume listing: rDivs are injected here; appended skill-card copies are also added here. -->
@@ -465,19 +508,9 @@ function onResumeSkillCardClick(event) {
     padding: 10px;
     flex-shrink: 0; /* Fits children */
 }
-
-.resume-skill-hint {
-    flex-shrink: 0;
-    margin: 0;
-    padding: 6px 10px 8px;
-    font-size: 12px;
-    line-height: 1.35;
-    color: var(--grey-dark-7, #888);
-    background-color: var(--grey-darkest, #1a1a1a);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-.resume-skill-hint strong {
-    color: var(--grey-dark-5, #aaa);
+#resume-content-header > p {
+    margin-block-start: 0.5em;
+    margin-block-end: 0.5em;
 }
 
 #resume-content-div-wrapper {
@@ -485,7 +518,7 @@ function onResumeSkillCardClick(event) {
     /* overflow-y is now controlled by the InfiniteScrollingContainer */
     overflow-x: visible; /* bizCardLineItems (rDivs) must never be clipped by their container */
     background-color: var(--grey-medium);
-    color: black;
+    color: black; /* default for empty area; .biz-resume-div and .skill-resume-div set their own color */
     position: relative; /* Needed for the absolute positioning of items by the scroller */
     /* 8px horizontal padding so selected rDiv box-shadow (8px ring) has room; matches cDiv selected border */
     padding-left: 8px;
@@ -536,7 +569,7 @@ function onResumeSkillCardClick(event) {
     flex-shrink: 0; /* Fits children */
 }
 
-#biz-card-controls {
+#resume-divs-controls {
     display: flex;
     gap: 5px;
     margin-top: 10px;
@@ -545,7 +578,7 @@ function onResumeSkillCardClick(event) {
     z-index: 100; /* High z-index to ensure it's on top of other elements */
     flex-wrap: wrap; /* Allow wrapping for the 2x2 layout */
 }
-.biz-card-control-button {
+.resume-divs-control-button {
     flex: 1 1 auto;
     min-width: 60px;
     padding: 8px 12px;
@@ -561,30 +594,30 @@ function onResumeSkillCardClick(event) {
 
 /* 2x2 layout for medium widths */
 @container (max-width: 320px) {
-    #biz-card-controls .biz-card-control-button {
+    #resume-divs-controls .resume-divs-control-button {
         flex-basis: calc(50% - 2.5px); /* 2 buttons per row, accounting for gap */
     }
 }
 
 /* 1x4 (single column) layout for narrow widths */
 @container (max-width: 160px) {
-    #biz-card-controls {
+    #resume-divs-controls {
         flex-direction: column;
     }
 }
 
-.biz-card-control-button:hover {
+.resume-divs-control-button:hover {
     background-color: var(--grey-dark-7);
 }
 #color-palette-container,
-#biz-card-sorting-container {
+#resume-divs-sorting-container {
     position: relative;
     display: flex;
     padding: 5px 0;
     width: 100%;
 }
 #color-palette-selector,
-#biz-resume-div-sorting-selector {
+#resume-divs-sorting-selector {
     flex: 1 1 auto;
     padding: 8px 12px;
     background-color: var(--grey-dark-6);
@@ -596,12 +629,12 @@ function onResumeSkillCardClick(event) {
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
 }
 #color-palette-selector:hover,
-#biz-resume-div-sorting-selector:hover {
+#resume-divs-sorting-selector:hover {
     background-color: var(--grey-dark-7);
 }
 
-/* Resume-view skill card – same width and spacing as rDivs (same container, gap 10px). */
-.resume-skill-cards-panel {
+/* Resume-view skill card panel (v-if=false; appended copies use global block + scene.css). */
+.skill-resume-divs-panel {
     flex-shrink: 0;
     padding: 8px 0;
     display: flex;
@@ -610,19 +643,21 @@ function onResumeSkillCardClick(event) {
     background-color: var(--grey-dark-6);
     border-bottom: 1px solid rgba(255, 255, 255, 0.15);
 }
-.resume-skill-card {
+/* rDiv styles in global block below */
+
+/* .viewer-label styling consolidated in AppContent.vue */
+</style>
+
+<style>
+/* Global styles for rDivs and skill-resume-div - not scoped to ensure they apply to dynamically created elements */
+/* Normal border/padding/outline/radius come from scene.css (shared .biz-card-div, .biz-resume-div rule). */
+
+/* skill-resume-div: layout only; padding/border/background from scene.css shared rule (synced with skill-card-div) */
+.skill-resume-div {
     position: relative;
     width: 100%;
-    padding: 8px 36px 8px 12px;
-    cursor: pointer;
-    font-family: "Roboto", sans-serif;
-    font-size: 14px;
-    background-color: var(--data-background-color, #e6c229);
-    color: var(--data-foreground-color, #000);
-    border-width: var(--data-normal-inner-border-width, 3px);
-    border-style: solid;
-    border-color: var(--data-normal-inner-border-color, rgba(255, 255, 255, 0.9));
-    border-radius: calc(var(--data-normal-border-radius, 25px) / 2);
+    padding: var(--data-normal-padding);
+    padding-right: 36px; /* room for close button */
     min-height: 44px;
     display: flex;
     flex-direction: column;
@@ -630,11 +665,14 @@ function onResumeSkillCardClick(event) {
     justify-content: center;
     gap: 4px;
     box-sizing: border-box;
+    cursor: pointer;
 }
-.resume-skill-card-close {
+/* Close button: match r-div-close (circular, white bg, red border) */
+.skill-resume-div-close {
     position: absolute;
     top: 6px;
     right: 8px;
+    left: auto;
     width: 22px;
     height: 22px;
     padding: 0;
@@ -648,55 +686,49 @@ function onResumeSkillCardClick(event) {
     display: flex;
     align-items: center;
     justify-content: center;
+    z-index: 1;
 }
-.resume-skill-card-close:hover {
+.skill-resume-div-close:hover {
     color: #f00;
     border-color: #f00;
     background: rgba(255, 255, 255, 0.9);
 }
-.resume-skill-card-skill-name {
-    font-weight: 900;
-    text-decoration: underline;
+.skill-resume-div-skill-name {
     text-align: left;
 }
-.resume-skill-card-back-links {
+.skill-resume-div-back-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px;
+    gap: 4px;
     align-items: center;
 }
-.resume-skill-card-back-link {
+.skill-resume-div-back-link {
     padding: 0 2px;
     line-height: 0;
-    background: transparent;
     border: none;
+    box-shadow: none;
+    background: transparent !important;
+    background-color: transparent !important;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
-.resume-skill-card-back-link .back-icon {
+.skill-resume-div-back-link .back-icon {
     display: block;
+    background: transparent !important;
+    background-color: transparent !important;
 }
-.resume-skill-card-back-link:hover {
+.skill-resume-div-back-link:hover {
     opacity: 0.8;
 }
-.resume-skill-card-years {
+.skill-resume-div-years {
     font-size: 14px;
     text-decoration: underline;
 }
-/* Appended copies at end of resume listing (sibling of list, not inside infinite scroll) */
-.appended-skill-card-copy {
+.appended-skill-resume-div {
     flex-shrink: 0;
 }
-/* rDiv styles moved to global styles section below */
-
-/* .viewer-label styling consolidated in AppContent.vue */
-</style>
-
-<style>
-/* Global styles for rDivs - not scoped to ensure they apply to dynamically created elements */
-/* Normal border/padding/outline/radius come from scene.css (shared .biz-card-div, .biz-resume-div rule). */
 
 /* rDiv removed from resume listing (red X) - same behavior as skill card red X */
 .biz-resume-div.r-div-removed-from-listing {
@@ -794,13 +826,13 @@ function onResumeSkillCardClick(event) {
     overflow: visible; /* Show all content */
 }
 
-/* Hovered state - same padding/border as normal (margin from container) */
-.biz-resume-div.hovered {
+/* Hovered state – 2px #929292 outer, 1px #0028fb inner (match scene.css biz/skill unselected hover) */
+.biz-resume-div:not(.selected).hovered {
     background-color: var(--data-background-color-hovered) !important;
     color: var(--data-foreground-color-hovered) !important;
     padding: var(--data-normal-padding);
-    border: var(--data-normal-inner-border-width) solid var(--data-hovered-inner-border-color);
-    outline: var(--data-normal-outer-border-width) solid var(--data-hovered-outer-border-color);
+    border: 1px solid #0028fb !important;
+    outline: 2px solid #929292 !important;
     border-radius: var(--data-normal-border-radius) !important;
     filter: none !important;
 }
@@ -819,6 +851,8 @@ function onResumeSkillCardClick(event) {
     border-radius: var(--data-normal-border-radius) !important;
     filter: none !important;
 }
+
+/* Skill rDiv normal/hovered/selected: defined in scene.css (same as biz, half border-radius). */
 
 /* Enhanced rDiv content styling with flexbox auto-sizing */
 

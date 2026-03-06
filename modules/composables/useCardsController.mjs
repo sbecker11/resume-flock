@@ -17,12 +17,9 @@ import {
   MEAN_CARD_HEIGHT,
   MAX_CARD_POSITION_OFFSET,
   CARD_BORDER_WIDTH,
-  SKILL_REPOSITION_EDGE_VARIANCE,
   SKILL_REPOSITION_MIN_DISTANCE,
-  SKILL_REPOSITION_STRENGTH,
-  SKILL_REPOSITION_MAX_ITERATIONS,
-  SKILL_UNIQUE_X_MIN_SEPARATION,
-  SKILL_UNIQUE_X_JITTER
+  MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS,
+  SKILL_PLACEMENT_X_STDDEV
 } from '@/modules/core/cardConstants.mjs'
 import { useCardRegistry } from '@/modules/composables/useCardRegistry.mjs'
 import { injectGlobalElementRegistry } from '@/modules/composables/useGlobalElementRegistry.mjs'
@@ -630,9 +627,26 @@ export function useCardsController() {
             selectionManager.selectCard({ type: 'skill', skillCardId: skillCard.id }, 'CardsController.skillCardClick')
         })
         skillCard.addEventListener('mouseenter', () => {
-            if (selectionManager) selectionManager.hoverJobNumber(firstJobIndex, 'CardsController.skillCardMouseenter')
+            if (!selectionManager) return
+            const isSelected = selectionManager.selectedCard?.type === 'skill' && selectionManager.selectedCard?.skillCardId === skillCard.id
+            if (!isSelected) {
+                skillCard.classList.add('hovered')
+                const list = document.getElementById('resume-content-div-list') || document.getElementById('resume-content-div')
+                if (list) {
+                    list.querySelectorAll('.skill-resume-div, .appended-skill-resume-div').forEach((el) => {
+                        if ((el.getAttribute('data-skill-card-id') || '') === skillCard.id) el.classList.add('hovered')
+                    })
+                }
+            }
         })
         skillCard.addEventListener('mouseleave', () => {
+            skillCard.classList.remove('hovered')
+            const list = document.getElementById('resume-content-div-list') || document.getElementById('resume-content-div')
+            if (list) {
+                list.querySelectorAll('.skill-resume-div, .appended-skill-resume-div').forEach((el) => {
+                    if ((el.getAttribute('data-skill-card-id') || '') === skillCard.id) el.classList.remove('hovered')
+                })
+            }
             if (selectionManager) selectionManager.clearHover('CardsController.skillCardMouseleave')
         })
 
@@ -648,74 +662,33 @@ export function useCardsController() {
     const skillCardWidth = MEAN_CARD_WIDTH + 2 * CARD_BORDER_WIDTH
     const skillCardHeight = MEAN_CARD_HEIGHT + 2 * CARD_BORDER_WIDTH
 
-    /** Repulsion: push apart skill cards that are too close (flock-of-postcards applyRepulsionForces) */
-    function applyRepulsionForces(cardPositions, minTop, maxBottom, minLeft, maxRight) {
-        for (let iteration = 0; iteration < SKILL_REPOSITION_MAX_ITERATIONS; iteration++) {
-            let moved = false
-            for (let i = 0; i < cardPositions.length; i++) {
-                let forceX = 0, forceY = 0
-                for (let j = 0; j < cardPositions.length; j++) {
-                    if (i === j) continue
-                    const dx = cardPositions[i].x - cardPositions[j].x
-                    const dy = cardPositions[i].y - cardPositions[j].y
-                    const distance = Math.sqrt(dx * dx + dy * dy)
-                    if (distance < SKILL_REPOSITION_MIN_DISTANCE && distance > 0) {
-                        const force = ((SKILL_REPOSITION_MIN_DISTANCE - distance) / SKILL_REPOSITION_MIN_DISTANCE) * SKILL_REPOSITION_STRENGTH
-                        forceX += (dx / distance) * force * SKILL_REPOSITION_MIN_DISTANCE
-                        forceY += (dy / distance) * force * SKILL_REPOSITION_MIN_DISTANCE
-                        moved = true
-                    }
-                }
-                cardPositions[i].x += forceX
-                cardPositions[i].y += forceY
-                cardPositions[i].y = Math.max(minTop, Math.min(maxBottom - skillCardHeight, cardPositions[i].y))
-                cardPositions[i].x = Math.max(minLeft, Math.min(maxRight - skillCardWidth, cardPositions[i].x))
-            }
-            if (!moved) break
-        }
+    /** Box-Muller: one sample from N(0,1). */
+    function normalSample() {
+        const u1 = Math.random()
+        const u2 = Math.random()
+        if (u1 <= 0) return 0
+        return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
     }
 
-    /** Add jitter so cards don't align in a column (flock-of-postcards ensureUniqueXPositions) */
-    function ensureUniqueXPositions(cardPositions, maxRight) {
-        for (let iter = 0; iter < 5; iter++) {
-            let adjusted = 0
-            for (let i = 0; i < cardPositions.length; i++) {
-                for (let j = i + 1; j < cardPositions.length; j++) {
-                    const centerA = cardPositions[i].x + skillCardWidth / 2
-                    const centerB = cardPositions[j].x + skillCardWidth / 2
-                    const separation = Math.abs(centerB - centerA)
-                    if (separation < SKILL_UNIQUE_X_MIN_SEPARATION) {
-                        const jitterA = (Math.random() - 0.5) * SKILL_UNIQUE_X_JITTER
-                        const jitterB = (Math.random() - 0.5) * SKILL_UNIQUE_X_JITTER
-                        const baseAdj = (SKILL_UNIQUE_X_MIN_SEPARATION - separation) / 2
-                        if (centerA < centerB) {
-                            cardPositions[i].x -= baseAdj + jitterA
-                            cardPositions[j].x += baseAdj + jitterB
-                        } else {
-                            cardPositions[i].x += baseAdj + jitterA
-                            cardPositions[j].x -= baseAdj + jitterB
-                        }
-                        adjusted++
-                    }
-                }
-            }
-            for (const p of cardPositions) {
-                p.x = Math.max(0, Math.min(maxRight - skillCardWidth, p.x))
-            }
-            if (adjusted === 0) break
-        }
+    /** Sample from N(mean, stddev), then clamp to [minVal, maxVal]. */
+    function clampedNormal(mean, stddev, minVal, maxVal) {
+        const x = mean + normalSample() * stddev
+        return Math.max(minVal, Math.min(maxVal, x))
     }
 
     /**
-     * One-time reposition of skill cards (flock-of-postcards repositionAllCardsToWeightedAverages).
-     * Fixed 3D scene positions: spread Y over timeline, cluster X around left/right bizcard edges, repulsion, then clamp.
+     * One-time reposition of skill cards by trial-and-rejection.
+     * Y: random uniform over the total vertical span of all biz cards.
+     * X: random normal around biz card left/right edges (stddev SKILL_PLACEMENT_X_STDDEV).
+     * Reject if 2D distance to any placed center < SKILL_REPOSITION_MIN_DISTANCE; on max rejections use fallback layout.
      */
     function repositionSkillCardsToWeightedAverages(scenePlaneEl) {
         const bizcards = scenePlaneEl.querySelectorAll('.biz-card-div')
         const skillCards = scenePlaneEl.querySelectorAll('.skill-card-div')
-        if (bizcards.length === 0 || skillCards.length === 0) return
+        if (skillCards.length === 0) return
 
-        let minTop = Infinity, maxBottom = -Infinity, sumLeft = 0, sumRight = 0
+        let minTop = Infinity, maxBottom = -Infinity
+        let sumLeft = 0, sumRight = 0
         bizcards.forEach((el) => {
             const top = parseFloat(el.style.top) || 0
             const height = parseFloat(el.style.height) || 0
@@ -725,36 +698,128 @@ export function useCardsController() {
             sumLeft += left
             sumRight += left + BIZCARD_WIDTH
         })
-        const avgLeftEdge = sumLeft / bizcards.length
-        const avgRightEdge = sumRight / bizcards.length
         const sceneWidth = scenePlaneEl.offsetWidth || (scenePlaneEl.parentElement && scenePlaneEl.parentElement.offsetWidth) || 600
+        const sceneHeight = scenePlaneEl.offsetHeight || (scenePlaneEl.parentElement && scenePlaneEl.parentElement.offsetHeight) || 800
         const halfCardWidth = skillCardWidth / 2
+        const halfCardHeight = skillCardHeight / 2
         const maxRight = sceneWidth
+        const minCenterX = halfCardWidth
+        const maxCenterX = Math.max(minCenterX, maxRight - halfCardWidth)
+        const avgLeftEdge = bizcards.length > 0 ? sumLeft / bizcards.length : sceneWidth * 0.25
+        const avgRightEdge = bizcards.length > 0 ? sumRight / bizcards.length : sceneWidth * 0.75
+        const meanLeftCenterX = avgLeftEdge + halfCardWidth
+        const meanRightCenterX = avgRightEdge - halfCardWidth
 
-        const cardPositions = []
+        let minCenterY = minTop + halfCardHeight
+        let maxCenterY = Math.max(minCenterY, maxBottom - halfCardHeight)
+        if (maxCenterY <= minCenterY || !Number.isFinite(minCenterY) || !Number.isFinite(maxCenterY)) {
+            minCenterY = halfCardHeight
+            maxCenterY = Math.max(minCenterY, sceneHeight - halfCardHeight)
+        }
+
+        const placedCenters = []
+        let placementFailed = false
+
         for (let i = 0; i < skillCards.length; i++) {
             const card = skillCards[i]
-            const randomTop = mathUtils.getRandomInt(minTop, Math.max(minTop, maxBottom - skillCardHeight))
-            const clusterLeft = Math.random() < 0.5
-            const edgeVariance = SKILL_REPOSITION_EDGE_VARIANCE
-            let visualCenterX = clusterLeft
-                ? avgLeftEdge + (Math.random() - 0.5) * edgeVariance
-                : avgRightEdge + (Math.random() - 0.5) * edgeVariance
-            let left = visualCenterX - halfCardWidth
-            left = Math.max(0, Math.min(maxRight - skillCardWidth, left))
-            cardPositions.push({ card, x: left, y: randomTop })
-        }
-
-        applyRepulsionForces(cardPositions, minTop, maxBottom - skillCardHeight, 0, maxRight - skillCardWidth)
-        ensureUniqueXPositions(cardPositions, maxRight)
-
-        for (const p of cardPositions) {
-            p.x = Math.max(0, Math.min(maxRight - skillCardWidth, p.x))
-            p.y = Math.max(minTop, Math.min(maxBottom - skillCardHeight, p.y))
-            p.card.style.left = `${p.x}px`
-            p.card.style.top = `${p.y}px`
+            let rejections = 0
+            let left, top
+            outer: while (true) {
+                const cy = minCenterY + Math.random() * (maxCenterY - minCenterY)
+                const useLeft = Math.random() < 0.5
+                const cx = clampedNormal(
+                    useLeft ? meanLeftCenterX : meanRightCenterX,
+                    SKILL_PLACEMENT_X_STDDEV,
+                    minCenterX,
+                    maxCenterX
+                )
+                for (const p of placedCenters) {
+                    const dx = cx - p.cx
+                    const dy = cy - p.cy
+                    const distance = Math.sqrt(dx * dx + dy * dy)
+                    if (distance < SKILL_REPOSITION_MIN_DISTANCE) {
+                        rejections++
+                        if (rejections > MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS) {
+                            console.error('[CardsController] skill card placement failed: max trial rejections exceeded for card', i, card.id)
+                            placementFailed = true
+                            break outer
+                        }
+                        continue outer
+                    }
+                }
+                left = cx - halfCardWidth
+                top = cy - halfCardHeight
+                break
+            }
+            if (placementFailed) {
+                const bounds = {
+                    minCenterY,
+                    maxCenterY,
+                    meanLeftCenterX,
+                    meanRightCenterX
+                }
+                applySkillCardFallbackLayout(skillCards, skillCardWidth, skillCardHeight, sceneWidth, sceneHeight, bounds)
+                return
+            }
+            placedCenters.push({ cx: left + halfCardWidth, cy: top + halfCardHeight })
+            card.style.left = `${Math.max(0, left)}px`
+            card.style.top = `${Math.max(0, top)}px`
         }
         console.debug('[CardsController] skill cards repositioned', skillCards.length)
+    }
+
+    /**
+     * Fallback: same random distribution (Y uniform, X normal) with relaxed min distance so we
+     * always get floating-point random positions and never a quantized grid.
+     */
+    function applySkillCardFallbackLayout(skillCards, cardWidth, cardHeight, sceneWidth, sceneHeight, bounds) {
+        const halfCardWidth = cardWidth / 2
+        const halfCardHeight = cardHeight / 2
+        const minCenterX = halfCardWidth
+        const maxCenterX = Math.max(minCenterX, sceneWidth - halfCardWidth)
+        let minCenterY = bounds.minCenterY
+        let maxCenterY = bounds.maxCenterY
+        if (!Number.isFinite(minCenterY) || !Number.isFinite(maxCenterY) || maxCenterY <= minCenterY) {
+            minCenterY = halfCardHeight
+            maxCenterY = Math.max(minCenterY, (sceneHeight || 800) - halfCardHeight)
+        }
+        const fallbackMinDistance = SKILL_REPOSITION_MIN_DISTANCE * 0.7
+        const placedCenters = []
+        for (let i = 0; i < skillCards.length; i++) {
+            const card = skillCards[i]
+            let rejections = 0
+            let left, top
+            outer: while (true) {
+                const cy = minCenterY + Math.random() * (maxCenterY - minCenterY)
+                const useLeft = Math.random() < 0.5
+                const cx = clampedNormal(
+                    useLeft ? bounds.meanLeftCenterX : bounds.meanRightCenterX,
+                    SKILL_PLACEMENT_X_STDDEV,
+                    minCenterX,
+                    maxCenterX
+                )
+                for (const p of placedCenters) {
+                    const dx = cx - p.cx
+                    const dy = cy - p.cy
+                    if (Math.sqrt(dx * dx + dy * dy) < fallbackMinDistance) {
+                        rejections++
+                        if (rejections > MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS) {
+                            left = minCenterX + Math.random() * (maxCenterX - minCenterX) - halfCardWidth
+                            top = minCenterY + Math.random() * (maxCenterY - minCenterY) - halfCardHeight
+                            break outer
+                        }
+                        continue outer
+                    }
+                }
+                left = cx - halfCardWidth
+                top = cy - halfCardHeight
+                break
+            }
+            placedCenters.push({ cx: left + halfCardWidth, cy: top + halfCardHeight })
+            card.style.left = `${Math.max(0, left)}px`
+            card.style.top = `${Math.max(0, top)}px`
+        }
+        console.warn('[CardsController] skill cards placed with random fallback layout')
     }
 
     // Viewport change handler for repositioning selected clones
@@ -1052,12 +1117,20 @@ export function useCardsController() {
                 setTimeout(() => scrollCDivHeaderIntoView(card.jobNumber), 100)
             }
         } else {
-            // Skill selected: show only in resume listing; do not show selected clone in scene (dual in scene stays unselected)
+            // Skill selected: show as selected in both scene (clone) and resume (paired skill-resume-div)
             if (previousCard?.type === 'skill' && previousCard.skillCardId !== card.skillCardId) {
                 removeSkillCardClone(previousCard.skillCardId)
                 showSkillCardOriginal(previousCard.skillCardId)
             }
-            // Do not create skill card clone or hide original — scene keeps skill cards in place
+            hideSkillCardOriginal(card.skillCardId)
+            const cloneId = `${card.skillCardId}-clone`
+            if (!document.getElementById(cloneId)) {
+                createSkillCardClone(card.skillCardId)
+            }
+            const cloneEl = document.getElementById(cloneId)
+            if (cloneEl) {
+                cloneEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+            }
         }
     }
 

@@ -31,8 +31,6 @@ export function useParallaxEnhanced() {
   const lastRenderTime = ref(0)
   const renderCount = ref(0)
   const previousDisplacements = ref({ dh: null, dv: null })
-  // Mouse-over-scene: use actual mouse position for parallax so it works regardless of focal point mode
-  const mouseOverScenePosition = ref(null)
   let rafScheduled = false
 
   // Get positions using injected services instead of window globals
@@ -43,20 +41,21 @@ export function useParallaxEnhanced() {
     return debugFunctions?.getBullsEyePosition?.() || { x: 0, y: 0 }
   }
 
-  const getFocalPointPosition = () => {
-    if (focalPoint?.getPosition) {
-      return focalPoint.getPosition()
+  /** Effective focal position for parallax: read directly from the displayed #focal-point element (single source of truth). */
+  const getEffectiveFocalPosition = () => {
+    const el = typeof document !== 'undefined' && document.getElementById('focal-point')
+    if (el) {
+      const style = window.getComputedStyle(el)
+      if (style.visibility !== 'hidden' && style.display !== 'none') {
+        const rect = el.getBoundingClientRect()
+        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      }
     }
+    if (focalPoint?.getPosition) return focalPoint.getPosition()
     return debugFunctions?.getFocalPointPosition?.() || { x: window.innerWidth / 2, y: window.innerHeight / 2 }
   }
 
-  /** Effective focal position for parallax: mouse when over scene, otherwise store focal point */
-  const getEffectiveFocalPosition = () => {
-    if (mouseOverScenePosition.value) {
-      return mouseOverScenePosition.value
-    }
-    return getFocalPointPosition()
-  }
+  const getFocalPointPosition = () => getEffectiveFocalPosition()
 
   const getViewportOrigin = () => {
     return debugFunctions?.getViewportOrigin?.() || { x: 0, y: 0 }
@@ -89,8 +88,18 @@ export function useParallaxEnhanced() {
     return true
   }
 
-  /** Refresh all parallax transforms using current bulls-eye and effective focal (mouse or store) */
+  /** True when scene container and scene elements (cards/plane) exist so parallax can run. */
+  function isSceneReady() {
+    const scene = typeof document !== 'undefined' && document.getElementById('scene-container')
+    if (!scene) return false
+    const plane = scene.querySelector('#scene-plane')
+    return !!(plane && (scene.querySelector('.biz-card-div') || scene.querySelector('.skill-card-div')))
+  }
+
+  /** Refresh all parallax transforms using current bulls-eye and effective focal (from #focal-point element). Only runs when scene is ready. */
   function refreshAllParallaxTransforms() {
+    if (!isSceneReady()) return
+
     const bulls = getBullsEyePosition()
     const focal = getEffectiveFocalPosition()
     const dh = (bulls.x - focal.x) * PARALLAX_X_EXAGGERATION_FACTOR
@@ -145,41 +154,6 @@ export function useParallaxEnhanced() {
     renderAllCDivs()
   }
 
-  /** Throttled refresh for mousemove (one per frame) */
-  function scheduleParallaxRefresh() {
-    if (rafScheduled || !isInitialized.value) return
-    rafScheduled = true
-    requestAnimationFrame(() => {
-      rafScheduled = false
-      refreshAllParallaxTransforms()
-    })
-  }
-
-  function handleSceneMouseMove(event) {
-    mouseOverScenePosition.value = { x: event.clientX, y: event.clientY }
-    scheduleParallaxRefresh()
-  }
-
-  function handleSceneMouseLeave() {
-    mouseOverScenePosition.value = null
-    scheduleParallaxRefresh()
-  }
-
-  function attachSceneMouseListeners() {
-    const scene = typeof document !== 'undefined' && document.getElementById('scene-container')
-    if (!scene) return false
-    scene.addEventListener('mousemove', handleSceneMouseMove, { passive: true })
-    scene.addEventListener('mouseleave', handleSceneMouseLeave, { passive: true })
-    return true
-  }
-
-  function detachSceneMouseListeners() {
-    const scene = typeof document !== 'undefined' && document.getElementById('scene-container')
-    if (!scene) return
-    scene.removeEventListener('mousemove', handleSceneMouseMove)
-    scene.removeEventListener('mouseleave', handleSceneMouseLeave)
-  }
-
   // Setup event listeners
   const setupEventListeners = () => {
     window.addEventListener('focal-point-changed', handleFocalPointChanged)
@@ -193,7 +167,6 @@ export function useParallaxEnhanced() {
     window.removeEventListener('bulls-eye-moved', handleBullsEyeMoved)
     window.removeEventListener('scene-width-changed', renderAllCDivs)
     window.removeEventListener('resize', renderAllCDivs)
-    detachSceneMouseListeners()
   }
   
   // Service availability checks
@@ -220,13 +193,7 @@ export function useParallaxEnhanced() {
     
     setupEventListeners()
     isInitialized.value = true
-    // Mouse-over-scene drives parallax; scene may not be in DOM yet so retry
-    if (!attachSceneMouseListeners()) {
-      const retry = () => { attachSceneMouseListeners() }
-      setTimeout(retry, 150)
-      setTimeout(retry, 500)
-    }
-    // Apply initial parallax (e.g. when focal point is already offset from bulls-eye)
+    // Initial parallax run when scene is ready (may be no-op if scene not ready yet)
     requestAnimationFrame(() => refreshAllParallaxTransforms())
 
     // Make functions available globally for backwards compatibility

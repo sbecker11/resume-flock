@@ -142,7 +142,7 @@ export function useFocalPoint() {
   
   const FOCAL_POINT_EDGE_MARGIN = 30
 
-  /** Clamp point to stay within left column (scene) bounds, >= 10px from edges */
+  /** Clamp point to stay within scene container padded bounds. Focal point tracks mouse but cannot leave scene. */
   function clampToLeftColumn(mouseX, mouseY) {
     const leftColumn = typeof document !== 'undefined' && document.getElementById('scene-container')
     if (!leftColumn) {
@@ -168,22 +168,19 @@ export function useFocalPoint() {
     }
   }
 
-  // Pure vanilla JS handler for buttery smooth follow mode (same as drag)
+  // Follow mode: focal point always tracks mouse; position is clamped to scene padded bounds so it never leaves the scene.
   function createVanillaFollowHandler() {
     return (event) => {
       if (!focalPointElement.value) return
 
       const { x, y } = clampToLeftColumn(event.clientX, event.clientY)
 
-      // PURE VANILLA JS: Direct DOM manipulation for maximum performance
       const element = focalPointElement.value
       element.style.left = `${x}px`
       element.style.top = `${y}px`
 
-      // Update store values for parallax system (minimal overhead)
       actions.setFocalPoint(x, y)
 
-      // Dispatch event for parallax system
       window.dispatchEvent(new CustomEvent('focal-point-changed', {
         detail: { x, y }
       }))

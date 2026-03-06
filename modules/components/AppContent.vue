@@ -570,11 +570,10 @@ watch(orientation, (newOrientation) => {
   user-select: none;
 }
 
-/* Resume viewer label (dark text with white drop shadow for light backgrounds) */
+/* Resume viewer label (dark text for light backgrounds) */
 .resume-viewer-label,
 .viewer-label.resume-viewer-label {
   color: black !important;
-  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9);
 }
 
 /* Scene viewer label (light text with dark shadow for dark backgrounds) */
@@ -597,7 +596,6 @@ watch(orientation, (newOrientation) => {
   pointer-events: none;
   z-index: 1000;
   color: black;
-  text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.9);
 }
 
 /* Position mirrored based on layout - opposite sides */

@@ -22,4 +22,12 @@ export const SKILL_REPOSITION_MIN_DISTANCE = 150;
 export const SKILL_REPOSITION_STRENGTH = 0.5;
 export const SKILL_REPOSITION_MAX_ITERATIONS = 20;
 export const SKILL_UNIQUE_X_MIN_SEPARATION = 40;
-export const SKILL_UNIQUE_X_JITTER = 10;
+/** Minimum separation between skill card centers on both axes (px). Must be >= card height (~81px) to avoid vertical overlap. */
+export const SKILL_MIN_SEPARATION = 90;
+/** Minimum vertical gap between top edges so skill cards (and skill vs biz) don't align on the same row. */
+export const SKILL_MIN_TOP_EDGE_SEPARATION = 55;
+
+/** Max trial-rejections per skill card during placement; exceed → use random fallback (no grid). */
+export const MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS = 5000;
+/** Stddev (px) for normal distribution of skill card X around biz card left/right edges. */
+export const SKILL_PLACEMENT_X_STDDEV = 100;

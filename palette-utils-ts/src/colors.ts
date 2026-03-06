@@ -7,6 +7,7 @@ import type {
   ContrastIconSet,
   GetContrastIconSetOptions,
   GetHighlightColorOptions,
+  HighContrastForBackground,
   RGB,
 } from './types.js';
 
@@ -50,34 +51,71 @@ function getLuminance(hex: string): number {
 }
 
 /**
- * Threshold for "use black text": when relative luminance > this, use black.
- * Standard 0.5 corresponds to a light grey (~#bc); #888888 has L ≈ 0.21.
- * Using 0.35 so colours brighter than mid-sRGB (e.g. #cb937f, L ≈ 0.37) get black text.
+ * Perceptual lightness (LAB L*) in 0–100. Used for "is this background light?" so text/icon
+ * contrast matches human perception. Replaces the previous rule (bright if HSV.V >= 0.5).
  */
-const HIGH_CONTRAST_LUMINANCE_THRESHOLD = 0.35;
-
-/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses relative luminance (WCAG); threshold 0.35 so mid-light colours like #cb937f get black. */
-export function getHighContrastMono(hex: string): '#000000' | '#ffffff' {
-  return getLuminance(hex) > HIGH_CONTRAST_LUMINANCE_THRESHOLD ? '#000000' : '#ffffff';
+function getLightnessLab(hex: string): number {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return 50;
+  const lab = rgbToLab(rgb.r, rgb.g, rgb.b);
+  return lab.L;
 }
 
 /**
- * Returns paths for url, back, and img icons. Uses black PNGs only.
- * variant is 'black' on light backgrounds, 'white' on dark; when variant is 'white',
- * apply CSS filter: invert(1) so icons render white on dark background.
+ * Threshold for "bright background → use black text/icons": when LAB L* >= this, use black.
+ * Rule changed from: bright if HSV.V >= 0.5 → bright if LAB L* >= this (perceptual).
+ * 23 keeps very dark colors (L* < 23) with white text; everything else gets black.
  */
-export function getContrastIconSet(
-  hex: string,
+/** L* >= this → light (black text); L* < this → dark (white text). Set so #61478e (L* ≈ 36) is dark. */
+const LAB_LIGHT_THRESHOLD = 37;
+
+/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses LAB L* (perceptual lightness); bright when L* >= LAB_LIGHT_THRESHOLD → black text/icons. */
+export function getHighContrastMono(hex: string): '#000000' | '#ffffff' {
+  const L = getLightnessLab(hex);
+  return L >= LAB_LIGHT_THRESHOLD ? '#000000' : '#ffffff';
+}
+
+/**
+ * Returns high-contrast text color and icon set for a given background in one call, so text and
+ * icons always use the same light/dark decision. Prefer this over separate getHighContrastMono
+ * and getIconSetForBackgroundColor to avoid mismatches.
+ */
+export function getHighContrastForBackground(
+  backgroundColorHex: string,
   options: GetContrastIconSetOptions = {}
-): ContrastIconSet {
+): HighContrastForBackground {
+  const L = getLightnessLab(backgroundColorHex);
+  const textColor: '#000000' | '#ffffff' = L >= LAB_LIGHT_THRESHOLD ? '#000000' : '#ffffff';
+  const variant = textColor === '#000000' ? 'black' : 'white';
   const iconBase = options.iconBase ?? '/palette-utils/icons/anchors';
-  const variant = getHighContrastMono(hex) === '#000000' ? 'black' : 'white';
-  return {
+  const iconSet: ContrastIconSet = {
     url: `${iconBase}/icons8-url-16-black.png`,
     back: `${iconBase}/icons8-back-16-black.png`,
     img: `${iconBase}/icons8-img-16-black.png`,
     variant,
   };
+  return { textColor, iconSet };
+}
+
+/**
+ * Returns an icon set (url, back, img paths and variant) for a given background color.
+ * Prefer getHighContrastForBackground when you need both text color and icons for the same background.
+ */
+export function getIconSetForBackgroundColor(
+  backgroundColorHex: string,
+  options: GetContrastIconSetOptions = {}
+): ContrastIconSet {
+  return getHighContrastForBackground(backgroundColorHex, options).iconSet;
+}
+
+/**
+ * @deprecated Use getIconSetForBackgroundColor. Returns paths for url, back, and img icons (same behavior).
+ */
+export function getContrastIconSet(
+  hex: string,
+  options: GetContrastIconSetOptions = {}
+): ContrastIconSet {
+  return getIconSetForBackgroundColor(hex, options);
 }
 
 function srgbToLinear(c: number): number {

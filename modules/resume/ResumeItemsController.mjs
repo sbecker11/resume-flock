@@ -123,8 +123,6 @@ class ResumeItemsController {
         bizResumeDiv.setAttribute('data-color-index', jobNumber);
         console.log(`[DEBUG] Color index set - Job ${jobNumber}: rDiv data-color-index=${jobNumber}`);
 
-        bizResumeDiv.style.pointerEvents = 'auto';
-
         // Create enhanced resume content with job details
         const bizResumeDetailsDiv = this.createEnhancedResumeDetailsDiv(jobNumber);
         bizResumeDiv.appendChild(bizResumeDetailsDiv);
@@ -177,6 +175,30 @@ class ResumeItemsController {
         return `resume-${jobNumber}`;
     }
 
+    /**
+     * Get job number from a biz-resume-div element. ID convention: id="resume-10" → 10.
+     */
+    getJobNumberFromBizResumeDiv(rDiv) {
+        if (!rDiv) return null;
+        const id = rDiv.id || '';
+        const m = id.match(/^resume-(\d+)$/);
+        if (m) return parseInt(m[1], 10);
+        const attr = rDiv.getAttribute('data-job-number');
+        if (attr == null || attr === '') return null;
+        const n = parseInt(attr, 10);
+        return Number.isNaN(n) ? null : n;
+    }
+
+    /**
+     * Get the matching biz-card-div (original) from a biz-resume-div. ID convention:
+     * rDiv id="resume-10" → cDiv id="biz-card-div-10" (clone id="biz-card-div-10-clone").
+     */
+    getBizCardDivFromBizResumeDiv(rDiv) {
+        const jobNumber = this.getJobNumberFromBizResumeDiv(rDiv);
+        if (jobNumber == null || Number.isNaN(jobNumber)) return null;
+        return document.getElementById(`biz-card-div-${jobNumber}`);
+    }
+
     createEnhancedResumeDetailsDiv(jobNumber) {
         // Get job data for this job number
         const jobData = jobs[jobNumber];
@@ -220,8 +242,6 @@ class ResumeItemsController {
         const jobNumPart = document.createElement('span');
         jobNumPart.className = 'job-number';
         jobNumPart.textContent = `#${jobNumber}`;
-        jobNumPart.style.fontWeight = 'bold';
-        jobNumPart.style.opacity = '0.8';
         idAndHexSpan.appendChild(jobNumPart);
         idAndHexSpan.appendChild(document.createTextNode(' label: '));
         const labelSpan = document.createElement('span');
@@ -542,82 +562,11 @@ class ResumeItemsController {
     }
     
     _applyHoverStyles(bizResumeDiv) {
-        // Apply hover styles using CSS custom properties
-        const hoveredBgColor = bizResumeDiv.getAttribute('data-background-color-hovered');
-        const hoveredFgColor = bizResumeDiv.getAttribute('data-foreground-color-hovered');
-        const hoveredPadding = bizResumeDiv.getAttribute('data-hovered-padding');
-        const hoveredInnerBorderWidth = bizResumeDiv.getAttribute('data-hovered-inner-border-width');
-        const hoveredInnerBorderColor = bizResumeDiv.getAttribute('data-hovered-inner-border-color');
-        const hoveredOuterBorderWidth = bizResumeDiv.getAttribute('data-hovered-outer-border-width');
-        const hoveredOuterBorderColor = bizResumeDiv.getAttribute('data-hovered-outer-border-color');
-        const hoveredBorderRadius = bizResumeDiv.getAttribute('data-hovered-border-radius');
-        
-        if (hoveredBgColor) {
-            bizResumeDiv.style.setProperty('--data-background-color-hovered', hoveredBgColor);
-        }
-        if (hoveredFgColor) {
-            bizResumeDiv.style.setProperty('--data-foreground-color-hovered', hoveredFgColor);
-        }
-        if (hoveredPadding) {
-            bizResumeDiv.style.setProperty('--data-hovered-padding', hoveredPadding);
-        }
-        if (hoveredInnerBorderWidth) {
-            bizResumeDiv.style.setProperty('--data-hovered-inner-border-width', hoveredInnerBorderWidth);
-        }
-        if (hoveredInnerBorderColor) {
-            bizResumeDiv.style.setProperty('--data-hovered-inner-border-color', hoveredInnerBorderColor);
-        }
-        if (hoveredOuterBorderWidth) {
-            bizResumeDiv.style.setProperty('--data-hovered-outer-border-width', hoveredOuterBorderWidth);
-        }
-        if (hoveredOuterBorderColor) {
-            bizResumeDiv.style.setProperty('--data-hovered-outer-border-color', hoveredOuterBorderColor);
-        }
-        if (hoveredBorderRadius) {
-            bizResumeDiv.style.setProperty('--data-hovered-border-radius', hoveredBorderRadius);
-        }
-        
-        // Add hovered class for CSS rule to apply
+        // Palette already set --data-* vars; CSS uses them when .hovered is present
         bizResumeDiv.classList.add('hovered');
     }
-    
+
     _clearHoverStyles(bizResumeDiv) {
-        // Restore normal styles using CSS custom properties
-        const normalBgColor = bizResumeDiv.getAttribute('data-background-color');
-        const normalFgColor = bizResumeDiv.getAttribute('data-foreground-color');
-        const normalPadding = bizResumeDiv.getAttribute('data-normal-padding');
-        const normalInnerBorderWidth = bizResumeDiv.getAttribute('data-normal-inner-border-width');
-        const normalInnerBorderColor = bizResumeDiv.getAttribute('data-normal-inner-border-color');
-        const normalOuterBorderWidth = bizResumeDiv.getAttribute('data-normal-outer-border-width');
-        const normalOuterBorderColor = bizResumeDiv.getAttribute('data-normal-outer-border-color');
-        const normalBorderRadius = bizResumeDiv.getAttribute('data-normal-border-radius');
-        
-        if (normalBgColor) {
-            bizResumeDiv.style.setProperty('--data-background-color', normalBgColor);
-        }
-        if (normalFgColor) {
-            bizResumeDiv.style.setProperty('--data-foreground-color', normalFgColor);
-        }
-        if (normalPadding) {
-            bizResumeDiv.style.setProperty('--data-normal-padding', normalPadding);
-        }
-        if (normalInnerBorderWidth) {
-            bizResumeDiv.style.setProperty('--data-normal-inner-border-width', normalInnerBorderWidth);
-        }
-        if (normalInnerBorderColor) {
-            bizResumeDiv.style.setProperty('--data-normal-inner-border-color', normalInnerBorderColor);
-        }
-        if (normalOuterBorderWidth) {
-            bizResumeDiv.style.setProperty('--data-normal-outer-border-width', normalOuterBorderWidth);
-        }
-        if (normalOuterBorderColor) {
-            bizResumeDiv.style.setProperty('--data-normal-outer-border-color', normalOuterBorderColor);
-        }
-        if (normalBorderRadius) {
-            bizResumeDiv.style.setProperty('--data-normal-border-radius', normalBorderRadius);
-        }
-        
-        // Remove hovered class
         bizResumeDiv.classList.remove('hovered');
     }
 
@@ -656,18 +605,11 @@ class ResumeItemsController {
             window.CONSOLE_LOG_IGNORE(`[DEBUG] ResumeItemsController.handleSelectionChanged: Found resume div for job ${selectedJobNumber}`);
             bizResumeDiv.classList.add('selected');
             
-            // Debug color matching using optimized registry (if available)
+            // Debug color matching
             const rDivColorIndex = bizResumeDiv.getAttribute('data-color-index');
             const rDivBgColor = window.getComputedStyle(bizResumeDiv).backgroundColor;
-            
-            // Try to get cDiv via card registry first, fallback to DOM query
-            let cDiv = null;
-            if (window.cardRegistry && window.cardRegistry.getCardElement) {
-                cDiv = window.cardRegistry.getCardElement(selectedJobNumber);
-            } else {
-                cDiv = document.getElementById(`biz-card-div-${selectedJobNumber}`);
-            }
-            
+            // cDiv from rDiv ID convention: resume-10 → biz-card-div-10
+            const cDiv = this.getBizCardDivFromBizResumeDiv(bizResumeDiv);
             const cDivColorIndex = cDiv?.getAttribute('data-color-index');
             const cDivBgColor = cDiv ? window.getComputedStyle(cDiv).backgroundColor : 'N/A';
             
@@ -685,29 +627,17 @@ class ResumeItemsController {
             // Trigger height recalculation to accommodate visible stats div
             this._triggerHeightRecalculation('[DEBUG] ResumeItemsController.handleSelectionChanged: Triggered height recalculation');
             
-            // CRITICAL FIX: Scroll corresponding cDiv into view
+            // CRITICAL FIX: Scroll corresponding cDiv into view (scrollable element is #scene-content, not #scene-container)
             if (cDiv) {
                 console.log(`[DEBUG] ResumeItemsController: Scrolling cDiv into view for job ${selectedJobNumber}`);
-                
-                // Find the scene container
-                const sceneContainer = document.getElementById('scene-container');
-                if (sceneContainer) {
-                    // Scroll the cDiv into the center of the scene container
-                    const sceneRect = sceneContainer.getBoundingClientRect();
+                const sceneScroll = document.getElementById('scene-content');
+                if (sceneScroll) {
+                    const sceneRect = sceneScroll.getBoundingClientRect();
                     const cDivRect = cDiv.getBoundingClientRect();
-                    
-                    // Calculate scroll position to center the cDiv
-                    const scrollTop = sceneContainer.scrollTop + (cDivRect.top - sceneRect.top) - (sceneRect.height / 2) + (cDivRect.height / 2);
-                    
-                    // Smooth scroll to position
-                    sceneContainer.scrollTo({
-                        top: scrollTop,
-                        behavior: 'smooth'
-                    });
-                    
-                    console.log(`[DEBUG] ResumeItemsController: Scrolled scene container to position ${Math.round(scrollTop)} for job ${selectedJobNumber}`);
+                    const scrollTop = sceneScroll.scrollTop + (cDivRect.top - sceneRect.top) - (sceneRect.height / 2) + (cDivRect.height / 2);
+                    sceneScroll.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
+                    console.log(`[DEBUG] ResumeItemsController: Scrolled scene-content to position ${Math.round(scrollTop)} for job ${selectedJobNumber}`);
                 } else {
-                    console.debug(`[ResumeItemsController] Scene container not found, using fallback scrollIntoView`);
                     cDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             } else {

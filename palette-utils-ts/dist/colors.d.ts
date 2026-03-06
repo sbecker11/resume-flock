@@ -2,18 +2,27 @@
  * Palette color utilities – TypeScript, no framework deps.
  * Use in Node, browser, or any TS/JS project that consumes exported palette JSON.
  */
-import type { ContrastIconSet, GetContrastIconSetOptions, GetHighlightColorOptions, RGB } from './types.js';
+import type { ContrastIconSet, GetContrastIconSetOptions, GetHighlightColorOptions, HighContrastForBackground, RGB } from './types.js';
 /** Format hex for display: always 7 chars (#rrggbb), lowercase. Expands #rgb to #rrggbb. */
 export declare function formatHexDisplay(hex: string | null | undefined): string;
 export declare function rgbToHex(r: number, g: number, b: number): string;
 /** Parse hex color to { r, g, b } (0-255). Returns null if invalid. */
 export declare function hexToRgb(hex: string): RGB | null;
-/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses LAB L* (perceptual lightness) so mid tones like #cb937f get black text. */
+/** Returns black or white hex for best contrast on the given background: white on dark, black on light. Uses LAB L* (perceptual lightness); bright when L* >= LAB_LIGHT_THRESHOLD → black text/icons. */
 export declare function getHighContrastMono(hex: string): '#000000' | '#ffffff';
 /**
- * Returns paths for url, back, and img icons. Uses black PNGs only.
- * variant is 'black' on light backgrounds, 'white' on dark; when variant is 'white',
- * apply CSS filter: invert(1) so icons render white on dark background.
+ * Returns high-contrast text color and icon set for a given background in one call, so text and
+ * icons always use the same light/dark decision. Prefer this over separate getHighContrastMono
+ * and getIconSetForBackgroundColor to avoid mismatches.
+ */
+export declare function getHighContrastForBackground(backgroundColorHex: string, options?: GetContrastIconSetOptions): HighContrastForBackground;
+/**
+ * Returns an icon set (url, back, img paths and variant) for a given background color.
+ * Prefer getHighContrastForBackground when you need both text color and icons for the same background.
+ */
+export declare function getIconSetForBackgroundColor(backgroundColorHex: string, options?: GetContrastIconSetOptions): ContrastIconSet;
+/**
+ * @deprecated Use getIconSetForBackgroundColor. Returns paths for url, back, and img icons (same behavior).
  */
 export declare function getContrastIconSet(hex: string, options?: GetContrastIconSetOptions): ContrastIconSet;
 /**

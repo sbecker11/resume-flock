@@ -1,6 +1,6 @@
 import { ref, watch, computed, getCurrentInstance } from 'vue';
 import { useAppState } from './useAppState.ts';
-import { parsePaletteJson, normalizePaletteColors, getHighContrastMono, getHighlightColor, getContrastIconSet, hexToRgb, rgbToHex } from 'color-palette-utils-ts';
+import { parsePaletteJson, normalizePaletteColors, getHighContrastForBackground, getHighlightColor, formatHexDisplay, hexToRgb, rgbToHex } from 'color-palette-utils-ts';
 import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 
@@ -479,9 +479,11 @@ export async function applyPaletteToElement(element) {
         throw new Error(`Color palette not found for name: ${paletteName}`);
     }
 
-    // Calculate base colors (palette-utils-ts: LCH-based highlight, high-contrast mono text)
-    const backgroundColor = colorPalette[paletteColorIndex % colorPalette.length];
-    const foregroundColor = getHighContrastMono(backgroundColor);
+    // Calculate base colors (palette-utils-ts: LCH-based highlight, high-contrast text + icons from single call)
+    const backgroundColor = formatHexDisplay(colorPalette[paletteColorIndex % colorPalette.length]) || colorPalette[paletteColorIndex % colorPalette.length];
+    const normalContrast = getHighContrastForBackground(backgroundColor, { iconBase: ICON_BASE });
+    const foregroundColor = normalContrast.textColor;
+    const normalIconSet = normalContrast.iconSet;
 
     const systemConstants = appState.value["system-constants"];
     // Selected: single knob 135 → L >= floor(100/1.35) darken (L'=L/1.35), else brighten (L'=L*1.35).
@@ -493,9 +495,9 @@ export async function applyPaletteToElement(element) {
         highlightPercent: selectedHighlightPercent,
         nearlyWhiteL: highLuminosityThreshold
     });
-    // Secondary colors for highlighted (selected): white on dark background, black on light (palette-utils)
-    const highlightedTextColor = getHighContrastMono(selectedBackgroundColor);
-    const highlightedIconSet = getContrastIconSet(selectedBackgroundColor, { iconBase: ICON_BASE }); /* usage: see docs/CONTRAST-ICONS-FLOCK-OF-POSTCARDS.md */
+    const highlightedContrast = getHighContrastForBackground(selectedBackgroundColor, { iconBase: ICON_BASE });
+    const highlightedTextColor = highlightedContrast.textColor;
+    const highlightedIconSet = highlightedContrast.iconSet;
 
     // Hover = (unselected + selected) / 2 in RGB — no brightness factor. Palette colors are validated at startup.
     const rgbNorm = hexToRgb(backgroundColor);
@@ -508,10 +510,9 @@ export async function applyPaletteToElement(element) {
         Math.round((rgbNorm.g + rgbSel.g) / 2),
         Math.round((rgbNorm.b + rgbSel.b) / 2)
     );
-    const hoveredForegroundColor = getHighContrastMono(hoveredBackgroundColor);
-    const hoveredIconSet = getContrastIconSet(hoveredBackgroundColor, { iconBase: ICON_BASE });
-
-    const normalIconSet = getContrastIconSet(backgroundColor, { iconBase: ICON_BASE });
+    const hoveredContrast = getHighContrastForBackground(hoveredBackgroundColor, { iconBase: ICON_BASE });
+    const hoveredForegroundColor = hoveredContrast.textColor;
+    const hoveredIconSet = hoveredContrast.iconSet;
 
     const borderRadius = appState.value.theme?.borderRadius || '25px';
 

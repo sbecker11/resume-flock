@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
+    "allowJs": true,
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "strict": true,
     "jsx": "preserve",
     "sourceMap": true,
@@ -16,7 +17,7 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   },
   "include": ["modules/**/*.ts", "modules/**/*.d.ts", "modules/**/*.vue", "main.ts", "vite.config.js", "modules/**/*.mjs", "static_content/**/*.mjs", "env.d.ts"],
 } 

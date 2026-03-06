@@ -13,7 +13,6 @@ import {
   SKILL_REPOSITION_STRENGTH,
   SKILL_REPOSITION_MAX_ITERATIONS,
   SKILL_UNIQUE_X_MIN_SEPARATION,
-  SKILL_UNIQUE_X_JITTER,
 } from './cardConstants.mjs';
 
 describe('core/cardConstants', () => {
@@ -35,6 +34,5 @@ describe('core/cardConstants', () => {
     expect(SKILL_REPOSITION_STRENGTH).toBe(0.5);
     expect(SKILL_REPOSITION_MAX_ITERATIONS).toBe(20);
     expect(SKILL_UNIQUE_X_MIN_SEPARATION).toBe(40);
-    expect(SKILL_UNIQUE_X_JITTER).toBe(10);
   });
 });

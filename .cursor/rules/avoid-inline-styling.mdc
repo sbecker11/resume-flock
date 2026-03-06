@@ -1,0 +1,11 @@
+---
+description: Styling note – inline styles allowed for dynamic layout (revert of "eliminate inline" refactor)
+alwaysApply: true
+---
+
+# Styling: inline styles allowed for dynamic layout
+
+- **Do not enforce** removing inline styles from this codebase. A previous "eliminate all inline styling" refactor was reverted after it caused regressions (e.g. card positioning).
+- **Card and scene layout** may use direct `element.style.left`, `element.style.top`, `element.style.width`, `element.style.height`, `element.style.filter`, `element.style.zIndex`, etc. Preserving this is intentional.
+- **State and presentation** can still use CSS classes (e.g. `.hovered`, `.selected`, `.clone`) where that fits; no requirement to avoid inline for layout.
+- **Theme data:** `useColorPalette.applyPaletteToElement()` sets `--data-*` custom properties on elements; that remains the single place for theme vars.

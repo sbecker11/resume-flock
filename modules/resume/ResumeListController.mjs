@@ -1,5 +1,8 @@
 // modules/resume/ResumeListController.mjs
 
+/** Set to true to use a simple scrollable list (no clones, no infinite wrap). */
+const DISABLE_INFINITE_SCROLL = true;
+
 import { BaseComponent } from '../core/abstracts/BaseComponent.mjs';
 import { InfiniteScrollingContainer } from './infiniteScrollingContainer.mjs';
 import * as domUtils from '../utils/domUtils.mjs';
@@ -54,6 +57,8 @@ class ResumeListController extends BaseComponent {
     this.currentSortRule = { field: 'startDate', direction: 'desc' }; // Default sort rule
     this.sortedIndices = []; // Maps sorted position to original index
     this.removedJobNumbers = new Set(); // Jobs removed from listing via rDiv close
+    /** Order of items in the resume list: selection order (interleaved biz + skill). Each entry: { type: 'biz', jobNumber } | { type: 'skill', skillCardId }. */
+    this.resumeListSelectionOrder = [];
     // isInitialized is managed by BaseComponent automatically
 
     this._setupColorPaletteListener();
@@ -234,14 +239,12 @@ class ResumeListController extends BaseComponent {
     }
 
     /**
-     * Handle new job-selected events for bidirectional scrolling
+     * Handle new job-selected events: add biz item to list in selection order (interleaved with skills) and re-render.
      */
     handleJobSelected(event) {
         const { jobNumber, source } = event.detail;
         console.debug('[ResumeListController] handleJobSelected', jobNumber);
-        
-        // rDiv scrolling is now handled by ResumeItemsController when rDivs are clicked
-        // No centralized scrolling needed here
+        this.addToResumeListOrder({ type: 'biz', jobNumber });
     }
 
 
@@ -275,11 +278,50 @@ class ResumeListController extends BaseComponent {
 
   /**
    * Remove a job's rDiv from the resume listing (persists until reload).
+   * After removal, scrolls so the next following item's top is 5px from the scrollport top.
    */
   removeJobFromListing(jobNumber) {
     if (!this.bizResumeDivs || !this.infiniteScroller) return;
+    const visibleJobNumbers = this.sortedIndices.filter((j) => !this.removedJobNumbers.has(j));
+    const deletedIndex = visibleJobNumbers.indexOf(jobNumber);
     this.removedJobNumbers.add(jobNumber);
+    this.resumeListSelectionOrder = this.resumeListSelectionOrder.filter((e) => !(e.type === 'biz' && e.jobNumber === jobNumber));
     this._setItemsFromSorted();
+    const nextJobNumber = deletedIndex >= 0 && deletedIndex < visibleJobNumbers.length - 1 ? visibleJobNumbers[deletedIndex + 1] : null;
+    if (nextJobNumber != null && this.resumeContentWrapper) {
+      requestAnimationFrame(() => {
+        const nextRDiv = this.infiniteScroller.originalItems.find(
+          (el) => el && parseInt(el.getAttribute('data-job-number'), 10) === nextJobNumber
+        );
+        if (nextRDiv) this._scrollResumeDivToTopOffset(nextRDiv, 5);
+      });
+    }
+  }
+
+  /**
+   * Scroll the resume viewport so the given element's top edge is offsetPx from the top-inner edge.
+   */
+  _scrollResumeDivToTopOffset(element, offsetPx = 5) {
+    const scrollport = this.resumeContentWrapper;
+    if (!scrollport || !element) return;
+    const elTop = element.getBoundingClientRect().top;
+    const portTop = scrollport.getBoundingClientRect().top;
+    scrollport.scrollTop += elTop - portTop - offsetPx;
+  }
+
+  /**
+   * Clear all resume divs from the listing (rDivs and appended skill-resume-divs). Persists until reload.
+   */
+  clearAllResumeDivsFromListing() {
+    if (!this.bizResumeDivs || !this.infiniteScroller) return;
+    this.resumeListSelectionOrder = [];
+    this.sortedIndices.forEach((j) => this.removedJobNumbers.add(j));
+    const itemsController = window.resumeItemsController;
+    if (itemsController && itemsController.dismissedJobNumbers) {
+      this.sortedIndices.forEach((j) => itemsController.dismissedJobNumbers.add(j));
+    }
+    if (this.infiniteScroller.clearFooterItems) this.infiniteScroller.clearFooterItems();
+    this._setItemsFromSelectionOrder();
   }
 
   /**
@@ -293,19 +335,147 @@ class ResumeListController extends BaseComponent {
   }
 
   _setItemsFromSorted() {
-    const sortedDivs = this.sortedIndices
-      .filter((j) => !this.removedJobNumbers.has(j))
-      .map((j) => this.bizResumeDivs[j]);
-    const selectedJobNumber = selectionManager.getSelectedJobNumber();
-    const visibleJobNumbers = this.sortedIndices.filter((j) => !this.removedJobNumbers.has(j));
+    this._setItemsFromSelectionOrder();
+  }
+
+  /**
+   * Build ordered list of DOM nodes from resumeListSelectionOrder (biz rDivs + skill divs interleaved), then set items.
+   */
+  _setItemsFromSelectionOrder() {
+    if (!this.infiniteScroller || !this.infiniteScroller.contentHolder) return;
+    const contentHolder = this.infiniteScroller.contentHolder;
+    const skillDivsByCardId = new Map();
+    contentHolder.querySelectorAll('.appended-skill-resume-div').forEach((el) => {
+      const id = el.getAttribute('data-skill-card-id');
+      if (id) skillDivsByCardId.set(id, el);
+    });
+    const orderedNodes = [];
+    for (const entry of this.resumeListSelectionOrder) {
+      if (entry.type === 'biz') {
+        if (this.removedJobNumbers.has(entry.jobNumber)) continue;
+        const div = this.bizResumeDivs?.[entry.jobNumber];
+        if (div) orderedNodes.push(div);
+      } else if (entry.type === 'skill') {
+        const div = skillDivsByCardId.get(entry.skillCardId);
+        if (div) orderedNodes.push(div);
+      }
+    }
+    const card = selectionManager.getSelectedCard();
     let start = 0;
-    if (selectedJobNumber !== null) {
-      const idx = visibleJobNumbers.indexOf(selectedJobNumber);
+    if (card) {
+      const idx = orderedNodes.findIndex((d) => {
+        if (d.classList.contains('biz-resume-div')) return card.type === 'biz' && parseInt(d.getAttribute('data-job-number'), 10) === card.jobNumber;
+        if (d.classList.contains('appended-skill-resume-div')) return card.type === 'skill' && d.getAttribute('data-skill-card-id') === card.skillCardId;
+        return false;
+      });
       if (idx !== -1) start = idx;
     }
-    this.infiniteScroller.setItems(sortedDivs, start);
+    this.infiniteScroller.setItems(orderedNodes, start);
   }
+
+  /**
+   * Add an entry to the resume list in selection order (so biz and skill items interleave). Then re-render.
+   * @param {{ type: 'biz', jobNumber: number } | { type: 'skill', skillCardId: string }} entry
+   */
+  addToResumeListOrder(entry) {
+    if (!entry || !entry.type) return;
+    const already = this.resumeListSelectionOrder.some(
+      (e) => e.type === entry.type && (e.type === 'biz' ? e.jobNumber === entry.jobNumber : e.skillCardId === entry.skillCardId)
+    );
+    if (!already) {
+      this.resumeListSelectionOrder.push(entry);
+      if (entry.type === 'biz') this.removedJobNumbers.delete(entry.jobNumber);
+    }
+    this._setItemsFromSelectionOrder();
+  }
+
+  /**
+   * Call after a skill div was appended to the list (so selection order stays in sync). Re-renders list in selection order.
+   */
+  notifySkillAddedToResumeListing(skillCardId) {
+    this.addToResumeListOrder({ type: 'skill', skillCardId });
+  }
+
+  /**
+   * Remove a skill from the list order (e.g. when user clicks X on the skill-resume-div). Re-renders list.
+   */
+  removeSkillFromResumeListOrder(skillCardId) {
+    this.resumeListSelectionOrder = this.resumeListSelectionOrder.filter(
+      (e) => !(e.type === 'skill' && e.skillCardId === skillCardId)
+    );
+    this._setItemsFromSelectionOrder();
+  }
+
   // endregion
+
+  /**
+   * Simple scroll: one list, no clones. Replaces infinite scroll when DISABLE_INFINITE_SCROLL is true.
+   */
+  _setupSimpleScrolling(sortedDivs, startingIndex) {
+    console.debug('[ResumeListController] _setupSimpleScrolling (normal scrollbar)');
+    const scrollport = this.resumeContentWrapper;
+    const contentHolder = this.resumeContentDiv;
+    if (!scrollport || !contentHolder) return;
+
+    Object.assign(scrollport.style, {
+      position: 'relative',
+      overflowY: 'auto',
+      overflowX: 'visible',
+      backgroundColor: 'var(--grey-dark-6)'
+    });
+    Object.assign(contentHolder.style, {
+      backgroundColor: 'var(--grey-dark-6)',
+      position: 'relative',
+      width: '100%',
+      height: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'stretch',
+      gap: '10px'
+    });
+
+    contentHolder.replaceChildren(...sortedDivs);
+
+    this.infiniteScroller = {
+      originalItems: sortedDivs,
+      allItems: sortedDivs,
+      scrollport,
+      contentHolder,
+      options: { cloneCount: 0 },
+      setItems(items, start = 0) {
+        this.originalItems = items;
+        this.allItems = items;
+        contentHolder.replaceChildren(...items);
+        if (items[start]) items[start].scrollIntoView({ behavior: 'auto', block: 'start' });
+      },
+      scrollToIndex(i, animate = false) {
+        const el = this.originalItems[i];
+        if (el) el.scrollIntoView({ behavior: animate ? 'smooth' : 'auto', block: 'start' });
+      },
+      getItemAtIndex(i) {
+        return this.originalItems[i] ?? null;
+      },
+      scrollToBizResumeDiv(el, smooth = true) {
+        if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+        return true;
+      },
+      getCurrentlyVisibleJob() {
+        return null;
+      },
+      recalculateHeights() {},
+      recalculateHeightsAfterPalette() {},
+      clearFooterItems() {
+        contentHolder.querySelectorAll('.appended-skill-resume-div').forEach((el) => el.remove());
+      },
+      configureItemSpacing() {},
+      getItemSpacing() { return 10; },
+      destroy() {}
+    };
+
+    if (sortedDivs[startingIndex]) {
+      sortedDivs[startingIndex].scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
+  }
 
   setupInfiniteScrolling() {
     console.debug('[ResumeListController] setupInfiniteScrolling');
@@ -315,24 +485,7 @@ class ResumeListController extends BaseComponent {
       return;
     }
 
-    // Create the infinite scroller - the constructor handles the singleton pattern
-    console.debug('[ResumeListController] creating infinite scroller');
-    this.infiniteScroller = new InfiniteScrollingContainer(
-      this.resumeContentWrapper, // scrollport element
-      this.resumeContentDiv,     // content element
-      {
-        onItemChange: this.handleResumeItemChange.bind(this)
-      }
-    );
-    
-    if (!this.infiniteScroller) {
-      console.log(`[DEBUG] setupInfiniteScrolling: Failed to create infinite scroller instance`);
-      return;
-    }
-
-    console.debug('[ResumeListController] infinite scroller ready');
-    
-    // Update sort order and build sorted divs *before* any scroll (so originalItems is set before scrollToIndex)
+    // Update sort order and build sorted divs first (needed for both infinite and simple scroll)
     this.updateSortedIndices();
     
     // Debug the mapping before creating sortedDivs
@@ -341,10 +494,23 @@ class ResumeListController extends BaseComponent {
     //   console.log(`  Index ${sortedIndex} -> Job ${jobNumber}`);
     // });
     
-    // Create sortedDivs array in the correct order (excluding removed)
+    // Create sortedDivs array in the correct order (excluding removed); one unique biz-resume-div per job
+    const seenJobNumbers = new Set();
     const sortedDivs = this.sortedIndices
       .filter((jobNum) => !this.removedJobNumbers.has(jobNum))
-      .map((originalIndex) => this.bizResumeDivs[originalIndex]);
+      .map((originalIndex) => this.bizResumeDivs[originalIndex])
+      .filter((div) => {
+        if (!div) return false;
+        const jobNum = parseInt(div.getAttribute('data-job-number'), 10);
+        if (Number.isNaN(jobNum) || seenJobNumbers.has(jobNum)) return false;
+        seenJobNumbers.add(jobNum);
+        return true;
+      });
+    // Initialize selection order so list shows biz items in sort order; later selections append in order (interleaved with skills)
+    this.resumeListSelectionOrder = sortedDivs.map((div) => {
+      const jobNum = parseInt(div.getAttribute('data-job-number'), 10);
+      return Number.isNaN(jobNum) ? null : { type: 'biz', jobNumber: jobNum };
+    }).filter(Boolean);
     
     // Verify the mapping is correct
     console.debug('[ResumeListController] verifying sortedDivs');
@@ -360,12 +526,11 @@ class ResumeListController extends BaseComponent {
     //   }
     // });
     
-    // Get the currently selected job number (startingIndex in visible/filtered list)
+    // Get the currently selected job number (startingIndex in deduped sortedDivs)
     const selectedJobNumber = selectionManager.getSelectedJobNumber();
-    const visibleJobNumbers = this.sortedIndices.filter((j) => !this.removedJobNumbers.has(j));
     let startingIndex = 0;
     if (selectedJobNumber !== null) {
-      const idx = visibleJobNumbers.indexOf(selectedJobNumber);
+      const idx = sortedDivs.findIndex((d) => parseInt(d.getAttribute('data-job-number'), 10) === selectedJobNumber);
       if (idx !== -1) startingIndex = idx;
     }
     
@@ -402,6 +567,28 @@ class ResumeListController extends BaseComponent {
         console.log(`  Job 10 (at sorted index ${job10SortedIndex}): Job 10 -> "${role}" at "${employer}"`);
       }
     }
+
+    if (DISABLE_INFINITE_SCROLL) {
+      this._setupSimpleScrolling(sortedDivs, startingIndex);
+      return;
+    }
+
+    // Create the infinite scroller - the constructor handles the singleton pattern
+    console.debug('[ResumeListController] creating infinite scroller');
+    this.infiniteScroller = new InfiniteScrollingContainer(
+      this.resumeContentWrapper, // scrollport element
+      this.resumeContentDiv,     // content element
+      {
+        onItemChange: this.handleResumeItemChange.bind(this)
+      }
+    );
+    
+    if (!this.infiniteScroller) {
+      console.log(`[DEBUG] setupInfiniteScrolling: Failed to create infinite scroller instance`);
+      return;
+    }
+
+    console.debug('[ResumeListController] infinite scroller ready');
     
     // Set the items in the infinite scroller
     this.infiniteScroller.setItems(sortedDivs, startingIndex);
@@ -737,65 +924,122 @@ class ResumeListController extends BaseComponent {
     // This function can be used for future functionality if needed
   }
 
-  goToNextResumeItem() {
-    const selectedJobNumber = selectionManager.getSelectedJobNumber();
-
-    if (!this.sortedIndices || this.sortedIndices.length === 0) return;
-
-    let currentSortedPosition = -1;
-    if (selectedJobNumber !== null) {
-      currentSortedPosition = this.sortedIndices.indexOf(selectedJobNumber);
+  /**
+   * Ordered list of entries (biz + skill in selection order) that are currently in the list.
+   * Matches the order of items in the resume list DOM / infiniteScroller.originalItems.
+   * @returns {{ type: 'biz', jobNumber: number } | { type: 'skill', skillCardId: string }[]}
+   */
+  getActiveOrderedEntries() {
+    if (!this.resumeListSelectionOrder || this.resumeListSelectionOrder.length === 0) return [];
+    const contentHolder = this.infiniteScroller?.contentHolder;
+    const skillDivsByCardId = new Map();
+    if (contentHolder) {
+      contentHolder.querySelectorAll('.appended-skill-resume-div').forEach((el) => {
+        const id = el.getAttribute('data-skill-card-id');
+        if (id) skillDivsByCardId.set(id, el);
+      });
     }
-
-    const nextSortedPosition = (currentSortedPosition + 1) % this.sortedIndices.length;
-    const nextJobNumber = this.sortedIndices[nextSortedPosition];
-
-    selectionManager.selectJobNumber(nextJobNumber, 'ResumeListController.goToNextResumeItem');
+    const entries = [];
+    for (const entry of this.resumeListSelectionOrder) {
+      if (entry.type === 'biz') {
+        if (this.removedJobNumbers.has(entry.jobNumber)) continue;
+        if (this.bizResumeDivs?.[entry.jobNumber]) entries.push(entry);
+      } else if (entry.type === 'skill') {
+        if (skillDivsByCardId.has(entry.skillCardId)) entries.push(entry);
+      }
+    }
+    return entries;
   }
 
-  goToPreviousResumeItem() {
-    const selectedJobNumber = selectionManager.getSelectedJobNumber();
-    console.log(`[DEBUG] goToPreviousResumeItem START: selectedJobNumber=${selectedJobNumber}`);
-
-    if (!this.sortedIndices || this.sortedIndices.length === 0) return;
-
-    let currentSortedPosition = -1;
-    if (selectedJobNumber !== null) {
-      currentSortedPosition = this.sortedIndices.indexOf(selectedJobNumber);
+  /** Index in active list of the currently selected card, or -1 if none. */
+  getSelectedListPosition() {
+    const card = selectionManager.getSelectedCard();
+    if (!card) return -1;
+    const entries = this.getActiveOrderedEntries();
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (card.type === 'biz' && e.type === 'biz' && e.jobNumber === card.jobNumber) return i;
+      if (card.type === 'skill' && e.type === 'skill' && e.skillCardId === card.skillCardId) return i;
     }
+    return -1;
+  }
 
-    console.log(`[DEBUG] goToPreviousResumeItem: currentSortedPosition=${currentSortedPosition}, sortedIndices.length=${this.sortedIndices.length}`);
-
-    let prevSortedPosition;
-    if (currentSortedPosition <= 0) {
-      prevSortedPosition = this.sortedIndices.length - 1;
-    } else {
-      prevSortedPosition = currentSortedPosition - 1;
+  /**
+   * Return the DOM element for the given list entry (biz rDiv or appended skill-resume-div).
+   */
+  _getListElementForEntry(entry) {
+    if (!entry) return null;
+    if (entry.type === 'biz') {
+      return document.getElementById('resume-' + entry.jobNumber) || this.bizResumeDivs?.[entry.jobNumber] || null;
     }
-
-    const prevJobNumber = this.sortedIndices[prevSortedPosition];
-    console.log(`[DEBUG] goToPreviousResumeItem: prevSortedPosition=${prevSortedPosition}, prevJobNumber=${prevJobNumber}`);
-    
-    // Check if we're trying to select the same job
-    if (prevJobNumber === selectedJobNumber) {
-      console.log(`[DEBUG] WARNING: About to select same job index ${prevJobNumber}!`);
+    if (entry.type === 'skill') {
+      const contentHolder = this.infiniteScroller?.contentHolder || document.getElementById('resume-content-div-list');
+      if (!contentHolder) return null;
+      return contentHolder.querySelector(`.appended-skill-resume-div[data-skill-card-id="${entry.skillCardId}"]`) || null;
     }
-    
-    selectionManager.selectJobNumber(prevJobNumber, 'ResumeListController.goToPreviousResumeItem');
+    return null;
+  }
+
+  /**
+   * Select the item at the given list position and scroll it (and its scene pair) into view.
+   * First=0, Next=current+1 (or 1 if none), Prev=current-1 (or last if none), Last=last.
+   * Scrolls so the item's top edge is visible. After smooth scroll we correct so the element's
+   * top aligns with the viewport top (fixes Prev when scrolling up).
+   */
+  _selectListPositionAndScroll(position) {
+    const entries = this.getActiveOrderedEntries();
+    if (position < 0 || position >= entries.length) return;
+    const entry = entries[position];
+    selectionManager.selectCard(entry, 'ResumeListController.resume-divs-controls');
+    requestAnimationFrame(() => {
+      const el = this._getListElementForEntry(entry);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+        setTimeout(() => {
+          const scrollport = this.resumeContentWrapper || this.infiniteScroller?.scrollport;
+          if (scrollport && el.isConnected) {
+            const elTop = el.getBoundingClientRect().top;
+            const portTop = scrollport.getBoundingClientRect().top;
+            const delta = elTop - portTop;
+            if (Math.abs(delta) > 2) {
+              scrollport.scrollTop += delta;
+              const maxScroll = scrollport.scrollHeight - scrollport.clientHeight;
+              scrollport.scrollTop = Math.max(0, Math.min(maxScroll, scrollport.scrollTop));
+            }
+          }
+        }, 350);
+      } else if (this.infiniteScroller && typeof this.infiniteScroller.scrollToIndex === 'function') {
+        this.infiniteScroller.scrollToIndex(position, true);
+      }
+    });
   }
 
   goToFirstResumeItem() {
-    if (!this.sortedIndices || this.sortedIndices.length === 0) return;
-    const firstJobNumber = this.sortedIndices[0];
-    console.log(`[DEBUG] goToFirstResumeItem: firstJobNumber=${firstJobNumber}, currentSelection=${selectionManager.getSelectedJobNumber()}`);
-    selectionManager.selectJobNumber(firstJobNumber, 'ResumeListController.goToFirstResumeItem');
+    const entries = this.getActiveOrderedEntries();
+    if (entries.length === 0) return;
+    this._selectListPositionAndScroll(0);
   }
 
   goToLastResumeItem() {
-    if (!this.sortedIndices || this.sortedIndices.length === 0) return;
-    const lastJobNumber = this.sortedIndices[this.sortedIndices.length - 1];
-    // console.log(`[DEBUG] goToLastResumeItem: Going to lastJobNumber=${lastJobNumber}, sortedIndices.length=${this.sortedIndices.length}`);
-    selectionManager.selectJobNumber(lastJobNumber, 'ResumeListController.goToLastResumeItem');
+    const entries = this.getActiveOrderedEntries();
+    if (entries.length === 0) return;
+    this._selectListPositionAndScroll(entries.length - 1);
+  }
+
+  goToNextResumeItem() {
+    const entries = this.getActiveOrderedEntries();
+    if (entries.length === 0) return;
+    const pos = this.getSelectedListPosition();
+    const nextPos = pos < 0 ? Math.min(1, entries.length - 1) : (pos + 1) % entries.length;
+    this._selectListPositionAndScroll(nextPos);
+  }
+
+  goToPreviousResumeItem() {
+    const entries = this.getActiveOrderedEntries();
+    if (entries.length === 0) return;
+    const pos = this.getSelectedListPosition();
+    const prevPos = pos <= 0 ? entries.length - 1 : pos - 1;
+    this._selectListPositionAndScroll(prevPos);
   }
 
   applySortRule(sortRule, isInitializing = false) {
@@ -992,7 +1236,7 @@ class ResumeListController extends BaseComponent {
     const m = String(id).match(/^resume-(\d+)$/);
     if (m) this.ensureJobInListing(parseInt(m[1], 10));
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
   }
 
   scrollToJobNumber(jobNumber, caller = '') {

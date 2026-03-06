@@ -164,22 +164,30 @@ overflow and ensures consistent sizing.
    HOVER FUNCTIONALITY (JavaScript + CSS)
    ======================================== */
 
-/* Resume divs: hover effects with consistent dimensions */
+/* Resume divs: hover effects. Biz gets optional ring; skill uses border/outline only (scene and resume identical). */
 .biz-resume-div:not(.selected).hovered {
-    /* Transparent ring effect to match cDiv-clone */
-    box-shadow: 
-        0 0 0 2px rgba(255, 255, 255, 0.3),  /* Subtle white ring */
-        0 4px 12px rgba(0, 0, 0, 0.3);       /* Drop shadow */
+    box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.3),
+        0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 999;
+    transition: all 0.2s ease;
+}
+.skill-resume-div:not(.selected).hovered,
+.appended-skill-resume-div:not(.selected).hovered {
+    box-shadow: none !important; /* Match scene: thin border/outline only from scene.css */
     z-index: 999;
     transition: all 0.2s ease;
 }
 
-/* Card divs: hover effects with consistent dimensions (no z-index; selection only moves to front) */
+/* Card divs: biz gets optional ring; skill uses border/outline only so scene matches resume. */
 .biz-card-div:not(.clone).hovered {
-    /* Keep 2px border, use box-shadow for hover effect */
-    box-shadow: 
-        0 0 0 2px rgba(255, 255, 255, 0.3),  /* Subtle white ring */
-        0 4px 12px rgba(0, 0, 0, 0.3);       /* Drop shadow */
+    box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.3),
+        0 4px 12px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+.skill-card-div:not(.clone).hovered {
+    box-shadow: none !important; /* Match resume: thin border/outline only from scene.css */
     transition: all 0.2s ease;
 }
 

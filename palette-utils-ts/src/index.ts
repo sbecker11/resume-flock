@@ -11,6 +11,7 @@ export type {
   ExportedPalette,
   GetContrastIconSetOptions,
   GetHighlightColorOptions,
+  HighContrastForBackground,
   LAB,
   LCH,
   RGB,
@@ -21,7 +22,9 @@ export {
   formatHexDisplay,
   getContrastIconSet,
   getHighlightColor,
+  getHighContrastForBackground,
   getHighContrastMono,
+  getIconSetForBackgroundColor,
   hexToRgb,
   rgbToHex,
 } from './colors.js';

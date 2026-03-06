@@ -99,6 +99,20 @@ body .biz-resume-div,
     pointer-events: auto;
     font-family: Arial, sans-serif !important;
 }
+/* High-contrast icon set: matches high-contrast text for the given background (white on dark, black on light). Always transparent background. */
+.url-icon,
+.back-icon,
+.img-icon {
+    background: transparent !important;
+    background-color: transparent !important;
+}
+/* Back icon wrappers (buttons/spans) must not add a background so icons stay transparent */
+.skill-resume-div-back-link,
+.skill-card-back-icon,
+.skill-card-back-icons {
+    background: transparent !important;
+    background-color: transparent !important;
+}
 /* Contrast icons in card descriptions: white on dark, black on light (normal state). */
 .biz-card-div[data-icon-set-variant="white"] .url-icon,
 .biz-card-div[data-icon-set-variant="white"] .back-icon,
@@ -106,16 +120,21 @@ body .biz-resume-div,
     filter: invert(1);
 }
 
-/* Hovered state - same padding/border as normal so text does not shift */
+/* Hovered state – 2px #929292 outer, 1px #0028fb inner (match skill unselected hover) */
 .biz-card-div.hovered {
     background-color: var(--data-background-color-hovered) !important;
     color: var(--data-foreground-color-hovered) !important;
     padding: var(--data-normal-padding);
-    border: var(--data-normal-inner-border-width) solid var(--data-hovered-inner-border-color);
-    outline: var(--data-normal-outer-border-width) solid var(--data-hovered-outer-border-color);
+    border: 1px solid #0028fb !important;
+    outline: 2px solid #929292 !important;
     border-radius: var(--data-normal-border-radius);
     box-shadow: none !important;
     filter: none !important; /* Override Z-based filter so text has no blur on hover */
+}
+.biz-card-div.hovered:focus,
+.biz-card-div.hovered:focus-visible {
+    outline: 2px solid #929292 !important;
+    outline-offset: 0;
 }
 .biz-card-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
 .biz-card-div.hovered[data-icon-set-hovered-variant="white"] .back-icon,
@@ -145,32 +164,73 @@ body .biz-resume-div,
     filter: invert(1);
 }
 
-/* Skill cards – parity with flock-of-postcards .card-div.
- * Class mapping: flock-of-postcards uses .bizcard-div for biz cards and .card-div for skill cards;
- * resume-flock uses .biz-card-div and .skill-card-div respectively. */
+/* Skill cards: same state rules as biz (normal, hovered, selected) but border-radius = half of biz. */
+/* Normal: same border width/color as biz, half radius */
 .skill-card-div {
     position: absolute;
     box-sizing: border-box;
     cursor: pointer;
     pointer-events: auto;
-    z-index: 10; /* Base above biz cards (JS sets 4–9); ensures skill cards only render above biz cards */
+    z-index: 10; /* Base above biz cards (JS sets 4–9) */
     font-family: "Roboto", sans-serif;
     font-weight: normal;
     font-size: 14px;
-    padding: 6px;
-    border-width: 3px;
-    border-style: solid;
-    border-color: var(--data-normal-inner-border-color);
+    padding: var(--data-normal-padding);
+    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color) !important;
+    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color) !important;
     border-radius: calc(var(--data-normal-border-radius, 25px) / 2);
     background-color: var(--data-background-color);
     color: var(--data-foreground-color);
-    transition: background-color 0.2s, color 0.2s;
+    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s;
 }
-.skill-card-div:hover {
-    background-color: var(--data-background-color-hovered);
-    color: var(--data-foreground-color-hovered);
+/* Hovered – 2px #929292 outer, 1px #0028fb inner; half radius; only when not selected */
+.skill-card-div:not(.clone).hovered {
+    background-color: var(--data-background-color-hovered) !important;
+    color: var(--data-foreground-color-hovered) !important;
+    padding: var(--data-normal-padding);
+    border: 1px solid #0028fb !important;
+    outline: 2px solid #929292 !important;
+    border-radius: calc(var(--data-normal-border-radius, 25px) / 2);
+    box-shadow: none !important;
+    filter: none !important;
 }
-/* Match flock-of-postcards .tag-link (skill title): bold, underlined; and div.card-div span.tag-link layout */
+.skill-card-div:not(.clone).hovered:focus,
+.skill-card-div:not(.clone).hovered:focus-visible {
+    outline: 2px solid #929292 !important;
+    outline-offset: 0;
+}
+/* Clone = selected skill card in scene – same as biz .clone, half radius */
+.skill-card-div.clone {
+    background-color: var(--data-background-color-selected) !important;
+    color: var(--data-foreground-color-selected) !important;
+    padding: var(--data-normal-padding);
+    border: var(--data-normal-inner-border-width) solid #801a81 !important;
+    outline: none !important;
+    box-shadow:
+        0 0 0 3px #ffffff,
+        0 0 0 8px #801a81,
+        0 3px 12px rgba(128, 0, 128, 0.4) !important;
+    border-radius: calc(var(--data-normal-border-radius, 25px) / 2);
+    filter: none !important;
+    z-index: 99;
+}
+/* Skill card contrast icons: same variant rules as biz (white on dark → invert) */
+.skill-card-div[data-icon-set-variant="white"] .url-icon,
+.skill-card-div[data-icon-set-variant="white"] .back-icon,
+.skill-card-div[data-icon-set-variant="white"] .img-icon {
+    filter: invert(1);
+}
+.skill-card-div:not(.clone).hovered[data-icon-set-hovered-variant="white"] .url-icon,
+.skill-card-div:not(.clone).hovered[data-icon-set-hovered-variant="white"] .back-icon,
+.skill-card-div:not(.clone).hovered[data-icon-set-hovered-variant="white"] .img-icon {
+    filter: invert(1);
+}
+.skill-card-div.clone[data-icon-set-selected-variant="white"] .url-icon,
+.skill-card-div.clone[data-icon-set-selected-variant="white"] .back-icon,
+.skill-card-div.clone[data-icon-set-selected-variant="white"] .img-icon {
+    filter: invert(1);
+}
+/* Match flock-of-postcards .tag-link (skill title): bold, underlined */
 .skill-card-div .skill-card-label {
     display: inline-block;
     max-width: 100%;
@@ -182,19 +242,73 @@ body .biz-resume-div,
     line-height: 1.2;
     text-align: left;
 }
-/* Match flock-of-postcards .card-div-header for secondary text */
 .skill-card-div .skill-card-z {
     font-size: 12px;
 }
 
-/* Clone = selected skill card in scene (flock-of-postcards: white dotted border only) */
-.skill-card-div.clone {
-    background-color: var(--data-background-color-selected, color-mix(in srgb, var(--data-background-color) 65%, white));
-    color: var(--data-foreground-color-selected, inherit);
-    filter: none !important;
-    z-index: 99;
-    border: 2px dotted rgba(255, 255, 255, 0.9) !important;
-    box-shadow: none;
+/* skillResumeLineItem: same state rules as biz-resume-div but border-radius = half (match skill-card-div). */
+.skill-resume-div,
+.appended-skill-resume-div,
+#resume-container .skill-resume-div,
+#resume-container .appended-skill-resume-div {
+    box-sizing: border-box;
+    background-color: var(--data-background-color) !important;
+    color: var(--data-foreground-color) !important;
+    padding: var(--data-normal-padding);
+    border: var(--data-normal-inner-border-width) solid var(--data-normal-inner-border-color) !important;
+    outline: var(--data-normal-outer-border-width) solid var(--data-normal-outer-border-color) !important;
+    border-radius: calc(var(--data-normal-border-radius, 25px) / 2) !important;
+    transition: background-color 0.2s, color 0.2s, border 0.2s, outline 0.2s;
+}
+/* Unselected hover: 2px #929292 outer, 1px #0028fb inner (match skill-card-div) */
+.skill-resume-div:not(.selected).hovered,
+.appended-skill-resume-div:not(.selected).hovered,
+#resume-container .skill-resume-div:not(.selected).hovered,
+#resume-container .appended-skill-resume-div:not(.selected).hovered {
+    background-color: var(--data-background-color-hovered) !important;
+    color: var(--data-foreground-color-hovered) !important;
+    border: 1px solid #0028fb !important;
+    outline: 2px solid #929292 !important;
+    border-radius: calc(var(--data-normal-border-radius, 25px) / 2) !important;
+}
+.skill-resume-div.selected,
+.appended-skill-resume-div.selected,
+#resume-container .skill-resume-div.selected,
+#resume-container .appended-skill-resume-div.selected {
+    background-color: var(--data-background-color-selected) !important;
+    color: var(--data-foreground-color-selected) !important;
+    border: var(--data-normal-inner-border-width) solid #801a81 !important;
+    outline: none !important;
+    box-shadow:
+        0 0 0 3px #ffffff,
+        0 0 0 8px #801a81,
+        0 3px 12px rgba(128, 0, 128, 0.4) !important;
+    border-radius: calc(var(--data-normal-border-radius, 25px) / 2) !important;
+}
+/* Skill resume div contrast icons (match text color per state) */
+.skill-resume-div[data-icon-set-variant="white"] .url-icon,
+.skill-resume-div[data-icon-set-variant="white"] .back-icon,
+.skill-resume-div[data-icon-set-variant="white"] .img-icon,
+#resume-container .skill-resume-div[data-icon-set-variant="white"] .url-icon,
+#resume-container .skill-resume-div[data-icon-set-variant="white"] .back-icon,
+#resume-container .skill-resume-div[data-icon-set-variant="white"] .img-icon {
+    filter: invert(1);
+}
+.skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
+.skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .back-icon,
+.skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .img-icon,
+.appended-skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
+.appended-skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .back-icon,
+.appended-skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .img-icon {
+    filter: invert(1);
+}
+.skill-resume-div.selected[data-icon-set-selected-variant="white"] .url-icon,
+.skill-resume-div.selected[data-icon-set-selected-variant="white"] .back-icon,
+.skill-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
+.appended-skill-resume-div.selected[data-icon-set-selected-variant="white"] .url-icon,
+.appended-skill-resume-div.selected[data-icon-set-selected-variant="white"] .back-icon,
+.appended-skill-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon {
+    filter: invert(1);
 }
 
 /* bizCardLineItem (rDiv): border styling must match .biz-card-div above (normal, hovered, selected). */
@@ -210,19 +324,21 @@ body .biz-resume-div[data-icon-set-variant="white"] .img-icon,
 #resume-container .biz-resume-div[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
-/* rDiv layout: same width/margin in all states so text does not shift selected ↔ unselected */
+/* rDiv layout: same width as skill-resume-div (100%, padding-right for close button) */
 .biz-resume-div,
 body .biz-resume-div,
 #resume-container .biz-resume-div,
 #resume-content-div-wrapper .biz-resume-div {
     background-color: var(--data-background-color) !important;
     color: var(--data-foreground-color) !important;
-    width: calc(100% - 16px);
-    margin-left: 8px;
-    margin-right: 8px;
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-right: 36px; /* room for close button, match skill-resume-div */
+    box-sizing: border-box;
 }
 
-/* Hovered state - same padding/border as normal so text does not shift */
+/* Hovered state – 2px #929292 outer, 1px #0028fb inner (match skill unselected hover) */
 .biz-resume-div.hovered,
 body .biz-resume-div.hovered,
 #resume-container .biz-resume-div.hovered,
@@ -230,8 +346,8 @@ body .biz-resume-div.hovered,
     background-color: var(--data-background-color-hovered) !important;
     color: var(--data-foreground-color-hovered) !important;
     padding: var(--data-normal-padding);
-    border: var(--data-normal-inner-border-width) solid var(--data-hovered-inner-border-color);
-    outline: var(--data-normal-outer-border-width) solid var(--data-hovered-outer-border-color);
+    border: 1px solid #0028fb !important;
+    outline: 2px solid #929292 !important;
     border-radius: var(--data-normal-border-radius);
     box-shadow: none !important;
     filter: none !important;
@@ -278,6 +394,40 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .back-icon,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon {
     filter: invert(1);
+}
+
+/* Selected biz (resume + scene clone): force header and debug row to match icon contrast.
+   Tie text color to the same attribute that controls icon invert (data-icon-set-selected-variant)
+   so custom-built header/debug row content always matches icons. */
+.biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
+.biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
+.biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex,
+.biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-label,
+.biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-list-index,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex {
+    color: #ffffff !important;
+}
+.biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
+.biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
+.biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex,
+.biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-label,
+.biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-list-index,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
+#resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
+#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex {
+    color: #000000 !important;
+}
+.biz-card-div.clone .biz-details-debug-row,
+.biz-card-div.clone .biz-details-debug-row .biz-details-id-and-hex {
+    color: var(--data-foreground-color-selected) !important;
 }
 
 .biz-details-z-value {

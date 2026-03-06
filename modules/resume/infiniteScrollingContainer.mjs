@@ -181,13 +181,60 @@ class InfiniteScrollingContainer {
    */
   _createClone(sourceItem, cloneType, originalIndex) {
     const clone = sourceItem.cloneNode(true);
-    
+    // cloneNode does not copy addEventListener handlers; re-attach rDiv close and click-to-select so clones behave like originals
+    this._attachRDivCloseHandler(clone);
+    this._attachRDivClickHandler(clone);
+
     this._markAsClone(clone, cloneType, originalIndex);
     this._updateCloneIds(clone, cloneType);
     this.prepareItemForInfiniteScroll(clone, originalIndex, cloneType);
     this._applyPaletteToClone(clone);
     
     return clone;
+  }
+
+  /**
+   * Re-attach the remove-from-listing click handler on an rDiv (used for clones; originals get it from ResumeItemsController).
+   */
+  _attachRDivCloseHandler(rDivOrClone) {
+    const closeBtn = rDivOrClone.querySelector?.('.r-div-close');
+    const jobNumberStr = rDivOrClone.getAttribute?.('data-job-number');
+    if (!closeBtn || jobNumberStr == null || jobNumberStr === '') return;
+    const jobNumber = parseInt(jobNumberStr, 10);
+    if (Number.isNaN(jobNumber)) return;
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const controller = window.resumeItemsController;
+      if (controller && typeof controller.removeRDivFromListing === 'function') {
+        controller.removeRDivFromListing(jobNumber);
+      }
+    });
+  }
+
+  /**
+   * Re-attach the click-to-select handler on an rDiv clone so that clicking the clone selects the job and scrolls the matching cDiv into view (same as original rDiv).
+   */
+  _attachRDivClickHandler(rDivOrClone) {
+    if (!rDivOrClone.classList?.contains('biz-resume-div')) return;
+    const jobNumberStr = rDivOrClone.getAttribute?.('data-job-number');
+    if (jobNumberStr == null || jobNumberStr === '') return;
+    const jobNumber = parseInt(jobNumberStr, 10);
+    if (Number.isNaN(jobNumber)) return;
+    rDivOrClone.addEventListener('click', (e) => {
+      if (e.target.closest('.r-div-close')) return;
+      const sm = selectionManager;
+      const isSelected = sm.getSelectedJobNumber() === jobNumber;
+      if (isSelected) {
+        sm.clearSelection('InfiniteScrollingContainer.rDivCloneClick');
+      } else {
+        sm.selectJobNumber(jobNumber, 'InfiniteScrollingContainer.rDivCloneClick');
+        const controller = window.resumeItemsController;
+        if (controller && typeof controller._scrollRDivIntoView === 'function') {
+          controller._scrollRDivIntoView(rDivOrClone, jobNumber);
+        }
+      }
+    });
   }
 
   /**
@@ -313,9 +360,9 @@ class InfiniteScrollingContainer {
     const targetItem = this.originalItems[wrappedIndex];
     
     if (targetItem) {
-      targetItem.scrollIntoView({ 
-        behavior: animate ? 'smooth' : 'auto', 
-        block: 'center' 
+      targetItem.scrollIntoView({
+        behavior: animate ? 'smooth' : 'auto',
+        block: 'start'
       });
       
       this.currentIndex = wrappedIndex;
@@ -450,10 +497,19 @@ class InfiniteScrollingContainer {
 
   /**
    * Reset container state. Preserves footer items (e.g. appended skill cards) so they are re-appended after rebuild.
+   * Keeps at most one footer item per data-skill-card-id so the list has unique skill-resume-divs only.
    */
   _resetState() {
-    this._footerItems = Array.from(this.contentHolder.querySelectorAll('.appended-skill-card-copy'));
-    this._footerItems.forEach(el => el.remove());
+    const footerNodes = this.contentHolder.querySelectorAll('.appended-skill-resume-div');
+    const seenSkillCardIds = new Set();
+    this._footerItems = [];
+    footerNodes.forEach((el) => {
+      const id = el.getAttribute('data-skill-card-id') ?? '';
+      if (seenSkillCardIds.has(id)) return;
+      seenSkillCardIds.add(id);
+      this._footerItems.push(el);
+    });
+    this._footerItems.forEach((el) => el.remove());
     this.contentHolder.innerHTML = '';
     this.headClones = [];
     this.tailClones = [];
@@ -498,11 +554,27 @@ class InfiniteScrollingContainer {
   }
 
   /**
+   * Clear all footer items (e.g. appended skill cards) from the list. Used when clearing all resume divs.
+   */
+  clearFooterItems() {
+    this._footerItems.forEach((el) => { if (el && el.parentNode) el.remove(); });
+    this._footerItems = [];
+  }
+
+  /**
    * Append a footer item (e.g. skill card copy). It will be preserved across setItems() rebuilds and kept after tail clones.
+   * Only one footer item per data-skill-card-id is kept; adding another with the same id replaces the previous.
    * @param {HTMLElement} node
    */
   appendFooterItem(node) {
-    if (!node || this.contentHolder !== node.parentNode) {
+    if (!node) return;
+    const skillCardId = node.getAttribute?.('data-skill-card-id') ?? '';
+    const existing = this._footerItems.find((el) => el.getAttribute?.('data-skill-card-id') === skillCardId);
+    if (existing && existing !== node) {
+      existing.remove();
+      this._footerItems = this._footerItems.filter((el) => el !== existing);
+    }
+    if (this.contentHolder !== node.parentNode) {
       this.contentHolder.appendChild(node);
     }
     if (!this._footerItems.includes(node)) {
