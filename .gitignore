@@ -2,3 +2,6 @@ node_modules/
 .env
 coverage/
 palette-utils-ts/coverage/
+
+# Local-only Cursor command (do not push)
+.cursor/commands/env.md
