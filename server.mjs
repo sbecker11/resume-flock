@@ -12,7 +12,8 @@ const PROJECT_ROOT = process.cwd();
 const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
-const APP_STATUS_FILE_PATH = path.resolve(PROJECT_ROOT, 'app-status.json');
+const APP_STATUS_PATH = path.resolve(PROJECT_ROOT, 'app_status.json');
+const APP_STATUS_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_status.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
 const PARSED_RESUMES_DIR = path.resolve(PROJECT_ROOT, 'parsed_resumes');
@@ -63,40 +64,34 @@ async function readJobsAndSkillsFromPaths(jobsPath, skillsPath) {
     return { jobs, skills };
 }
 
-/** Read app-status.json; returns { 'current-resume-id': null } if missing or invalid. */
-async function readAppStatus() {
+/** If app_status.json is missing, initialize it from app_status.example.json (local use only). */
+async function ensureAppStatusFile() {
     try {
-        const data = await fs.readFile(APP_STATUS_FILE_PATH, 'utf-8');
-        const status = JSON.parse(data);
-        const id = status['current-resume-id'];
-        return { 'current-resume-id': id === undefined || id === null ? null : String(id) };
+        await fs.access(APP_STATUS_PATH);
     } catch (err) {
-        if (err.code === 'ENOENT') return { 'current-resume-id': null };
-        console.error('[server] Error reading app-status.json:', err.message);
-        return { 'current-resume-id': null };
+        if (err.code === 'ENOENT') {
+            try {
+                const example = await fs.readFile(APP_STATUS_EXAMPLE_PATH, 'utf-8');
+                await fs.writeFile(APP_STATUS_PATH, example, 'utf-8');
+                console.log('📄 Initialized app_status.json from app_status.example.json');
+            } catch (e) {
+                console.error('[server] Could not initialize app_status.json from example:', e.message);
+            }
+        }
     }
-}
-
-/** Write app-status.json with current-resume-id. */
-async function writeAppStatus(currentResumeId) {
-    const status = { 'current-resume-id': currentResumeId === undefined || currentResumeId === null ? null : String(currentResumeId) };
-    await fs.writeFile(APP_STATUS_FILE_PATH, JSON.stringify(status, null, 2), 'utf-8');
 }
 
 // --- API Endpoints ---
 // These must be defined *before* the static file server.
 
-// GET /api/state: Fetches the saved application state (current-resume-id from app-status.json)
+// GET /api/state: Read application state from app_state.json (used at startup / hard-refresh)
 app.get('/api/state', async (req, res) => {
     try {
         await fs.access(STATE_FILE_PATH);
         const stateData = await fs.readFile(STATE_FILE_PATH, 'utf-8');
         const parsedState = JSON.parse(stateData);
-        const status = await readAppStatus();
-        if (parsedState['user-settings'] == null) parsedState['user-settings'] = {};
-        parsedState['user-settings'].currentResumeId = status['current-resume-id'];
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('📖 Loaded app state from disk - size:', sizeKB, 'KB, current-resume-id:', status['current-resume-id'], 'at:', new Date().toISOString());
+        console.log('📖 Loaded app state from disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
         res.json(parsedState);
     } catch (error) {
         if (error.code === 'ENOENT') {
@@ -109,26 +104,13 @@ app.get('/api/state', async (req, res) => {
     }
 });
 
-// GET /api/status: Returns app-status (current-resume-id) for re-init when state is missing
-app.get('/api/status', async (req, res) => {
-    try {
-        const status = await readAppStatus();
-        res.json(status);
-    } catch (error) {
-        console.error('Error reading app-status:', error);
-        res.status(500).json({ error: 'Failed to read app-status.' });
-    }
-});
-
-// POST /api/state: Saves the application state and app-status.json (current-resume-id)
+// POST /api/state: Write application state to app_state.json (whenever a persistent attribute is updated)
 app.post('/api/state', async (req, res) => {
     try {
         const stateData = JSON.stringify(req.body, null, 2);
         await fs.writeFile(STATE_FILE_PATH, stateData, 'utf-8');
-        const currentResumeId = req.body?.['user-settings']?.currentResumeId ?? null;
-        await writeAppStatus(currentResumeId);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, current-resume-id:', currentResumeId, 'at:', new Date().toISOString());
+        console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
         res.json({ success: true });
     } catch (error) {
         console.error('Error writing state file:', error);
@@ -1783,7 +1765,10 @@ function startServer(port) {
         await initializeSyncLogsDirectory();
         console.log(`📝 Sync logs available at /sync-logs-dashboard`);
         console.log(`📝 Sync logs API at /api/sync-logs`);
-        
+
+        // Local-only app_status.json: create from example if missing
+        await ensureAppStatusFile();
+
         // Initialize event data directories
         await initializeEventDataDirectories();
         console.log(`🔬 Automated analysis available at /analysis-dashboard`);

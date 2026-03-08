@@ -6,9 +6,11 @@ palette-utils-ts/coverage/
 # macOS folder metadata (any directory)
 .DS_Store
 
-# Persisted UI state (per-user; app writes on change)
+# Persisted UI state (per-user; app writes when a persistent attribute is updated)
 app_state.json
-app-status.json
+
+# Local-only status (initialized from app_status.example.json if missing)
+app_status.json
 
 # Local-only Cursor command (do not push)
 .cursor/commands/env.md
