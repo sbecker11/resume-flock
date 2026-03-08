@@ -1,5 +1,5 @@
 import { AppState, saveState } from './stateManager.mjs';
-import { jobs } from '../data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs';
 
 // Selection Manager now handles high-level orchestration
 // It should directly manage the rDiv → cDiv synchronization flow
@@ -209,12 +209,11 @@ class SelectionManager {
         if (jobNumber === null || jobNumber === undefined) {
             return null;
         }
-        
-        // Jobs array is 0-indexed, jobNumber should match the array index
+        const jobs = getGlobalJobsDependency().getJobsData();
+        if (!Array.isArray(jobs)) return null;
         if (jobNumber >= 0 && jobNumber < jobs.length) {
             return jobs[jobNumber];
         }
-        
         console.warn(`[SelectionManager] Job number ${jobNumber} out of range (0-${jobs.length - 1})`);
         return null;
     }

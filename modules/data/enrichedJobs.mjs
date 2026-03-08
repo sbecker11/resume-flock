@@ -1,13 +1,10 @@
 /**
- * Enriched jobs data: merges static_content/jobs/jobs.mjs with static_content/skills/skills.mjs
- * so each job has references and job-skills for bizCards and skillCards.
+ * Enrichment only: merges raw jobs with skills so each job has references and job-skills.
+ * Jobs and skills are loaded via the resume API; this module does not import static files.
  *
  * - references: array of "<a href=\"url\">[SkillName]</a>" for parseDescriptionToBullets
- * - job-skills: object of skill names mentioned in Description that exist in skills (for "Technologies & Skills" section)
+ * - job-skills: object of skill names mentioned in Description that exist in skills
  */
-
-import { jobs as rawJobs } from '../../static_content/jobs/jobs.mjs';
-import { skills } from '../../static_content/skills/skills.mjs';
 
 const BRACKET_REGEX = /\[([^\]]+)\]/g;
 
@@ -38,25 +35,20 @@ function enrichJobFromDescription(description, skillsMap) {
 }
 
 /**
- * Enriched jobs array: each job has references and 'job-skills' from skills.mjs.
- * @type {Array<object & { references: string[], 'job-skills': Record<string, string> }>}
+ * Enrich raw jobs with references and job-skills using the skills map.
+ * @param {Array<object>} rawJobs - Jobs from API (jobs.mjs format)
+ * @param {Record<string, { url?: string, img?: string }>} skills - Skills from API (skills.mjs format)
+ * @returns {Array<object & { references: string[], 'job-skills': Record<string, string> }>}
  */
-export const jobs = rawJobs.map((job) => {
-  const { refs, jobSkills } = enrichJobFromDescription(job.Description, skills);
-  return {
-    ...job,
-    references: refs,
-    'job-skills': jobSkills,
-  };
-});
-
-/** Skills map for lookups (url, img per skill name). */
-export { skills };
-
-/**
- * Return enriched jobs (for code that expects getJobsData from jobs.mjs).
- * @returns {typeof jobs}
- */
-export function getJobsData() {
-  return jobs;
+export function enrichJobsWithSkills(rawJobs, skills) {
+  if (!Array.isArray(rawJobs)) return [];
+  const skillsMap = skills && typeof skills === 'object' ? skills : {};
+  return rawJobs.map((job) => {
+    const { refs, jobSkills } = enrichJobFromDescription(job.Description, skillsMap);
+    return {
+      ...job,
+      references: refs,
+      'job-skills': jobSkills,
+    };
+  });
 }

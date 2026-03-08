@@ -58,6 +58,8 @@ export interface AppState {
     selectedElementId: string | null;
     /** Dual element in the other view (scene ↔ resume). e.g. resume-5 ↔ biz-card-div-5-clone; skill-card-div-3 ↔ resume element with data-skill-card-id="skill-card-div-3". */
     selectedDualElementId: string | null;
+    /** Resume data source: null = default (static_content), or parsed resume id for /api/resumes/:id/data */
+    currentResumeId: string | null;
 
     resume: {
       sortRule: SortRule;

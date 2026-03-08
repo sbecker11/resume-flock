@@ -12,6 +12,10 @@ const PROJECT_ROOT = process.cwd();
 const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
+const APP_STATUS_FILE_PATH = path.resolve(PROJECT_ROOT, 'app-status.json');
+const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
+const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
+const PARSED_RESUMES_DIR = path.resolve(PROJECT_ROOT, 'parsed_resumes');
 const SYNC_LOGS_DIR = path.resolve(PROJECT_ROOT, 'sync-logs');
 const SYNC_LOGS_INDEX_FILE = path.resolve(SYNC_LOGS_DIR, 'index.json');
 const EVENT_DATA_DIR = path.resolve(PROJECT_ROOT, 'event-data');
@@ -28,17 +32,71 @@ app.use(express.json());
 // Parse text bodies for the CSS endpoint
 app.use(express.text());
 
+/** Parse .mjs file content (e.g. "export const jobs = [...];") to JSON. */
+function parseMjsExport(content, varName) {
+    const prefix = `const ${varName} = `;
+    const idx = content.indexOf(prefix);
+    if (idx === -1) {
+        const exportPrefix = `export const ${varName} = `;
+        const exportIdx = content.indexOf(exportPrefix);
+        if (exportIdx === -1) throw new Error(`Missing "${varName}" in .mjs content`);
+        const start = exportIdx + exportPrefix.length;
+        const rest = content.slice(start);
+        const end = rest.lastIndexOf(';');
+        const json = (end === -1 ? rest : rest.slice(0, end)).trim();
+        return JSON.parse(json);
+    }
+    const start = idx + prefix.length;
+    const rest = content.slice(start);
+    const end = rest.lastIndexOf(';');
+    const json = (end === -1 ? rest : rest.slice(0, end)).trim();
+    return JSON.parse(json);
+}
+
+async function readJobsAndSkillsFromPaths(jobsPath, skillsPath) {
+    const [jobsContent, skillsContent] = await Promise.all([
+        fs.readFile(jobsPath, 'utf-8'),
+        fs.readFile(skillsPath, 'utf-8')
+    ]);
+    const jobs = parseMjsExport(jobsContent, 'jobs');
+    const skills = parseMjsExport(skillsContent, 'skills');
+    return { jobs, skills };
+}
+
+/** Read app-status.json; returns { 'current-resume-id': null } if missing or invalid. */
+async function readAppStatus() {
+    try {
+        const data = await fs.readFile(APP_STATUS_FILE_PATH, 'utf-8');
+        const status = JSON.parse(data);
+        const id = status['current-resume-id'];
+        return { 'current-resume-id': id === undefined || id === null ? null : String(id) };
+    } catch (err) {
+        if (err.code === 'ENOENT') return { 'current-resume-id': null };
+        console.error('[server] Error reading app-status.json:', err.message);
+        return { 'current-resume-id': null };
+    }
+}
+
+/** Write app-status.json with current-resume-id. */
+async function writeAppStatus(currentResumeId) {
+    const status = { 'current-resume-id': currentResumeId === undefined || currentResumeId === null ? null : String(currentResumeId) };
+    await fs.writeFile(APP_STATUS_FILE_PATH, JSON.stringify(status, null, 2), 'utf-8');
+}
+
 // --- API Endpoints ---
 // These must be defined *before* the static file server.
 
-// GET /api/state: Fetches the saved application state
+// GET /api/state: Fetches the saved application state (current-resume-id from app-status.json)
 app.get('/api/state', async (req, res) => {
     try {
         await fs.access(STATE_FILE_PATH);
         const stateData = await fs.readFile(STATE_FILE_PATH, 'utf-8');
         const parsedState = JSON.parse(stateData);
+        const status = await readAppStatus();
+        if (parsedState['user-settings'] == null) parsedState['user-settings'] = {};
+        parsedState['user-settings'].currentResumeId = status['current-resume-id'];
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('📖 Loaded app state from disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
+        console.log('📖 Loaded app state from disk - size:', sizeKB, 'KB, current-resume-id:', status['current-resume-id'], 'at:', new Date().toISOString());
         res.json(parsedState);
     } catch (error) {
         if (error.code === 'ENOENT') {
@@ -51,17 +109,70 @@ app.get('/api/state', async (req, res) => {
     }
 });
 
-// POST /api/state: Saves the application state
+// GET /api/status: Returns app-status (current-resume-id) for re-init when state is missing
+app.get('/api/status', async (req, res) => {
+    try {
+        const status = await readAppStatus();
+        res.json(status);
+    } catch (error) {
+        console.error('Error reading app-status:', error);
+        res.status(500).json({ error: 'Failed to read app-status.' });
+    }
+});
+
+// POST /api/state: Saves the application state and app-status.json (current-resume-id)
 app.post('/api/state', async (req, res) => {
     try {
         const stateData = JSON.stringify(req.body, null, 2);
         await fs.writeFile(STATE_FILE_PATH, stateData, 'utf-8');
+        const currentResumeId = req.body?.['user-settings']?.currentResumeId ?? null;
+        await writeAppStatus(currentResumeId);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
+        console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, current-resume-id:', currentResumeId, 'at:', new Date().toISOString());
         res.json({ success: true });
     } catch (error) {
         console.error('Error writing state file:', error);
         res.status(500).json({ error: 'Failed to write state file.' });
+    }
+});
+
+// GET /api/resumes/default/data: Jobs and skills from static_content (default resume)
+app.get('/api/resumes/default/data', async (req, res) => {
+    try {
+        await fs.access(STATIC_JOBS_PATH);
+        await fs.access(STATIC_SKILLS_PATH);
+        const { jobs, skills } = await readJobsAndSkillsFromPaths(STATIC_JOBS_PATH, STATIC_SKILLS_PATH);
+        res.json({ jobs, skills });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.status(404).json({ error: 'Default resume data not found (static_content/jobs, static_content/skills).' });
+        } else {
+            console.error('Error reading default resume data:', error);
+            res.status(500).json({ error: 'Failed to read default resume data.' });
+        }
+    }
+});
+
+// GET /api/resumes/:id/data: Jobs and skills for a parsed resume (parsed_resumes/<id>/)
+app.get('/api/resumes/:id/data', async (req, res) => {
+    const { id } = req.params;
+    if (!id || id === 'default') {
+        return res.status(400).json({ error: 'Invalid resume id.' });
+    }
+    try {
+        const jobsPath = path.join(PARSED_RESUMES_DIR, id, 'jobs', 'jobs.mjs');
+        const skillsPath = path.join(PARSED_RESUMES_DIR, id, 'skills', 'skills.mjs');
+        await fs.access(jobsPath);
+        await fs.access(skillsPath);
+        const { jobs, skills } = await readJobsAndSkillsFromPaths(jobsPath, skillsPath);
+        res.json({ jobs, skills });
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            res.status(404).json({ error: `Resume "${id}" not found.` });
+        } else {
+            console.error('Error reading resume data:', error);
+            res.status(500).json({ error: 'Failed to read resume data.' });
+        }
     }
 });
 

@@ -1,7 +1,8 @@
 // modules/composables/useJobsDependency.mjs
-// Vue 3 dependency management for jobs data loading
+// Vue 3 dependency management for jobs data loading (from resume API)
 
 import { ref, computed, readonly } from 'vue'
+import { enrichJobsWithSkills } from '../data/enrichedJobs.mjs'
 
 // Global state for jobs dependency
 const jobsState = ref({
@@ -16,41 +17,57 @@ const dependentControllers = ref(new Set())
 
 /**
  * Composable for managing jobs data dependency
- * Replaces the IM pattern with Vue 3 reactive dependency management
+ * Loads jobs/skills from resume API (default or parsed resume id), enriches, and notifies controllers.
  */
 export function useJobsDependency() {
-  
+
   /**
-   * Load jobs data asynchronously
+   * Load jobs data from resume API (default or currentResumeId from app state).
+   * @param {object} [options] - { forceResumeId?: string | null, force?: boolean }
+   * @returns {Promise<Array>} Enriched jobs array
    */
-  const loadJobs = async () => {
-    if (jobsState.value.isLoading || jobsState.value.data) {
+  const loadJobs = async (options = {}) => {
+    const { forceResumeId, force = false } = options
+    if (!force && (jobsState.value.isLoading || jobsState.value.data)) {
       console.log('[useJobsDependency] Jobs already loading or loaded, returning existing data')
-      return jobsState.value.data // Already loading or loaded
+      return jobsState.value.data
     }
-    
-    console.log('[useJobsDependency] 🔄 Loading jobs data...')
+
+    let resumeId = forceResumeId
+    if (resumeId === undefined) {
+      try {
+        const { useAppState } = await import('./useAppState.ts')
+        const { appState } = useAppState()
+        resumeId = appState.value?.['user-settings']?.currentResumeId ?? null
+      } catch (_) {
+        resumeId = null
+      }
+    }
+
+    const url = resumeId
+      ? `/api/resumes/${encodeURIComponent(resumeId)}/data`
+      : '/api/resumes/default/data'
+    console.log('[useJobsDependency] 🔄 Loading jobs from resume API:', url)
     jobsState.value.isLoading = true
     jobsState.value.error = null
-    
+
     try {
-      // Import jobs data
-      const jobsModule = await import('../data/enrichedJobs.mjs')
-      const jobs = jobsModule.default || jobsModule.jobs || jobsModule
-      
-      if (!Array.isArray(jobs)) {
-        throw new Error('Jobs data is not an array')
+      const res = await fetch(url)
+      if (!res.ok) {
+        const errBody = await res.text()
+        throw new Error(res.status === 404 ? `Resume data not found: ${url}` : `Resume API ${res.status}: ${errBody}`)
       }
-      
+      const { jobs: rawJobs, skills } = await res.json()
+      if (!Array.isArray(rawJobs)) {
+        throw new Error('API returned jobs that are not an array')
+      }
+      const jobs = enrichJobsWithSkills(rawJobs, skills || {})
       jobsState.value.data = jobs
       jobsState.value.isInitialized = true
-      
+
       console.log(`[useJobsDependency] ✅ Jobs loaded successfully: ${jobs.length} jobs`)
-      
-      // Notify all dependent controllers that jobs are ready
-      console.log(`[useJobsDependency] 📢 Notifying ${dependentControllers.value.size} dependent controllers...`)
+
       await notifyDependentControllers()
-      
       return jobs
     } catch (error) {
       console.error('[useJobsDependency] ❌ Failed to load jobs:', error)
@@ -145,6 +162,9 @@ export function useJobsDependency() {
     jobsState.value.data ? jobsState.value.data.length : 0
   )
   
+  /** Sync getter for code that expects getJobsData() (returns current jobs array or empty array). */
+  const getJobsData = () => jobsState.value.data ?? []
+
   return {
     // Reactive state (readonly)
     jobsData: readonly(computed(() => jobsState.value.data)),
@@ -153,9 +173,10 @@ export function useJobsDependency() {
     isReady,
     hasError,
     jobsCount,
-    
+
     // Methods
     loadJobs,
+    getJobsData,
     registerController,
     waitForJobs
   }

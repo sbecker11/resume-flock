@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue';
-import { jobs } from '@/modules/data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '@/modules/composables/useJobsDependency.mjs';
 import { selectionManager } from '@/modules/core/selectionManager.mjs';
 import { useColorPalette } from '@/modules/composables/useColorPalette.mjs';
 import { applyPaletteToElement } from '@/modules/composables/useColorPalette.mjs';
@@ -154,9 +154,10 @@ const selectedSkillCard = computed(() => {
   for (const bizCardId of bizCardIds) {
     const bizEl = document.getElementById(bizCardId);
     const jobNum = bizEl != null ? parseInt(bizEl.getAttribute('data-job-number'), 10) : NaN;
-    if (Number.isNaN(jobNum) || jobNum < 0 || jobNum >= jobs.length) continue;
+    const jobsList = getGlobalJobsDependency().getJobsData();
+    if (Number.isNaN(jobNum) || jobNum < 0 || jobNum >= jobsList.length) continue;
     referencingJobNumbers.push(jobNum);
-    totalMonths += getMonthsExperience(jobs[jobNum]);
+    totalMonths += getMonthsExperience(jobsList[jobNum]);
   }
   const totalYearsExperience = totalMonths <= 0 ? 0 : Math.ceil(totalMonths / 12);
   return { skillName, referencingJobNumbers, totalYearsExperience };
@@ -216,9 +217,10 @@ function getSkillCardDataFromId(skillCardId) {
   for (const bizCardId of bizCardIds) {
     const bizEl = document.getElementById(bizCardId) || document.querySelector(`[id="${bizCardId}"]`);
     const jobNum = bizEl != null ? parseInt(bizEl.getAttribute('data-job-number'), 10) : NaN;
-    if (Number.isNaN(jobNum) || jobNum < 0 || jobNum >= jobs.length) continue;
+    const jobsList = getGlobalJobsDependency().getJobsData();
+    if (Number.isNaN(jobNum) || jobNum < 0 || jobNum >= jobsList.length) continue;
     referencingJobNumbers.push(jobNum);
-    totalMonths += getMonthsExperience(jobs[jobNum]);
+    totalMonths += getMonthsExperience(jobsList[jobNum]);
   }
   const totalYearsExperience = totalMonths <= 0 ? 0 : Math.ceil(totalMonths / 12);
   return { skillName, referencingJobNumbers, totalYearsExperience };

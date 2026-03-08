@@ -1,5 +1,5 @@
 import { ref, onMounted, onUnmounted, watch, inject, computed, watchEffect } from 'vue'
-import { jobs } from '@/modules/data/enrichedJobs.mjs'
+import { getGlobalJobsDependency } from '@/modules/composables/useJobsDependency.mjs'
 import { selectionManager } from '@/modules/core/selectionManager.mjs'
 import { useTimeline, initialize } from '@/modules/composables/useTimeline.mjs'
 import { useColorPalette, applyPaletteToElement, readyPromise } from '@/modules/composables/useColorPalette.mjs'
@@ -100,6 +100,12 @@ export function useCardsController() {
     async function initializeCardsController() {
         if (isInitialized.value) {
             console.debug('[CardsController] already initialized')
+            return
+        }
+
+        const jobs = getGlobalJobsDependency().getJobsData()
+        if (!Array.isArray(jobs) || jobs.length === 0) {
+            console.warn('[CardsController] No jobs data yet, skipping init')
             return
         }
 
@@ -965,7 +971,8 @@ export function useCardsController() {
         // document.body.appendChild(debugEl)
         
         // Pre-create clones for all jobs
-        for (let jobNumber = 0; jobNumber < jobs.length; jobNumber++) {
+        const jobsList = getGlobalJobsDependency().getJobsData()
+        for (let jobNumber = 0; jobNumber < jobsList.length; jobNumber++) {
             const originalCard = cardRegistry.getCardElement(jobNumber)
             if (!originalCard) {
                 console.warn(`[preCreateAllClones] Original card not found for job ${jobNumber}`)
@@ -1372,14 +1379,16 @@ export function useCardsController() {
     }
     
     function hideAllClones() {
-        for (let jobNumber = 0; jobNumber < jobs.length; jobNumber++) {
+        const jobsList = getGlobalJobsDependency().getJobsData()
+        for (let jobNumber = 0; jobNumber < jobsList.length; jobNumber++) {
             hideJobClone(jobNumber)
         }
         console.log(`[hideAllClones] ✅ Hidden all clones`)
     }
     
     function showAllOriginals() {
-        for (let jobNumber = 0; jobNumber < jobs.length; jobNumber++) {
+        const jobsList = getGlobalJobsDependency().getJobsData()
+        for (let jobNumber = 0; jobNumber < jobsList.length; jobNumber++) {
             showJobOriginal(jobNumber)
         }
         console.log(`[showAllOriginals] ✅ Shown all original cards`)

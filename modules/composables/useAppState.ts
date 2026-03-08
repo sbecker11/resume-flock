@@ -57,6 +57,7 @@ function getDefaultState(): AppState {
             lastVisitedJobNumber: null,
             selectedElementId: null,
             selectedDualElementId: null,
+            currentResumeId: null,
             resume: {
                 sortRule: { field: 'startDate', direction: 'asc' }
             },
@@ -300,7 +301,19 @@ async function loadStateFromServer(): Promise<AppState> {
             if (!response.ok) {
                 if (response.status === 404) {
                     console.log("No saved state found on server, using default state.")
-                    return getDefaultState()
+                    const defaultState = getDefaultState()
+                    try {
+                        const statusRes = await fetch('/api/status')
+                        if (statusRes.ok) {
+                            const status = await statusRes.json()
+                            const id = status['current-resume-id']
+                            if (id != null && defaultState['user-settings']) {
+                                defaultState['user-settings'].currentResumeId = id
+                                console.log("[AppState] Restored current-resume-id from app-status.json:", id)
+                            }
+                        }
+                    } catch (_) { /* ignore */ }
+                    return defaultState
                 } else {
                     throw new Error(`Server responded with status: ${response.status}`)
                 }

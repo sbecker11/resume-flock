@@ -47,9 +47,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, watch, onMounted } from 'vue';
 import { useTimeline, initialize } from '@/modules/composables/useTimeline.mjs';
-import { jobs } from '@/modules/data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '@/modules/composables/useJobsDependency.mjs';
 
 // Props
 const props = defineProps({
@@ -62,11 +62,17 @@ const props = defineProps({
 // Use timeline composable
 const { years, timelineHeight, isInitialized: timelineInitialized } = useTimeline();
 
-// Initialize timeline with jobs data
-if (!timelineInitialized.value) {
-  console.log('[Timeline] Initializing timeline with jobs data...');
-  initialize(jobs);
+function tryInitTimeline() {
+  if (timelineInitialized.value) return;
+  const jobs = getGlobalJobsDependency().getJobsData();
+  if (Array.isArray(jobs) && jobs.length > 0) {
+    console.log('[Timeline] Initializing timeline with jobs data...');
+    initialize(jobs);
+  }
 }
+
+onMounted(() => tryInitTimeline());
+watch(() => getGlobalJobsDependency().jobsData, () => tryInitTimeline(), { deep: true });
 
 console.log('[Timeline] Component initialized with Vue composables - timelineHeight:', timelineHeight.value, 'Years array length:', years.value.length);
 </script>

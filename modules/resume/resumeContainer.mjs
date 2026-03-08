@@ -1,7 +1,7 @@
 // modules/resume/resumeContainer.mjs
 
 import * as sceneContainer  from '../scene/sceneContainerModule.mjs';
-import { getJobsData } from '../data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs';
 import * as selectionManager from '../core/selectionManager.mjs';
 import * as dom from '../utils/domUtils.mjs';
 import * as eventBus from '../core/eventBus.mjs';

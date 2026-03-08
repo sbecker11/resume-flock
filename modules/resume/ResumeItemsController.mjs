@@ -6,7 +6,7 @@ import { selectionManager } from '../core/selectionManager.mjs';
 // import { cardsController } from './CardsController.mjs'; // Now using Vue composable approach
 import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 // import { initializationManager } from '../core/initializationManager.mjs'; // IM framework no longer used
-import { jobs } from '../data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs';
 // No longer directly manipulating other managers
 // import { bizCardDivManager } from './bizCardDivManager.mjs';
 // import * as scenePlane from './scenePlane.mjs';
@@ -200,7 +200,8 @@ class ResumeItemsController {
     }
 
     createEnhancedResumeDetailsDiv(jobNumber) {
-        // Get job data for this job number
+        // Get job data for this job number (from resume API via jobs dependency)
+        const jobs = getGlobalJobsDependency().getJobsData();
         const jobData = jobs[jobNumber];
         if (!jobData) {
             console.warn(`Job data not found for job number ${jobNumber}`);

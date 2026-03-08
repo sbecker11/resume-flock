@@ -14,8 +14,7 @@ import { selectionManager } from '../core/selectionManager.mjs';
 // import { cardsController } from '../scene/CardsController.mjs'; // Now using Vue composable approach
 import { AppState, saveState } from '../core/stateManager.mjs';
 // import { initializationManager } from '../core/initializationManager.mjs'; // IM framework no longer used
-// Import enriched jobs (jobs + skills) for bizCards and skillCards
-import { jobs } from '../data/enrichedJobs.mjs';
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs';
 // Import new Vue composable for color palette functionality
 import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 // Import fundamental components to ensure they're registered with IM
@@ -89,25 +88,10 @@ class ResumeListController extends BaseComponent {
 
   // registerForInitialization() method removed - BaseComponent handles registration automatically
 
-  initialize({ CardsController, JobsDataManager, ColorPaletteManager }) {
-    console.debug('[ResumeListController] initializing', {
-      CardsController: !!CardsController,
-      JobsDataManager: !!JobsDataManager,
-      ColorPaletteManager: !!ColorPaletteManager
-    });
-
-    // Business logic only - no DOM operations here
-    // DOM operations moved to setupDom()
-
-    // Store injected dependencies
-    // this.cardsController = CardsController; // No longer using legacy CardsController
-    // this.jobsDataManager = JobsDataManager; // No longer using JobsDataManager - using direct import
-    // this.colorPaletteManager = ColorPaletteManager; // No longer using ColorPaletteManager
-
-    // Get jobs data directly (no longer using JobsDataManager)
-    this.originalJobsData = jobs;
-    
-    console.debug('[ResumeListController] init complete');
+  initialize(jobsData) {
+    // Called by useJobsDependency with jobs array from resume API (default or parsed)
+    this.originalJobsData = Array.isArray(jobsData) ? jobsData : getGlobalJobsDependency().getJobsData();
+    console.debug('[ResumeListController] init complete, jobs:', this.originalJobsData?.length ?? 0);
   }
 
     /**
