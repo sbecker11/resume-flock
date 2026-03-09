@@ -76,7 +76,7 @@ export interface AppState {
     };
   };
 
-  // System constants grouped together  
+  // System constants grouped together (not user-editable in the app)
   "system-constants": {
     zIndex: {
       root: number;
@@ -172,6 +172,13 @@ export interface AppState {
         hovered: BorderOverrideStyle;
         selected: BorderOverrideStyle;
       };
+    };
+    /** Parallax/depth rendering constants (camelCase; not user-editable) */
+    rendering: {
+      parallaxScaleAtMaxZ: number;   // 0–1, scale at max Z (default 0.9)
+      saturationAtMaxZ: number;      // 0–1+ (default 1.0 = no change)
+      brightnessAtMaxZ: number;      // 0–1 (default 1.0 = no darkening)
+      blurAtMaxZ: number;            // px blur at max Z (default 0)
     };
   };
 }

@@ -1246,7 +1246,7 @@ This constraint is implemented in:
 2. **`AppContent.vue`** - Layout percentage display
 3. **`SceneContainer.vue`** - Scene width calculations
 4. **`appStore.mjs`** - State management
-5. **`app_state.json`** - Persistent storage
+5. **`app_state.json`** - Persistent storage (see [docs/LOCAL-FILES-AND-SECRETS.md](docs/LOCAL-FILES-AND-SECRETS.md) for local files and secrets, including `.env`)
 
 ### **🧮 Percentage Calculation Pattern**
 
@@ -1410,7 +1410,7 @@ This **resizeHandle** represents a significant advancement in layout management,
 The resize handle drag operation was causing performance issues due to a cascading chain of reactive updates:
 
 ```
-ResizeHandle drag → events → ResumeContainer resize → InfiniteScrollingContainer → rDiv recalculation → jerky feedback
+ResizeHandle drag → events → ResumeContainer resize → ResumeListScrollContainer → rDiv recalculation → jerky feedback
 ```
 
 **Root Cause**: Resize events fired on every mouse move during dragging, triggering expensive layout recalculations throughout the component hierarchy.
@@ -1503,9 +1503,9 @@ const handleMouseUp = (event) => {
 
 This **debounced event architecture** eliminates the cascading resize performance bottleneck while preserving the responsive user experience and accurate final layout positioning.
 
-## Infinite Scrolling Container: Novel Virtual Scrolling Architecture
+## Resume List Scroll Container: Novel Virtual Scrolling Architecture
 
-This project implements a **sophisticated infinite scrolling system** that provides seamless performance for large datasets while maintaining visual continuity and state preservation. The `InfiniteScrollingContainer` represents a novel approach to virtual scrolling that goes beyond traditional implementations.
+This project implements a **sophisticated resume list scroll (wrapping) system** that provides seamless performance for large datasets while maintaining visual continuity and state preservation. The `ResumeListScrollContainer` represents a novel approach to virtual scrolling that goes beyond traditional implementations.
 
 ### **🎯 Core Innovation: Hybrid Virtual Scrolling**
 
@@ -1519,8 +1519,8 @@ Unlike traditional virtual scrolling that only renders visible items, this syste
 ### **🏗️ Architecture Overview**
 
 ```javascript
-// InfiniteScrollingContainer.mjs - Core Structure
-class InfiniteScrollingContainer {
+// resumeListScrollContainer.mjs - Core Structure
+class ResumeListScrollContainer {
   constructor() {
     this.allItems = [];           // All items with calculated positions
     this.visibleItems = [];       // Currently visible items
@@ -1536,7 +1536,7 @@ class InfiniteScrollingContainer {
 
 #### **Dynamic Height Measurement**
 ```javascript
-// InfiniteScrollingContainer.mjs - Height Calculation
+// resumeListScrollContainer.mjs - Height Calculation
 calculateItemPositions(forceRecalculation = false) {
   let currentTop = 0;
   
@@ -1580,12 +1580,12 @@ calculateItemPositions(forceRecalculation = false) {
 
 #### **Clone Creation System**
 ```javascript
-// InfiniteScrollingContainer.mjs - Clone Management
+// resumeListScrollContainer.mjs - Clone Management
 cloneItem(originalElement, originalIndex, cloneType) {
   const clone = originalElement.cloneNode(true);
   
   // Add clone identifiers
-  clone.classList.add('infinite-scroll-clone');
+  clone.classList.add('resume-list-clone');
   clone.classList.add(`${cloneType}-clone`);
   clone.dataset.originalIndex = originalIndex;
   clone.dataset.cloneType = cloneType;
@@ -1599,7 +1599,7 @@ cloneItem(originalElement, originalIndex, cloneType) {
       applyPaletteToElement(clone);
       clone.classList.remove('hovered', 'selected');
     } catch (error) {
-      console.log('Failed to apply palette to infinite scroll clone:', error);
+      console.log('Failed to apply palette to resume-list clone:', error);
     }
   }
   
@@ -1616,7 +1616,7 @@ cloneItem(originalElement, originalIndex, cloneType) {
 
 #### **Scroll Position Preservation**
 ```javascript
-// InfiniteScrollingContainer.mjs - Scroll Management
+// resumeListScrollContainer.mjs - Scroll Management
 handleScroll() {
   const scrollTop = this.scrollport.scrollTop;
   const scrollHeight = this.scrollport.scrollHeight;
@@ -1645,7 +1645,7 @@ preserveScrollPosition() {
 
 #### **Momentum Scrolling**
 ```javascript
-// InfiniteScrollingContainer.mjs - Momentum System
+// resumeListScrollContainer.mjs - Momentum System
 handleWheel(event) {
   event.preventDefault();
   
@@ -1667,7 +1667,7 @@ handleWheel(event) {
 
 #### **Smooth Transitions**
 ```javascript
-// InfiniteScrollingContainer.mjs - Transition Management
+// resumeListScrollContainer.mjs - Transition Management
 updateVisibleItems(visibleTop, visibleBottom) {
   // Calculate which items should be visible
   const newVisibleItems = this.allItems.filter(item => 
@@ -1703,7 +1703,7 @@ updateVisibleItems(visibleTop, visibleBottom) {
 
 #### **Content-Aware Styling**
 ```javascript
-// InfiniteScrollingContainer.mjs - Styling Integration
+// resumeListScrollContainer.mjs - Styling Integration
 applyItemStyling(item) {
   // Apply palette-based styling
   if (item.element.hasAttribute('data-color-index')) {
@@ -1731,7 +1731,7 @@ applyItemStyling(item) {
 
 #### **Memory Management**
 ```javascript
-// InfiniteScrollingContainer.mjs - Memory Optimization
+// resumeListScrollContainer.mjs - Memory Optimization
 destroy() {
   // Remove event listeners
   this.scrollport.removeEventListener('scroll', this.handleScroll.bind(this));
@@ -1782,16 +1782,15 @@ destroy() {
 #### **Event-Driven Updates**
 ```javascript
 // ResumeListController.mjs - Integration
-setupInfiniteScrolling() {
-  this.infiniteScroller = new InfiniteScrollingContainer();
-  this.infiniteScroller.initialize(this.resumeContentDiv, {
+setupResumeListScroll() {
+  this.scrollContainer = new ResumeListScrollContainer(this.resumeContentWrapper, this.resumeContentDiv, {
     items: this.bizResumeDivs,
     onItemSelect: (item) => {
-      selectionManager.selectJobNumber(item.jobNumber, 'InfiniteScroller');
+      selectionManager.selectJobNumber(item.jobNumber, 'ResumeListScrollContainer');
     },
     onScroll: () => {
       // Update scroll position in global state
-      AppState.resume.scrollPosition = this.infiniteScroller.getScrollPosition();
+      AppState.resume.scrollPosition = this.scrollContainer.getScrollPosition();
       saveState(AppState);
     }
   });

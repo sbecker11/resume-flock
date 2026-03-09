@@ -39,6 +39,11 @@ import { useAppState } from '../composables/useAppState.ts'
 
 // Selection management
 import { selectionManager } from '../core/selectionManager.mjs'
+import {
+  registerTimelineReinit,
+  registerCardsReinit,
+  registerGetBizCardDivs
+} from '../resume/resumeReinitializer.mjs'
 
 const { appState, updateAppState } = useAppState()
 let sceneContentScrollTimeoutId = null
@@ -187,9 +192,16 @@ watch(elementCounts, (newCounts) => {
 }, { deep: true })
 
 // Scene-specific composables
-const { timelineHeight } = useTimeline()
+const timelineComposable = useTimeline()
+const { timelineHeight, reinitialize: timelineReinitialize } = timelineComposable
 // Cards controller will auto-initialize when scene-plane-ready event fires
-const { initializeCardsController } = useCardsController()
+const cardsController = useCardsController()
+const { initializeCardsController, reinitializeResumeData, bizCardDivs } = cardsController
+
+// Register reinit callbacks for resume system (parsed resume switch)
+registerTimelineReinit((jobsData) => timelineReinitialize(jobsData))
+registerCardsReinit(() => reinitializeResumeData())
+registerGetBizCardDivs(() => bizCardDivs.value ?? [])
 
 // Focal point system (aim point removed)
 const { setFocalPointElement } = useFocalPoint()

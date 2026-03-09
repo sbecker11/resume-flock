@@ -9,8 +9,5 @@ palette-utils-ts/coverage/
 # Persisted UI state (per-user; app writes when a persistent attribute is updated)
 app_state.json
 
-# Local-only status (initialized from app_status.example.json if missing)
-app_status.json
-
 # Local-only Cursor command (do not push)
 .cursor/commands/env.md

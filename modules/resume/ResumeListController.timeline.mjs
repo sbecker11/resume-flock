@@ -1,6 +1,6 @@
 // modules/resume/ResumeListController.mjs
 
-import { InfiniteScrollingContainer } from './infiniteScrollingContainer.mjs';
+import { ResumeListScrollContainer } from './resumeListScrollContainer.mjs';
 import * as domUtils from '../utils/domUtils.mjs';
 // No longer directly interacting with these for selection
 // import { bizCardDivManager } from '../scene/bizCardDivManager.mjs';
@@ -13,7 +13,7 @@ import { AppState, saveState } from '../core/stateManager.mjs';
 class ResumeListController {
   constructor() {
     this.resumeContentDiv = null; // Defer initialization
-    this.infiniteScroller = null;
+    this.scrollContainer = null;
     this.bizResumeDivs = null;
     this.originalJobsData = null;
     this.currentSortRule = null;
@@ -36,7 +36,7 @@ class ResumeListController {
     this.originalJobsData = originalJobsData;
     this.bizResumeDivs = bizResumeDivs;
     
-    this.setupInfiniteScrolling();
+    this.setupResumeListScroll();
     
     // Listen for selection changes to save state
     selectionManager.addEventListener('selectionChanged', this.handleSelectionChanged.bind(this));
@@ -69,7 +69,7 @@ class ResumeListController {
   reinitialize(bizResumeDivs) {
     window.CONSOLE_LOG_IGNORE("ResumeListController: Re-initializing with fresh DOM elements.");
     this.bizResumeDivs = bizResumeDivs;
-    this.setupInfiniteScrolling();
+    this.setupResumeListScroll();
     // After re-setup, we should scroll to the currently selected item.
     const selectedJobIndex = selectionManager.getSelectedJobIndex();
     if (selectedJobIndex !== null) {
@@ -123,15 +123,15 @@ class ResumeListController {
 
   // endregion
 
-  setupInfiniteScrolling() {
-    this.infiniteScroller = new InfiniteScrollingContainer(this.resumeContentWrapper, this.resumeContentDiv, {
+  setupResumeListScroll() {
+    this.scrollContainer = new ResumeListScrollContainer(this.resumeContentWrapper, this.resumeContentDiv, {
       cloneCount: 3,
       transitionDuration: 300,
       onItemChange: (index, item) => {
         this.handleResumeItemChange(index, item);
       }
     });
-    this.infiniteScroller.setItems(this.bizResumeDivs);
+    this.scrollContainer.setItems(this.bizResumeDivs);
   }
 
   handleResumeItemChange(index, resumeDiv) {
@@ -212,13 +212,13 @@ class ResumeListController {
     console.trace(); // This will show the call stack
     
     window.CONSOLE_LOG_IGNORE(`[ResumeListController] scrollToJobIndex called for jobIndex: ${jobIndex} from: ${caller}`);
-    window.CONSOLE_LOG_IGNORE(`[ResumeListController] Scroller initialized: ${!!this.infiniteScroller}`);
-    if (!this.infiniteScroller) return;
+    window.CONSOLE_LOG_IGNORE(`[ResumeListController] Scroller initialized: ${!!this.scrollContainer}`);
+    if (!this.scrollContainer) return;
 
     const newSortedIndex = this.sortedIndices.indexOf(jobIndex);
     window.CONSOLE_LOG_IGNORE(`[ResumeListController] Found sortedIndex: ${newSortedIndex}`);
     if (newSortedIndex !== -1) {
-      this.infiniteScroller.scrollToItem(newSortedIndex);
+      this.scrollContainer.scrollToItem(newSortedIndex);
     } else {
       console.error(`ResumeListController: ${caller}: newSortedIndex not found for job index ${jobIndex}`);
     }
@@ -241,6 +241,9 @@ class ResumeListController {
           break;
         case 'startDate':
           comparison = this.compareDates(a.job.start, b.job.start);
+          break;
+        case 'endDate':
+          comparison = this.compareDates(a.job.end, b.job.end);
           break;
         case 'role':
           comparison = this.compareStrings(a.job.role, b.job.role);
@@ -293,17 +296,17 @@ class ResumeListController {
   }
 
   applyNewSort() {
-    if (!this.infiniteScroller) return;
+    if (!this.scrollContainer) return;
 
     // Create new array of divs in sorted order
     const sortedDivs = this.sortedIndices.map(originalIndex => this.bizResumeDivs[originalIndex]);
 
-    // Update the infinite scroller with the new order, starting at index 0
+    // Update the scroll container with the new order, starting at index 0
     const startingIndex = 0;
-    this.infiniteScroller.setItems(sortedDivs, startingIndex);
+    this.scrollContainer.setItems(sortedDivs, startingIndex);
 
     // After setting items, explicitly scroll to the new starting index without animation
-    this.infiniteScroller.scrollToItem(startingIndex, 'applyNewSort', true);
+    this.scrollContainer.scrollToItem(startingIndex, 'applyNewSort', true);
   }
 
   // Convenience methods for common sorts
@@ -414,9 +417,9 @@ class ResumeListController {
   }
 
   destroy() {
-    if (this.infiniteScroller) {
-      this.infiniteScroller.destroy();
-      this.infiniteScroller = null;
+    if (this.scrollContainer) {
+      this.scrollContainer.destroy();
+      this.scrollContainer = null;
     }
   }
 
@@ -428,12 +431,12 @@ class ResumeListController {
             return;
         }
         
-        if (!this.infiniteScroller) {
-            console.warn(`ResumeListController: infiniteScroller is not initialized`);
+        if (!this.scrollContainer) {
+            console.warn(`ResumeListController: scrollContainer is not initialized`);
             return;
         }
         
-        const resumeDiv = this.infiniteScroller.getItemAtIndex(sortedIndex);
+        const resumeDiv = this.scrollContainer.getItemAtIndex(sortedIndex);
         if (resumeDiv) {
             resumeDiv.classList.add(className);
             window.CONSOLE_LOG_IGNORE(`ResumeListController: Added class ${className} to item at index ${sortedIndex}`);
@@ -454,12 +457,12 @@ class ResumeListController {
             return;
         }
         
-        if (!this.infiniteScroller) {
-            console.warn(`ResumeListController: infiniteScroller is not initialized`);
+        if (!this.scrollContainer) {
+            console.warn(`ResumeListController: scrollContainer is not initialized`);
             return;
         }
         
-        const resumeDiv = this.infiniteScroller.getItemAtIndex(sortedIndex);
+        const resumeDiv = this.scrollContainer.getItemAtIndex(sortedIndex);
         if (resumeDiv) {
             resumeDiv.classList.remove(className);
             window.CONSOLE_LOG_IGNORE(`ResumeListController: Removed class ${className} from item at index ${sortedIndex}`);
@@ -473,7 +476,7 @@ class ResumeListController {
   }
 
   /**
-   * Scroll a bizResumeDiv into view using the infiniteScroller
+   * Scroll a bizResumeDiv into view using the resume list scroll container
    * @param {HTMLElement} bizResumeDiv - The bizResumeDiv to scroll into view
    * @returns {boolean} - Whether the scroll was successful
    */
@@ -485,14 +488,14 @@ class ResumeListController {
     
     window.CONSOLE_LOG_IGNORE(`ResumeListController: Scrolling bizResumeDiv ${bizResumeDiv.id} into view`);
     
-    // If we have an infinite scroller, use it (most efficient)
-    if (this.infiniteScroller) {
-      window.CONSOLE_LOG_IGNORE(`ResumeListController: Using infiniteScroller to scroll bizResumeDiv ${bizResumeDiv.id}`);
-      return this.infiniteScroller.scrollToBizResumeDiv(bizResumeDiv, true);
+    // If we have the scroll container, use it (most efficient)
+    if (this.scrollContainer) {
+      window.CONSOLE_LOG_IGNORE(`ResumeListController: Using scrollContainer to scroll bizResumeDiv ${bizResumeDiv.id}`);
+      return this.scrollContainer.scrollToBizResumeDiv(bizResumeDiv, true);
     }
     
-    // If we don't have an infinite scroller, use direct scrollIntoView
-    window.CONSOLE_LOG_IGNORE(`ResumeListController: No infiniteScroller available, using direct scrollIntoView for ${bizResumeDiv.id}`);
+    // If we don't have the scroll container, use direct scrollIntoView
+    window.CONSOLE_LOG_IGNORE(`ResumeListController: No scrollContainer available, using direct scrollIntoView for ${bizResumeDiv.id}`);
     try {
       bizResumeDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return true;

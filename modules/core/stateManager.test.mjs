@@ -46,6 +46,12 @@ describe('stateManager', () => {
       fetch.mockRejectedValueOnce(new Error('network'));
       const state = await loadState();
       expect(state).toHaveProperty('version');
+      expect(state).toHaveProperty('layout');
+    });
+    it('returns default state when fetch returns non-404 error status', async () => {
+      fetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      const state = await loadState();
+      expect(state).toHaveProperty('version');
     });
     it('returns merged state when fetch returns valid JSON', async () => {
       fetch.mockResolvedValueOnce({
@@ -55,6 +61,22 @@ describe('stateManager', () => {
       const state = await loadState();
       expect(state).toHaveProperty('layout');
       expect(state.layout.orientation).toBe('scene-right');
+    });
+    it('migrates 1.2 to 1.3 and merges with defaults', async () => {
+      fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          version: '1.2',
+          theme: {
+            borderSettings: { normal: { padding: '8px', innerBorderWidth: '1px', outerBorderWidth: '0px', outerBorderColor: 'transparent', borderRadius: '25px' }, hovered: {}, selected: {} },
+            rDivBorderOverrideSettings: { normal: { padding: '15px', innerBorderWidth: '1px' }, hovered: {}, selected: {} },
+          },
+        }),
+      });
+      const state = await loadState();
+      expect(state.version).toBe('1.3');
+      expect(state.theme.borderSettings.hovered).toHaveProperty('padding');
+      expect(state.theme.rDivBorderOverrideSettings.selected).toHaveProperty('padding');
     });
   });
 
@@ -67,6 +89,11 @@ describe('stateManager', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       }));
+    });
+    it('throws when fetch fails', async () => {
+      fetch.mockRejectedValueOnce(new Error('network'));
+      const state = getDefaultState();
+      await expect(saveState(state)).rejects.toThrow('network');
     });
   });
 

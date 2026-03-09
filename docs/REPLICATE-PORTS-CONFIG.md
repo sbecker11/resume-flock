@@ -26,7 +26,7 @@ Use **EXPRESS_PORT** (not generic `PORT`) so the app’s architecture is explici
 **Root `.env.example`**:
 
 - Document all three: `EXPRESS_PORT`, `VITE_DEV_PORT`, `VITE_API_PORT` with defaults and one-line comments (what each is, when to set).
-- **Never commit `.env`** (keep it in `.gitignore`). Creating a local `.env` is then just: copy `.env.example` to `.env` (no need to remember port numbers).
+- **Never commit `.env`** (keep it in `.gitignore`). Creating a local `.env` is then just: copy `.env.example` to `.env` (no need to remember port numbers). For other local-only files (e.g. `app_state.json`), see [LOCAL-FILES-AND-SECRETS.md](LOCAL-FILES-AND-SECRETS.md).
 
 **Client `client/.env`** (optional):
 
@@ -74,7 +74,7 @@ So: dev server port from `VITE_DEV_PORT`; proxy uses `VITE_API_PORT` if set, els
 
 - **start** – Run the script that kills EXPRESS_PORT and starts the server (e.g. `node scripts/start-server.js`).
 - **dev** – `concurrently` “dev server” and “wait-and-dev-client” (both use EXPRESS_PORT / VITE_DEV_PORT from `.env`).
-- **dev:open** – `concurrently` “dev” and the script that waits for VITE_DEV_PORT and opens the browser.
+- **dev:concurrent** (or similar) – `concurrently` “dev server”, Vite, and the script that opens the browser (e.g. open-chrome).
 - **dev:server** – Script that kills EXPRESS_PORT and starts the dev server.
 - **dev:client** – `cd client && npm run dev` (Vite reads VITE_DEV_PORT / VITE_API_PORT from env when you run via wait-and-dev-client).
 - **open:app** – Open `http://localhost:${process.env.EXPRESS_PORT || 3000}` (load `.env` first, e.g. `require('dotenv').config()`).
@@ -114,7 +114,7 @@ No `PORT` or raw `3000`/`5173` in these script commands; everything goes through
 - [ ] Server listens on `process.env.EXPRESS_PORT || 3000`.
 - [ ] Scripts (start, dev, wait-and-dev-client, open-after-wait, open-dev-client, echo-build-url) use EXPRESS_PORT / VITE_DEV_PORT from `.env` (no hardcoded ports).
 - [ ] Vite: `server.port` from VITE_DEV_PORT; proxy target from VITE_API_PORT or EXPRESS_PORT.
-- [ ] package.json: start, dev, dev:open, open:app, build, start:open point at these scripts and env.
+- [ ] package.json: start, dev, dev:concurrent (or open-chrome), build point at these scripts and env.
 - [ ] Docker/Compose: EXPRESS_PORT in env; port mapping matches.
 - [ ] Docs and changelog updated to say EXPRESS_PORT (and optional port utils).
 

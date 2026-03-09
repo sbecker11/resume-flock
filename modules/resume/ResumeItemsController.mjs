@@ -448,7 +448,7 @@ class ResumeItemsController {
             return;
         }
 
-        // Find the scrollable container (infinite scroll container or parent)
+        // Find the scrollable container (resume list scroll container or parent)
         const scrollContainer = this._findScrollContainer(bizResumeDiv);
         if (!scrollContainer) {
             console.warn(`[ResumeItemsController] No scroll container found for job ${jobNumber}, using fallback scroll`);
@@ -482,10 +482,10 @@ class ResumeItemsController {
      * @returns {HTMLElement|null} The scrollable container
      */
     _findScrollContainer(bizResumeDiv) {
-        // First try to find the infinite scroller's scrollport
+        // First try to find the scroll container's scrollport
         let current = bizResumeDiv.parentElement;
         while (current) {
-            if (current.classList.contains('infinite-scroll-container') || 
+            if (current.classList.contains('resume-list-scroll-container') || 
                 current.style.overflowY === 'auto' || 
                 current.style.overflowY === 'scroll' ||
                 current.id === 'resume-container') {
@@ -714,8 +714,8 @@ class ResumeItemsController {
     // Helper method to trigger height recalculation (replaces direct window access)
     _triggerHeightRecalculation(debugMessage) {
         // Try to access via window first (backwards compatibility)
-        if (window.resumeListController && window.resumeListController.infiniteScroller) {
-            window.resumeListController.infiniteScroller.recalculateHeights();
+        if (window.resumeListController && window.resumeListController.scrollContainer) {
+            window.resumeListController.scrollContainer.recalculateHeights();
             console.log(debugMessage);
         } else {
             // Fallback: dispatch event for components using provide/inject

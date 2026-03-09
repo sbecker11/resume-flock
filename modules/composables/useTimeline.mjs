@@ -12,6 +12,51 @@ const startYear = ref(0);
 const endYear = ref(0);
 const timelineHeight = ref(0);
 
+function computeBoundsFromJobs(jobsData) {
+    if (!jobsData || !Array.isArray(jobsData) || jobsData.length === 0) return null;
+    let earliestStartDate = null;
+    for (const job of jobsData) {
+        try {
+            const startDate = dateUtils.parseFlexibleDateString(job.start);
+            if (!earliestStartDate || startDate < earliestStartDate) earliestStartDate = startDate;
+        } catch (e) {
+            console.error('Error parsing job start date:', job.start, e);
+            throw e;
+        }
+    }
+    if (!earliestStartDate) return null;
+    const timelineStartDate = new Date(earliestStartDate);
+    timelineStartDate.setFullYear(timelineStartDate.getFullYear() - 1);
+    const today = new Date();
+    const timelineEndDate = new Date(today);
+    timelineEndDate.setFullYear(timelineEndDate.getFullYear() + 1);
+    const dateToFractionalYear = (date) =>
+        date.getFullYear() + date.getMonth() / 12 + date.getDate() / 365.25 / 12;
+    const start = dateToFractionalYear(timelineStartDate);
+    const end = dateToFractionalYear(timelineEndDate);
+    const totalYearSpan = end - start;
+    const height = totalYearSpan * YEAR_HEIGHT + TIMELINE_PADDING_TOP;
+    return { start, end, height };
+}
+
+/**
+ * Reinitialize timeline with new jobs data (updates bounds). Safe to call when already initialized.
+ * @param {Array} jobsData - Enriched jobs array
+ */
+function reinitialize(jobsData) {
+    if (!jobsData || !Array.isArray(jobsData) || jobsData.length === 0) {
+        window.CONSOLE_LOG_IGNORE("Timeline reinitialize: no jobs data.");
+        return;
+    }
+    const bounds = computeBoundsFromJobs(jobsData);
+    if (!bounds) return;
+    startYear.value = bounds.start;
+    endYear.value = bounds.end;
+    timelineHeight.value = bounds.height;
+    isInitialized.value = true;
+    window.CONSOLE_LOG_IGNORE(`Timeline reinitialized: ${bounds.start} to ${bounds.end}`);
+}
+
 // --- Initialization Function ---
 function initialize(jobsData) {
     if (isInitialized.value) return; // Already initialized
@@ -20,52 +65,17 @@ function initialize(jobsData) {
         return;
     }
 
-    // Self-initializing timeline: analyze jobs data to determine bounds
-    // Min: Earliest job start date - 1 year  
-    // Max: Today + 1 year
-    
-    let earliestStartDate = null;
-    jobsData.forEach(job => {
-        try {
-            const startDate = dateUtils.parseFlexibleDateString(job.start);
-            if (!earliestStartDate || startDate < earliestStartDate) {
-                earliestStartDate = startDate;
-            }
-        } catch (error) {
-            console.error('Error parsing job start date:', job.start, error);
-            throw error;
-        }
-    });
-    
-    if (!earliestStartDate) {
+    const bounds = computeBoundsFromJobs(jobsData);
+    if (!bounds) {
         console.error('No valid job start dates found');
         return;
     }
-    
-    // Timeline start: Earliest job - 1 year (preserve month/day)
-    const timelineStartDate = new Date(earliestStartDate);
-    timelineStartDate.setFullYear(timelineStartDate.getFullYear() - 1);
-    
-    // Timeline end: Today + 1 year (preserve month/day) 
-    const today = new Date();
-    const timelineEndDate = new Date(today);
-    timelineEndDate.setFullYear(timelineEndDate.getFullYear() + 1);
-    
-    // Convert to fractional years for linear interpolation
-    const dateToFractionalYear = (date) => {
-        return date.getFullYear() + 
-               date.getMonth()/12 + 
-               date.getDate()/365.25/12;
-    };
-    
-    startYear.value = dateToFractionalYear(timelineStartDate);
-    endYear.value = dateToFractionalYear(timelineEndDate);
-
-    // Calculate timeline height - back to normal while we find the real issue
-    const totalYearSpan = endYear.value - startYear.value;
-    timelineHeight.value = (totalYearSpan * YEAR_HEIGHT) + TIMELINE_PADDING_TOP;
+    startYear.value = bounds.start;
+    endYear.value = bounds.end;
+    timelineHeight.value = bounds.height;
     isInitialized.value = true;
-    window.CONSOLE_LOG_IGNORE(`Timeline initialized: ${timelineStartDate.toDateString()} to ${timelineEndDate.toDateString()}`);
+    window.CONSOLE_LOG_IGNORE(`Timeline initialized: ${bounds.start} to ${bounds.end}`);
+    return;
 }
 
 // --- Composable ---
@@ -149,7 +159,8 @@ function useTimeline() {
         years,
         getPositionForDate,
         getDateForPosition,
+        reinitialize,
     };
 }
 
-export { initialize, useTimeline }; 
+export { initialize, reinitialize, useTimeline }; 

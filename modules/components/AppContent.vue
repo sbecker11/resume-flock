@@ -63,6 +63,7 @@ import { useSelectedElementIdPersistence } from '../composables/useSelectedEleme
 
 // Resume system initialization (to be migrated)
 import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
+import { registerResumeListReinit } from '../resume/resumeReinitializer.mjs'
 
 // Vue 3 keyboard navigation (replaces legacy keyDownModule)
 import { useKeyboardNavigation } from '../composables/useKeyboardNavigation.mjs'
@@ -351,6 +352,18 @@ onMounted(async () => {
     // PHASE 5: Resume system (legacy during migration)
     console.log('[AppContent] 📋 Initializing resume system...')
     await initializeResumeSystem()
+
+    // Register resume list reinit for parsed-resume switch (rebuild list from new bizCardDivs)
+    registerResumeListReinit(async (bizCardDivs) => {
+      const rlc = window.resumeListController
+      if (!rlc || !bizCardDivs?.length) return
+      const listEl = document.getElementById('resume-content-div-list')
+      if (!listEl) return
+      while (listEl.firstChild) listEl.firstChild.remove()
+      const bizResumeDivs = await rlc.createAllBizResumeDivs(bizCardDivs)
+      bizResumeDivs.forEach((div) => listEl.appendChild(div))
+      rlc.reinitialize(bizResumeDivs)
+    })
 
     // Restore last selected DOM element from persisted state (after rDivs exist)
     setTimeout(() => {

@@ -66,22 +66,37 @@ export function useCardsController() {
     const timelineComposable = useTimeline()
     const { getPositionForDate, getDateForPosition, isInitialized: timelineInitialized } = timelineComposable
 
+    // Jobs dependency: init when jobs become available (handles race where scene-plane-ready fires before loadJobs())
+    const jobsDependency = getGlobalJobsDependency()
+
     // EVENT-DRIVEN: Auto-initialize when scene-plane is ready (proper dependency order)
     onMounted(() => {
         // Listen for scene-plane-ready event to initialize when ScenePlane dependency is satisfied
         const handleScenePlaneReady = () => {
             if (!isInitialized.value && allDependenciesReady.value) {
-                console.debug('[CardsController] initializing cards')
+                console.debug('[CardsController] initializing cards (scene-plane-ready)')
                 initializeCardsController()
             }
         }
-        
+
+        // Also run when jobs become ready (in case scene-plane-ready fired before loadJobs() completed)
+        const stop = watch(
+            () => jobsDependency.isReady?.value && jobsDependency.getJobsData?.()?.length > 0,
+            (jobsReady) => {
+                if (!jobsReady || isInitialized.value || !allDependenciesReady.value) return
+                console.debug('[CardsController] initializing cards (jobs now ready)')
+                initializeCardsController()
+            },
+            { immediate: true }
+        )
+
         // Wait for scene-plane-ready event (proper dependency ordering)
         window.addEventListener('scene-plane-ready', handleScenePlaneReady)
-        
+
         // Cleanup listener on unmount
         onUnmounted(() => {
             window.removeEventListener('scene-plane-ready', handleScenePlaneReady)
+            stop()
         })
     })
     
@@ -414,7 +429,8 @@ export function useCardsController() {
         
         // Parse dates once at the top level for use throughout the function
         const originalJobStartDate = dateUtils.parseFlexibleDateString(job.start || job.startDate)
-        const originalJobEndDate = (job.end === "CURRENT_DATE" || !job.end) ? new Date() : dateUtils.parseFlexibleDateString(job.end)
+        const originalJobEndDate = (job.end === "CURRENT_DATE" || (job.end && String(job.end).toLowerCase().includes('present')) || !job.end) ? new Date() : dateUtils.parseFlexibleDateString(job.end)
+        const isEndPresent = !job.end || job.end === 'CURRENT_DATE' || (typeof job.end === 'string' && job.end.toLowerCase().includes('present'))
         
         // Create separate copies for positioning calculations (will be forced to day 1)
         const jobStartDate = originalJobStartDate ? new Date(originalJobStartDate) : null
@@ -523,7 +539,7 @@ export function useCardsController() {
             <div class="biz-details-role" style="font-weight: bold; padding: 2px;">
                 ${job.role || 'Unknown Role'}
             </div>
-            <div class="biz-details-dates" style="font-weight: bold; padding: 2px;">${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A'}</div>
+            <div class="biz-details-dates" style="font-weight: bold; padding: 2px;">${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${isEndPresent ? 'Present' : (originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A')}</div>
             <div class="biz-details-debug-row"><span class="biz-details-id-and-hex">#${jobNumber} z:${sceneZ} <span class="hex-normal"></span> <span class="hex-highlighted"></span></span></div>
             <div class="job-stats" style="font-size: 10px; color: #666; margin-top: 4px;">
                 Skills: ${skillCount} | References: ${job.references ? job.references.length : 0}
@@ -2119,10 +2135,28 @@ export function useCardsController() {
         }
     }
 
+    /**
+     * Clear scene cards and registry, then re-run init from current jobs data.
+     * Call after loadJobs({ force: true, forceResumeId }) so getJobsData() returns new data.
+     */
+    async function reinitializeResumeData() {
+        const scenePlaneEl = scenePlaneElement ?? elementRegistry.getScenePlane()
+        if (scenePlaneEl) {
+            scenePlaneEl.querySelectorAll('.biz-card-div').forEach((el) => el.remove())
+            scenePlaneEl.querySelectorAll('.skill-card-div').forEach((el) => el.remove())
+        }
+        cardRegistry.clearRegistry?.()
+        elementRegistry?.clearAllCache?.()
+        isInitialized.value = false
+        bizCardDivs.value = []
+        await initializeCardsController()
+    }
+
     return {
         isInitialized,
         bizCardDivs,
         initializeCardsController,
+        reinitializeResumeData,
         preCreateAllClones
     }
 }

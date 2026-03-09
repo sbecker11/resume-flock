@@ -73,7 +73,7 @@ Option A keeps compatibility with existing parser output.
 
 - **State**: Add to persisted app state (e.g. under `user-settings` or a top-level key):
   - `currentResumeId: string | null` — when non-null, jobs/skills are loaded from the API for this id instead of from static content.
-- **Persistence**: Save/load with existing state so that after refresh the same parsed resume is active (or “default” when `currentResumeId === null`).
+- **Persistence**: Save/load with existing state so that after refresh the same parsed resume is active (or “default” when `currentResumeId === null`). Application state is stored in `app_state.json`; see [LOCAL-FILES-AND-SECRETS.md](LOCAL-FILES-AND-SECRETS.md) for local files.
 
 ---
 

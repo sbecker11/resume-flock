@@ -3,17 +3,16 @@ import fs from 'fs/promises'; // Use promises for async/await
 import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { parseMjsExport } from './modules/data/parseMjsExport.mjs';
 
 // Load .env from project root (see docs/REPLICATE-PORTS-CONFIG.md)
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
-// Assume server is run from the project root directory
 const PROJECT_ROOT = process.cwd();
 const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
-const APP_STATUS_PATH = path.resolve(PROJECT_ROOT, 'app_status.json');
-const APP_STATUS_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_status.example.json');
+const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_state.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
 const PARSED_RESUMES_DIR = path.resolve(PROJECT_ROOT, 'parsed_resumes');
@@ -33,49 +32,31 @@ app.use(express.json());
 // Parse text bodies for the CSS endpoint
 app.use(express.text());
 
-/** Parse .mjs file content (e.g. "export const jobs = [...];") to JSON. */
-function parseMjsExport(content, varName) {
-    const prefix = `const ${varName} = `;
-    const idx = content.indexOf(prefix);
-    if (idx === -1) {
-        const exportPrefix = `export const ${varName} = `;
-        const exportIdx = content.indexOf(exportPrefix);
-        if (exportIdx === -1) throw new Error(`Missing "${varName}" in .mjs content`);
-        const start = exportIdx + exportPrefix.length;
-        const rest = content.slice(start);
-        const end = rest.lastIndexOf(';');
-        const json = (end === -1 ? rest : rest.slice(0, end)).trim();
-        return JSON.parse(json);
-    }
-    const start = idx + prefix.length;
-    const rest = content.slice(start);
-    const end = rest.lastIndexOf(';');
-    const json = (end === -1 ? rest : rest.slice(0, end)).trim();
-    return JSON.parse(json);
-}
-
 async function readJobsAndSkillsFromPaths(jobsPath, skillsPath) {
-    const [jobsContent, skillsContent] = await Promise.all([
-        fs.readFile(jobsPath, 'utf-8'),
-        fs.readFile(skillsPath, 'utf-8')
-    ]);
+    const jobsContent = await fs.readFile(jobsPath, 'utf-8');
     const jobs = parseMjsExport(jobsContent, 'jobs');
-    const skills = parseMjsExport(skillsContent, 'skills');
+    let skills = {};
+    try {
+        const skillsContent = await fs.readFile(skillsPath, 'utf-8');
+        skills = parseMjsExport(skillsContent, 'skills') || {};
+    } catch (e) {
+        if (e.code !== 'ENOENT') throw e;
+    }
     return { jobs, skills };
 }
 
-/** If app_status.json is missing, initialize it from app_status.example.json (local use only). */
-async function ensureAppStatusFile() {
+/** If app_state.json is missing, initialize it from app_state.example.json (safe defaults, no user data). */
+async function ensureAppStateFile() {
     try {
-        await fs.access(APP_STATUS_PATH);
+        await fs.access(STATE_FILE_PATH);
     } catch (err) {
         if (err.code === 'ENOENT') {
             try {
-                const example = await fs.readFile(APP_STATUS_EXAMPLE_PATH, 'utf-8');
-                await fs.writeFile(APP_STATUS_PATH, example, 'utf-8');
-                console.log('📄 Initialized app_status.json from app_status.example.json');
+                const example = await fs.readFile(STATE_EXAMPLE_PATH, 'utf-8');
+                await fs.writeFile(STATE_FILE_PATH, example, 'utf-8');
+                console.log('📄 Initialized app_state.json from app_state.example.json');
             } catch (e) {
-                console.error('[server] Could not initialize app_status.json from example:', e.message);
+                console.error('[server] Could not initialize app_state.json from example:', e.message);
             }
         }
     }
@@ -85,9 +66,10 @@ async function ensureAppStatusFile() {
 // These must be defined *before* the static file server.
 
 // GET /api/state: Read application state from app_state.json (used at startup / hard-refresh)
+// If app_state.json is missing, initialize it from app_state.example.json (committed; safe defaults, no user data) then return it.
 app.get('/api/state', async (req, res) => {
     try {
-        await fs.access(STATE_FILE_PATH);
+        await ensureAppStateFile();
         const stateData = await fs.readFile(STATE_FILE_PATH, 'utf-8');
         const parsedState = JSON.parse(stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
@@ -95,7 +77,7 @@ app.get('/api/state', async (req, res) => {
         res.json(parsedState);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            console.log('📖 State file not found, client will use defaults');
+            console.log('📖 State file not found and app_state.example.json missing; client will use defaults');
             res.status(404).json({ error: 'State file not found.' });
         } else {
             console.error('Error reading state file:', error);
@@ -136,16 +118,26 @@ app.get('/api/resumes/default/data', async (req, res) => {
 });
 
 // GET /api/resumes/:id/data: Jobs and skills for a parsed resume (parsed_resumes/<id>/)
+// Supports two layouts: (1) jobs/jobs.mjs + skills/skills.mjs, (2) jobs.mjs at folder root (skills optional).
 app.get('/api/resumes/:id/data', async (req, res) => {
     const { id } = req.params;
     if (!id || id === 'default') {
         return res.status(400).json({ error: 'Invalid resume id.' });
     }
+    const dir = path.join(PARSED_RESUMES_DIR, id);
+    let jobsPath = path.join(dir, 'jobs', 'jobs.mjs');
     try {
-        const jobsPath = path.join(PARSED_RESUMES_DIR, id, 'jobs', 'jobs.mjs');
-        const skillsPath = path.join(PARSED_RESUMES_DIR, id, 'skills', 'skills.mjs');
         await fs.access(jobsPath);
-        await fs.access(skillsPath);
+    } catch (e) {
+        if (e.code === 'ENOENT') {
+            jobsPath = path.join(dir, 'jobs.mjs');
+            await fs.access(jobsPath);
+        } else {
+            throw e;
+        }
+    }
+    const skillsPath = path.join(dir, 'skills', 'skills.mjs');
+    try {
         const { jobs, skills } = await readJobsAndSkillsFromPaths(jobsPath, skillsPath);
         res.json({ jobs, skills });
     } catch (error) {
@@ -1765,9 +1757,6 @@ function startServer(port) {
         await initializeSyncLogsDirectory();
         console.log(`📝 Sync logs available at /sync-logs-dashboard`);
         console.log(`📝 Sync logs API at /api/sync-logs`);
-
-        // Local-only app_status.json: create from example if missing
-        await ensureAppStatusFile();
 
         // Initialize event data directories
         await initializeEventDataDirectories();

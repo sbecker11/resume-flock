@@ -92,4 +92,32 @@ describe('useAppContext', () => {
     expect(deps['FocalPoint']).toBe(fp);
     expect(deps['BullsEye']).toBe(be);
   });
+
+  it('eventBus on, emit, off', async () => {
+    const { provideAppContext, useAppContext } = await import('./useAppContext.mjs');
+    provideAppContext();
+    const ctx = useAppContext();
+    const cb = vi.fn();
+    ctx.eventBus.on('ev', cb);
+    ctx.eventBus.emit('ev', { x: 1 });
+    expect(cb).toHaveBeenCalledWith({ x: 1 });
+    ctx.eventBus.off('ev', cb);
+    ctx.eventBus.emit('ev', { x: 2 });
+    expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it('all useXxxDI return null when not provided', async () => {
+    const {
+      useAimPointDI,
+      useBullsEyeDI,
+      useSceneContainerDI,
+      useColorPaletteDI,
+      useTimelineDI,
+    } = await import('./useAppContext.mjs');
+    expect(useAimPointDI()).toBe(null);
+    expect(useBullsEyeDI()).toBe(null);
+    expect(useSceneContainerDI()).toBe(null);
+    expect(useColorPaletteDI()).toBe(null);
+    expect(useTimelineDI()).toBe(null);
+  });
 });

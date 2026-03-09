@@ -47,9 +47,9 @@ async function createBasicResumeDivs(resumeListController, resumeItemsController
             // Initialize the sort indices
             resumeListController.sortedIndices = Array.from({length: jobsData.length}, (_, i) => i);
             
-            // Setup infinite scrolling - this is crucial for scrollability!
-            console.debug('[ResumeSystemInitializer] setting up infinite scrolling');
-            resumeListController.setupInfiniteScrolling();
+            // Setup resume list scroll - this is crucial for scrollability!
+            console.debug('[ResumeSystemInitializer] setting up resume list scroll');
+            resumeListController.setupResumeListScroll();
             
             return true;
         } else {
@@ -143,9 +143,9 @@ export async function initializeResumeSystem() {
         
         const totalJobs = jobsData.length;
         const createdDivs = resumeListController.bizResumeDivs?.length || 0;
-        const infiniteItems = resumeListController.infiniteScroller?.originalItems?.length || 0;
+        const scrollItemCount = resumeListController.scrollContainer?.originalItems?.length || 0;
         
-        indicator.innerHTML = `✅ Resume System (Vue3)<br/>Jobs: ${totalJobs}<br/>Divs: ${createdDivs}<br/>Infinite: ${infiniteItems}`;
+        indicator.innerHTML = `✅ Resume System (Vue3)<br/>Jobs: ${totalJobs}<br/>Divs: ${createdDivs}<br/>Scroll: ${scrollItemCount}`;
         document.body.appendChild(indicator);
         
         // Remove the indicator after 5 seconds  
@@ -188,8 +188,8 @@ export function testResumeSystem() {
         console.log('- applySortRule:', typeof window.resumeListController.applySortRule);
         console.log('- originalJobsData length:', window.resumeListController.originalJobsData?.length);
         console.log('- bizResumeDivs length:', window.resumeListController.bizResumeDivs?.length);
-        console.log('- infiniteScroller exists:', !!window.resumeListController.infiniteScroller);
-        console.log('- infiniteScroller type:', typeof window.resumeListController.infiniteScroller);
+        console.log('- scrollContainer exists:', !!window.resumeListController.scrollContainer);
+        console.log('- scrollContainer type:', typeof window.resumeListController.scrollContainer);
     }
     
     if (window.resumeItemsController) {
@@ -251,12 +251,12 @@ export function testScrolling() {
         console.log('- Can scroll:', wrapper.scrollHeight > wrapper.clientHeight);
     }
     
-    if (window.resumeListController?.infiniteScroller) {
-        console.log('InfiniteScrollingContainer status:');
-        console.log('- Instance exists:', !!window.resumeListController.infiniteScroller);
-        console.log('- Constructor name:', window.resumeListController.infiniteScroller.constructor.name);
-        console.log('- Original items length:', window.resumeListController.infiniteScroller.originalItems?.length);
-        console.log('- Current index:', window.resumeListController.infiniteScroller.currentIndex);
+    if (window.resumeListController?.scrollContainer) {
+        console.log('ResumeListScrollContainer status:');
+        console.log('- Instance exists:', !!window.resumeListController.scrollContainer);
+        console.log('- Constructor name:', window.resumeListController.scrollContainer.constructor.name);
+        console.log('- Original items length:', window.resumeListController.scrollContainer.originalItems?.length);
+        console.log('- Current index:', window.resumeListController.scrollContainer.currentIndex);
     }
     
     if (window.resumeListController) {

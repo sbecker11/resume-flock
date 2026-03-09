@@ -1,5 +1,5 @@
-// modules/resume/infiniteScrollingContainer.mjs
-// TRUE INFINITE SCROLLING - Creates illusion of infinite content with head/tail clones
+// modules/resume/resumeListScrollContainer.mjs
+// Resume list scroll container with seamless wrapping via head/tail clones
 //
 // Single ordered list (contentHolder): [ head clones | original items | tail clones | footer items (e.g. skill cards) ].
 // Pre/post caching: head = copies of last N originals at top; tail = copies of first N originals at bottom.
@@ -9,9 +9,9 @@ import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 import { selectionManager } from '../core/selectionManager.mjs';
 
 /**
- * Configuration constants for infinite scrolling behavior
+ * Configuration for resume list scroll (wrapping) behavior
  */
-const INFINITE_SCROLL_CONFIG = {
+const RESUME_LIST_SCROLL_CONFIG = {
   CLONE_COUNT: 10,              // Number of clones to create above and below
   SCROLL_BUFFER: 200,           // Pixels from edge to trigger repositioning
   REPOSITION_DELAY: 100,        // Delay before allowing next repositioning
@@ -41,11 +41,11 @@ const CONTAINER_STYLES = {
 };
 
 /**
- * InfiniteScrollingContainer - Provides true infinite scrolling with seamless wrapping
+ * ResumeListScrollContainer - Resume list with seamless wrapping via head/tail clones
  */
-class InfiniteScrollingContainer {
+class ResumeListScrollContainer {
   /**
-   * Create an infinite scrolling container
+   * Create a resume list scroll container
    * @param {HTMLElement} scrollportElement - The scrollable container element
    * @param {HTMLElement} contentElement - The content holder element
    * @param {Object} options - Configuration options
@@ -53,7 +53,7 @@ class InfiniteScrollingContainer {
    */
   constructor(scrollportElement, contentElement, options = {}) {
     this._validateConstructorParams(scrollportElement, contentElement);
-    
+
     this.scrollport = scrollportElement;
     this.contentHolder = contentElement;
     this.options = {
@@ -74,15 +74,15 @@ class InfiniteScrollingContainer {
   }
 
   /**
-   * Initialize the infinite scrolling container
+   * Initialize the scroll container
    */
   init() {
     try {
       this.setupContainer();
       this.setupScrollListener();
-      console.debug('[InfiniteScrollingContainer] initialized');
+      console.debug('[ResumeListScrollContainer] initialized');
     } catch (error) {
-      console.error('[InfiniteScrollingContainer] Initialization failed:', error);
+      console.error('[ResumeListScrollContainer] Initialization failed:', error);
       throw error;
     }
   }
@@ -91,15 +91,12 @@ class InfiniteScrollingContainer {
    * Set up container styling and layout
    */
   setupContainer() {
-    console.debug('[InfiniteScrollingContainer] setupContainer');
-    
-    // Apply scrollport styles
+    console.debug('[ResumeListScrollContainer] setupContainer');
+
+    this.scrollport.classList?.add('resume-list-scroll-container');
     this._applyStyles(this.scrollport, CONTAINER_STYLES.scrollport);
-    
-    // Apply content holder styles
     this._applyStyles(this.contentHolder, CONTAINER_STYLES.contentHolder);
 
-    // Keep resume list indices in sync when children are added or removed
     this._listIndicesObserver = new MutationObserver(() => this._updateResumeListIndices());
     this._listIndicesObserver.observe(this.contentHolder, { childList: true });
   }
@@ -116,7 +113,7 @@ class InfiniteScrollingContainer {
   }
 
   /**
-   * Set the items for infinite scrolling
+   * Set the items for the resume list
    * @param {Array} items - Array of DOM elements to display
    * @param {number} startingIndex - Initial index to display (default: 0)
    */
@@ -124,28 +121,25 @@ class InfiniteScrollingContainer {
     if (!Array.isArray(items)) {
       throw new Error('Items must be an array');
     }
-    
-    console.debug('[InfiniteScrollingContainer] setItems', items.length);
-    
+
+    console.debug('[ResumeListScrollContainer] setItems', items.length);
+
     this._resetState();
     this.originalItems = [...items];
-    
+
     if (items.length === 0) {
-      console.warn('[InfiniteScrollingContainer] No items provided');
+      console.warn('[ResumeListScrollContainer] No items provided');
       return;
     }
-    
-    this._buildInfiniteScrollStructure();
+
+    this._buildScrollStructure();
     this._isInitialized = true;
   }
 
-  /**
-   * Create head clones (items that appear above the original list)
-   */
   createHeadClones() {
-    const cloneCount = Math.min(INFINITE_SCROLL_CONFIG.CLONE_COUNT, this.originalItems.length);
+    const cloneCount = Math.min(RESUME_LIST_SCROLL_CONFIG.CLONE_COUNT, this.originalItems.length);
     const sourceItems = this.originalItems.slice(-cloneCount);
-    
+
     sourceItems.forEach((sourceItem, index) => {
       if (sourceItem) {
         const originalIndex = this.originalItems.length - cloneCount + index;
@@ -156,13 +150,10 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Create tail clones (items that appear below the original list)
-   */
   createTailClones() {
-    const cloneCount = Math.min(INFINITE_SCROLL_CONFIG.CLONE_COUNT, this.originalItems.length);
+    const cloneCount = Math.min(RESUME_LIST_SCROLL_CONFIG.CLONE_COUNT, this.originalItems.length);
     const sourceItems = this.originalItems.slice(0, cloneCount);
-    
+
     sourceItems.forEach((sourceItem, index) => {
       if (sourceItem) {
         const clone = this._createClone(sourceItem, 'tail', index);
@@ -172,30 +163,19 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Create a clone of an item for infinite scrolling
-   * @param {HTMLElement} sourceItem - The original item to clone
-   * @param {string} cloneType - Type of clone ('head' or 'tail')
-   * @param {number} originalIndex - Index of the original item
-   * @returns {HTMLElement} The cloned element
-   */
   _createClone(sourceItem, cloneType, originalIndex) {
     const clone = sourceItem.cloneNode(true);
-    // cloneNode does not copy addEventListener handlers; re-attach rDiv close and click-to-select so clones behave like originals
     this._attachRDivCloseHandler(clone);
     this._attachRDivClickHandler(clone);
 
     this._markAsClone(clone, cloneType, originalIndex);
     this._updateCloneIds(clone, cloneType);
-    this.prepareItemForInfiniteScroll(clone, originalIndex, cloneType);
+    this.prepareItemForScroll(clone, originalIndex, cloneType);
     this._applyPaletteToClone(clone);
-    
+
     return clone;
   }
 
-  /**
-   * Re-attach the remove-from-listing click handler on an rDiv (used for clones; originals get it from ResumeItemsController).
-   */
   _attachRDivCloseHandler(rDivOrClone) {
     const closeBtn = rDivOrClone.querySelector?.('.r-div-close');
     const jobNumberStr = rDivOrClone.getAttribute?.('data-job-number');
@@ -212,9 +192,6 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Re-attach the click-to-select handler on an rDiv clone so that clicking the clone selects the job and scrolls the matching cDiv into view (same as original rDiv).
-   */
   _attachRDivClickHandler(rDivOrClone) {
     if (!rDivOrClone.classList?.contains('biz-resume-div')) return;
     const jobNumberStr = rDivOrClone.getAttribute?.('data-job-number');
@@ -226,9 +203,9 @@ class InfiniteScrollingContainer {
       const sm = selectionManager;
       const isSelected = sm.getSelectedJobNumber() === jobNumber;
       if (isSelected) {
-        sm.clearSelection('InfiniteScrollingContainer.rDivCloneClick');
+        sm.clearSelection('ResumeListScrollContainer.rDivCloneClick');
       } else {
-        sm.selectJobNumber(jobNumber, 'InfiniteScrollingContainer.rDivCloneClick');
+        sm.selectJobNumber(jobNumber, 'ResumeListScrollContainer.rDivCloneClick');
         const controller = window.resumeItemsController;
         if (controller && typeof controller._scrollRDivIntoView === 'function') {
           controller._scrollRDivIntoView(rDivOrClone, jobNumber);
@@ -238,137 +215,101 @@ class InfiniteScrollingContainer {
   }
 
   /**
-   * Prepare an item for infinite scrolling layout
-   * @param {HTMLElement} item - The item to prepare
-   * @param {number} index - The item's index
-   * @param {string} type - The item type ('original', 'head', 'tail')
+   * Prepare an item for layout (positioning and tracking)
    */
-  prepareItemForInfiniteScroll(item, index, type) {
+  prepareItemForScroll(item, index, type) {
     this._clearPositioningStyles(item);
     this._applyFlexboxStyles(item);
     this._addTrackingAttributes(item, index, type);
   }
 
-  /**
-   * Clear positioning styles from an element
-   * @param {HTMLElement} element - The element to clear styles from
-   */
   _clearPositioningStyles(element) {
     const propertiesToRemove = ['position', 'top', 'left', 'height', 'width', 'transform'];
     propertiesToRemove.forEach(prop => element.style.removeProperty(prop));
   }
 
-  /**
-   * Check if scrolling has approached boundaries and trigger repositioning.
-   * Only reposition when in head/tail clone regions; do not reposition when in footer (e.g. skill cards).
-   */
   checkScrollBoundaries() {
     const { scrollTop, scrollHeight, clientHeight } = this.scrollport;
-    const buffer = INFINITE_SCROLL_CONFIG.SCROLL_BUFFER;
+    const buffer = RESUME_LIST_SCROLL_CONFIG.SCROLL_BUFFER;
     const metrics = this._calculateRepositionMetrics();
     const endOfTail = metrics.headHeight + metrics.originalHeight + metrics.tailHeight;
 
     if (scrollTop < buffer) {
-      console.debug('[InfiniteScrollingContainer] near top boundary');
+      console.debug('[ResumeListScrollContainer] near top boundary');
       this._repositionToBottom();
     } else if (scrollTop + clientHeight > scrollHeight - buffer && scrollTop < endOfTail) {
-      console.debug('[InfiniteScrollingContainer] near bottom boundary');
+      console.debug('[ResumeListScrollContainer] near bottom boundary');
       this._repositionToTop();
     }
   }
 
-  /**
-   * Reposition scroll from top boundary to bottom equivalent position
-   */
   _repositionToBottom() {
     if (this.isRepositioning) return;
     this._setRepositioning(true);
-    
+
     const metrics = this._calculateRepositionMetrics();
     const currentScrollInOriginals = this.scrollport.scrollTop - metrics.headHeight;
     const newScrollTop = metrics.headHeight + metrics.originalHeight + currentScrollInOriginals;
-    
+
     this.scrollport.scrollTop = newScrollTop;
-    console.log(`[InfiniteScrollingContainer] Repositioned from top area to bottom: ${newScrollTop}px`);
-    
+    console.log(`[ResumeListScrollContainer] Repositioned from top area to bottom: ${newScrollTop}px`);
+
     this._scheduleRepositioningReset();
   }
 
-  /**
-   * Reposition scroll from bottom boundary to top equivalent position
-   */
   _repositionToTop() {
     if (this.isRepositioning) return;
     this._setRepositioning(true);
-    
+
     const metrics = this._calculateRepositionMetrics();
     const currentScrollInTailClones = this.scrollport.scrollTop - metrics.headHeight - metrics.originalHeight;
     const newScrollTop = metrics.headHeight + currentScrollInTailClones;
-    
+
     this.scrollport.scrollTop = newScrollTop;
-    console.debug('[InfiniteScrollingContainer] repositioned bottom→top');
-    
+    console.debug('[ResumeListScrollContainer] repositioned bottom→top');
+
     this._scheduleRepositioningReset();
   }
 
-  /**
-   * Calculate height of head clones with performance optimization
-   * @returns {number} Total height of head clones
-   */
   calculateHeadClonesHeight() {
     return this._calculateCollectionHeight(this.headClones);
   }
 
-  /**
-   * Calculate height of original content with performance optimization
-   * @returns {number} Total height of original items
-   */
   calculateOriginalContentHeight() {
     return this._calculateCollectionHeight(this.originalItems);
   }
 
-  /**
-   * Calculate height of tail clones with performance optimization
-   * @returns {number} Total height of tail clones
-   */
   calculateTailClonesHeight() {
     return this._calculateCollectionHeight(this.tailClones);
   }
 
-  /**
-   * Scroll to a specific item by index
-   * @param {number} originalIndex - Index of the item to scroll to
-   * @param {boolean} animate - Whether to animate the scroll
-   */
   scrollToIndex(originalIndex, animate = true) {
-    console.debug('[InfiniteScrollingContainer] scrollToIndex', originalIndex);
-    
-    // Safety check: ensure originalItems array is populated
+    console.debug('[ResumeListScrollContainer] scrollToIndex', originalIndex);
+
     if (!this.originalItems || this.originalItems.length === 0) {
-      console.debug(`[InfiniteScrollingContainer] Cannot scroll - no items available (originalItems length: ${this.originalItems?.length || 0})`);
+      console.debug(`[ResumeListScrollContainer] Cannot scroll - no items available (originalItems length: ${this.originalItems?.length || 0})`);
       return;
     }
-    
+
     const wrappedIndex = this._wrapIndex(originalIndex);
-    
-    // Check if _wrapIndex returned invalid index (no items available)
+
     if (wrappedIndex === -1) {
-      console.warn(`[InfiniteScrollingContainer] Cannot scroll - invalid wrapped index`);
+      console.warn(`[ResumeListScrollContainer] Cannot scroll - invalid wrapped index`);
       return;
     }
-    
+
     const targetItem = this.originalItems[wrappedIndex];
-    
+
     if (targetItem) {
       targetItem.scrollIntoView({
         behavior: animate ? 'smooth' : 'auto',
         block: 'start'
       });
-      
+
       this.currentIndex = wrappedIndex;
       this._notifyItemChange(wrappedIndex, targetItem);
     } else {
-      console.warn(`[InfiniteScrollingContainer] No item found at index ${wrappedIndex} (total items: ${this.originalItems.length})`);
+      console.warn(`[ResumeListScrollContainer] No item found at index ${wrappedIndex} (total items: ${this.originalItems.length})`);
     }
   }
 
@@ -390,7 +331,7 @@ class InfiniteScrollingContainer {
       const itemJobNumber = parseInt(item.getAttribute('data-job-number'), 10);
       return itemJobNumber === jobNumber;
     });
-    
+
     if (index !== -1) {
       this.scrollToIndex(index, animate);
       return true;
@@ -399,13 +340,11 @@ class InfiniteScrollingContainer {
   }
 
   recalculateHeights() {
-    // No-op for flexbox - heights are automatic
-    console.debug('[InfiniteScrollingContainer] recalculateHeights no-op');
+    console.debug('[ResumeListScrollContainer] recalculateHeights no-op');
   }
 
   recalculateHeightsAfterPalette() {
-    // No-op for flexbox - palette changes don't affect layout
-    console.debug('[InfiniteScrollingContainer] recalculateHeightsAfterPalette no-op');
+    console.debug('[ResumeListScrollContainer] recalculateHeightsAfterPalette no-op');
   }
 
   getCurrentIndex() {
@@ -420,9 +359,7 @@ class InfiniteScrollingContainer {
     return this.originalItems[index] || null;
   }
 
-  // Method for compatibility with legacy sorting code
   getCurrentlyVisibleJob() {
-    // Return the current job number from the currently visible item
     const currentItem = this.getCurrentItem();
     if (currentItem) {
       const jobNumber = parseInt(currentItem.getAttribute('data-job-number'), 10);
@@ -432,13 +369,11 @@ class InfiniteScrollingContainer {
   }
 
   goToNext() {
-    // Infinite scrolling - no bounds checking needed
     const nextIndex = this.currentIndex + 1;
     this.scrollToIndex(nextIndex);
   }
 
   goToPrevious() {
-    // Infinite scrolling - no bounds checking needed  
     const prevIndex = this.currentIndex - 1;
     this.scrollToIndex(prevIndex);
   }
@@ -458,7 +393,6 @@ class InfiniteScrollingContainer {
   }
 
   destroy() {
-    // Clean up
     this.originalItems = [];
     this.headClones = [];
     this.tailClones = [];
@@ -467,14 +401,6 @@ class InfiniteScrollingContainer {
     this.isRepositioning = false;
   }
 
-  // Static methods for singleton compatibility
-  // ==================== PRIVATE HELPER METHODS ====================
-
-  /**
-   * Validate constructor parameters
-   * @param {HTMLElement} scrollportElement - Scrollport element to validate
-   * @param {HTMLElement} contentElement - Content element to validate
-   */
   _validateConstructorParams(scrollportElement, contentElement) {
     if (!scrollportElement || !(scrollportElement instanceof HTMLElement)) {
       throw new Error('Scrollport element must be a valid HTMLElement');
@@ -484,21 +410,12 @@ class InfiniteScrollingContainer {
     }
   }
 
-  /**
-   * Apply styles to an element
-   * @param {HTMLElement} element - Element to style
-   * @param {Object} styles - Style properties to apply
-   */
   _applyStyles(element, styles) {
     Object.entries(styles).forEach(([property, value]) => {
       element.style[property] = value;
     });
   }
 
-  /**
-   * Reset container state. Preserves footer items (e.g. appended skill cards) so they are re-appended after rebuild.
-   * Keeps at most one footer item per data-skill-card-id so the list has unique skill-resume-divs only.
-   */
   _resetState() {
     const footerNodes = this.contentHolder.querySelectorAll('.appended-skill-resume-div');
     const seenSkillCardIds = new Set();
@@ -517,22 +434,15 @@ class InfiniteScrollingContainer {
     this.isRepositioning = false;
   }
 
-  /**
-   * Build the complete infinite scroll structure: head clones, originals, tail clones, then footer items (skill cards).
-   */
-  _buildInfiniteScrollStructure() {
+  _buildScrollStructure() {
     this.createHeadClones();
     this._addOriginalItems();
     this.createTailClones();
     this._appendFooterItems();
     this._updateResumeListIndices();
-    console.debug('[InfiniteScrollingContainer] structure created', this.originalItems.length, 'footer items:', this._footerItems.length);
+    console.debug('[ResumeListScrollContainer] structure created', this.originalItems.length, 'footer items:', this._footerItems.length);
   }
 
-  /**
-   * Update each resume item's list index from its current position in the container.
-   * Indices change when items are inserted or removed, so this is not a fixed property.
-   */
   _updateResumeListIndices() {
     if (!this.contentHolder) return;
     const total = this.contentHolder.children.length;
@@ -542,9 +452,6 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Re-append preserved footer items (e.g. appended skill cards) after tail clones so pre/post clone caching is unchanged.
-   */
   _appendFooterItems() {
     this._footerItems.forEach(node => {
       if (node && node.parentNode !== this.contentHolder) {
@@ -553,19 +460,11 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Clear all footer items (e.g. appended skill cards) from the list. Used when clearing all resume divs.
-   */
   clearFooterItems() {
     this._footerItems.forEach((el) => { if (el && el.parentNode) el.remove(); });
     this._footerItems = [];
   }
 
-  /**
-   * Append a footer item (e.g. skill card copy). It will be preserved across setItems() rebuilds and kept after tail clones.
-   * Only one footer item per data-skill-card-id is kept; adding another with the same id replaces the previous.
-   * @param {HTMLElement} node
-   */
   appendFooterItem(node) {
     if (!node) return;
     const skillCardId = node.getAttribute?.('data-skill-card-id') ?? '';
@@ -583,40 +482,26 @@ class InfiniteScrollingContainer {
     this._updateResumeListIndices();
   }
 
-  /**
-   * Add original items to the container
-   */
   _addOriginalItems() {
     this.originalItems.forEach((item, index) => {
       if (item) {
-        this.prepareItemForInfiniteScroll(item, index, 'original');
+        this.prepareItemForScroll(item, index, 'original');
         this.contentHolder.appendChild(item);
       }
     });
   }
 
-  /**
-   * Mark an element as a clone with appropriate attributes
-   * @param {HTMLElement} clone - The cloned element
-   * @param {string} cloneType - Type of clone ('head' or 'tail')
-   * @param {number} originalIndex - Index of the original item
-   */
   _markAsClone(clone, cloneType, originalIndex) {
-    clone.classList.add('infinite-scroll-clone', `${cloneType}-clone`);
+    clone.classList.add('resume-list-clone', `${cloneType}-clone`);
     clone.dataset.originalIndex = originalIndex.toString();
     clone.dataset.cloneType = cloneType;
   }
 
-  /**
-   * Update IDs in cloned elements to avoid duplicates
-   * @param {HTMLElement} clone - The cloned element
-   * @param {string} cloneType - Type of clone ('head' or 'tail')
-   */
   _updateCloneIds(clone, cloneType) {
     if (clone.id) {
       clone.id = `${clone.id}-${cloneType}-clone`;
     }
-    
+
     const childrenWithIds = clone.querySelectorAll('[id]');
     childrenWithIds.forEach(child => {
       if (child.id) {
@@ -625,23 +510,15 @@ class InfiniteScrollingContainer {
     });
   }
 
-  /**
-   * Apply color palette to a cloned element with error handling
-   * @param {HTMLElement} clone - The cloned element
-   */
   _applyPaletteToClone(clone) {
     try {
       applyPaletteToElement(clone);
-      } catch (error) {
-      console.error('Failed to apply palette to infinite scroll clone:', error);
+    } catch (error) {
+      console.error('Failed to apply palette to resume list clone:', error);
       throw error;
     }
   }
 
-  /**
-   * Apply flexbox styles to an item
-   * @param {HTMLElement} item - The item to style
-   */
   _applyFlexboxStyles(item) {
     const flexStyles = {
       position: 'relative',
@@ -652,39 +529,23 @@ class InfiniteScrollingContainer {
     this._applyStyles(item, flexStyles);
   }
 
-  /**
-   * Add tracking attributes to an item
-   * @param {HTMLElement} item - The item to add attributes to
-   * @param {number} index - The item's index
-   * @param {string} type - The item type
-   */
   _addTrackingAttributes(item, index, type) {
-    item.dataset.infiniteScrollType = type;
-    item.dataset.infiniteScrollIndex = index.toString();
+    item.dataset.scrollItemType = type;
+    item.dataset.scrollItemIndex = index.toString();
   }
 
-  /**
-   * Calculate total height of a collection of elements
-   * @param {Array} collection - Collection of DOM elements
-   * @returns {number} Total height
-   */
   _calculateCollectionHeight(collection) {
     if (collection.length === 0) return 0;
-    
-    // Use estimated height for performance if many items
+
     if (collection.length > 10) {
-      return collection.length * INFINITE_SCROLL_CONFIG.DEFAULT_ITEM_HEIGHT;
+      return collection.length * RESUME_LIST_SCROLL_CONFIG.DEFAULT_ITEM_HEIGHT;
     }
-    
+
     return collection.reduce((total, item) => {
-      return total + (item?.offsetHeight || INFINITE_SCROLL_CONFIG.DEFAULT_ITEM_HEIGHT);
+      return total + (item?.offsetHeight || RESUME_LIST_SCROLL_CONFIG.DEFAULT_ITEM_HEIGHT);
     }, 0);
   }
 
-  /**
-   * Calculate metrics needed for repositioning
-   * @returns {Object} Repositioning metrics
-   */
   _calculateRepositionMetrics() {
     return {
       headHeight: this.calculateHeadClonesHeight(),
@@ -693,66 +554,47 @@ class InfiniteScrollingContainer {
     };
   }
 
-  /**
-   * Set repositioning state and prevent multiple simultaneous repositions
-   * @param {boolean} isRepositioning - Whether repositioning is active
-   */
   _setRepositioning(isRepositioning) {
     this.isRepositioning = isRepositioning;
   }
 
-  /**
-   * Schedule reset of repositioning flag
-   */
   _scheduleRepositioningReset() {
     setTimeout(() => {
       this.isRepositioning = false;
-    }, INFINITE_SCROLL_CONFIG.REPOSITION_DELAY);
+    }, RESUME_LIST_SCROLL_CONFIG.REPOSITION_DELAY);
   }
 
-  /**
-   * Wrap index to valid range for infinite scrolling
-   * @param {number} index - Index to wrap
-   * @returns {number} Wrapped index
-   */
   _wrapIndex(index) {
     if (!this.originalItems || this.originalItems.length === 0) {
-      console.warn(`[InfiniteScrollingContainer] Cannot wrap index - no items available`);
-      return -1; // Return invalid index to signal no items
+      console.warn(`[ResumeListScrollContainer] Cannot wrap index - no items available`);
+      return -1;
     }
-    
+
     if (index < 0 || index >= this.originalItems.length) {
       console.warn(`[DEBUG] scrollToIndex: Invalid index ${index} - using modulo to wrap around`);
       return ((index % this.originalItems.length) + this.originalItems.length) % this.originalItems.length;
     }
-    
+
     return index;
   }
 
-  /**
-   * Notify listeners of item change
-   * @param {number} index - New active index
-   * @param {HTMLElement} item - New active item
-   */
   _notifyItemChange(index, item) {
     if (this.options.onItemChange) {
       try {
         this.options.onItemChange(index, item);
       } catch (error) {
-        console.error('[InfiniteScrollingContainer] Error in onItemChange callback:', error);
+        console.error('[ResumeListScrollContainer] Error in onItemChange callback:', error);
         throw error;
       }
     }
   }
 
-  // ==================== STATIC METHODS ====================
-
   static reset() {
-    if (InfiniteScrollingContainer.instance) {
-      InfiniteScrollingContainer.instance.destroy();
-      InfiniteScrollingContainer.instance = null;
+    if (ResumeListScrollContainer.instance) {
+      ResumeListScrollContainer.instance.destroy();
+      ResumeListScrollContainer.instance = null;
     }
   }
 }
 
-export { InfiniteScrollingContainer };
+export { ResumeListScrollContainer };

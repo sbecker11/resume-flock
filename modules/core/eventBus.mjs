@@ -27,7 +27,6 @@ export function emit(eventName, data) {
                 callback(data);
             } catch (error) {
                 window.CONSOLE_LOG_IGNORE(`Error in event listener for ${eventName}:`, error);
-                throw error;
             }
         }
     }

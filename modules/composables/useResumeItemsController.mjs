@@ -15,8 +15,8 @@ export function useResumeItemsController() {
     
     // Height recalculation helper that uses the injected resume list controller
     recalculateHeights: () => {
-      if (resumeListController?.infiniteScroller) {
-        resumeListController.infiniteScroller.recalculateHeights()
+      if (resumeListController?.scrollContainer) {
+        resumeListController.scrollContainer.recalculateHeights()
         console.log('[useResumeItemsController] Triggered height recalculation via provide/inject')
       } else {
         console.warn('[useResumeItemsController] Resume list controller not available for height recalculation')

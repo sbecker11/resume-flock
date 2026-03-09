@@ -257,6 +257,24 @@ function migrateState(state) {
         window.CONSOLE_LOG_IGNORE('[MIGRATION] Successfully migrated to v1.3');
     }
 
+    // Ensure system-constants.rendering exists (parallax/depth constants; not user-editable)
+    const sc = state['system-constants'];
+    const renderingDefaults = { parallaxScaleAtMaxZ: 0.9, saturationAtMaxZ: 1.0, brightnessAtMaxZ: 1.0, blurAtMaxZ: 0 };
+    const fromUserSettings = state['user-settings']?.rendering;
+    if (sc) {
+        if (!sc.rendering) {
+            sc.rendering = fromUserSettings ? { ...renderingDefaults, ...fromUserSettings } : { ...renderingDefaults };
+            window.CONSOLE_LOG_IGNORE('[MIGRATION] Added missing system-constants.rendering (camelCase)');
+        } else {
+            const r = sc.rendering;
+            if (r.parallaxScaleAtMaxZ === undefined) r.parallaxScaleAtMaxZ = renderingDefaults.parallaxScaleAtMaxZ;
+            if (r.saturationAtMaxZ === undefined) r.saturationAtMaxZ = renderingDefaults.saturationAtMaxZ;
+            if (r.brightnessAtMaxZ === undefined) r.brightnessAtMaxZ = renderingDefaults.brightnessAtMaxZ;
+            if (r.blurAtMaxZ === undefined) r.blurAtMaxZ = renderingDefaults.blurAtMaxZ;
+        }
+        if (state['user-settings']?.rendering) delete state['user-settings'].rendering;
+    }
+
     return state;
 }
 
@@ -289,8 +307,8 @@ export async function loadState() {
         window.CONSOLE_LOG_IGNORE("Final state after migration and merge:", finalState);
         return finalState;
     } catch (e) {
-        reportError(e, '[stateManager] Error fetching state from server', '');
-        throw e;
+        reportError(e, '[stateManager] Error fetching state from server', 'Remedy: Using default state');
+        return getDefaultState();
     }
 }
 

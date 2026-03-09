@@ -38,14 +38,31 @@ const {
 watch(orderedPaletteNames, () => {}, { immediate: true });
 watch(currentPaletteFilename, () => {}, { immediate: true });
 
-const currentSortRule = ref({ field: 'startDate', direction: 'desc' });
+// Sort dropdown uses string keys because native <select> cannot bind object values reliably
+const SORT_OPTIONS = [
+  { key: 'startDate-desc', rule: { field: 'startDate', direction: 'desc' }, text: 'Start Date (Newest First)' },
+  { key: 'startDate-asc', rule: { field: 'startDate', direction: 'asc' }, text: 'Start Date (Oldest First)' },
+  { key: 'endDate-desc', rule: { field: 'endDate', direction: 'desc' }, text: 'End Date (Newest First)' },
+  { key: 'endDate-asc', rule: { field: 'endDate', direction: 'asc' }, text: 'End Date (Oldest First)' },
+  { key: 'employer-asc', rule: { field: 'employer', direction: 'asc' }, text: 'Employer (A-Z)' },
+  { key: 'role-asc', rule: { field: 'role', direction: 'asc' }, text: 'Role (A-Z)' },
+  { key: 'original-asc', rule: { field: 'original', direction: 'asc' }, text: 'Original order' },
+];
+const sortRuleKey = ref('startDate-desc');
 
-// Watch for changes in the sort rule and apply them
-watch(currentSortRule, (newSortRule) => {
-  if (resumeListController) {
-    resumeListController.applySortRule(newSortRule);
+function sortRuleToKey(rule) {
+  if (!rule || !rule.field) return 'startDate-desc';
+  const key = `${rule.field}-${rule.direction || 'asc'}`;
+  return SORT_OPTIONS.some((o) => o.key === key) ? key : 'startDate-desc';
+}
+
+// Watch for sort dropdown change and apply to controller (updates resume list and selection)
+watch(sortRuleKey, (key) => {
+  const option = SORT_OPTIONS.find((o) => o.key === key);
+  if (option && resumeListController) {
+    resumeListController.applySortRule(option.rule);
   }
-}, { deep: true });
+}, { immediate: false });
 
 // Watch for changes in the color palette selection and save them
 watch(currentPaletteFilename, async (newFilename) => {
@@ -54,12 +71,7 @@ watch(currentPaletteFilename, async (newFilename) => {
   }
 });
 
-const sortOptions = ref([
-  { value: { field: 'startDate', direction: 'desc' }, text: 'Start Date (Newest First)' },
-  { value: { field: 'startDate', direction: 'asc' }, text: 'Start Date (Oldest First)' },
-  { value: { field: 'employer', direction: 'asc' }, text: 'Employer (A-Z)' },
-  { value: { field: 'role', direction: 'asc' }, text: 'Role (A-Z)' },
-]);
+const sortOptions = SORT_OPTIONS;
 
 // Methods for buttons - these will now call the legacy controller via provide/inject
 function selectFirst() {
@@ -248,8 +260,8 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     }
     return false;
   }
-  // Single ordered list = infinite scroller's contentHolder (#resume-content-div-list).
-  const scroller = (resumeListController || window.resumeListController)?.infiniteScroller;
+  // Single ordered list = scroll container's contentHolder (#resume-content-div-list).
+  const scroller = (resumeListController || window.resumeListController)?.scrollContainer;
   const listEl = document.getElementById('resume-content-div-list');
   const appendTarget = listEl || document.getElementById('resume-content-div');
   if (!appendTarget) {
@@ -433,6 +445,20 @@ watch(
   { flush: 'post' }
 );
 
+function syncSortRuleKeyFromController() {
+  const controller = resumeListController || window.resumeListController;
+  if (controller && typeof controller.getCurrentSortRule === 'function') {
+    const rule = controller.getCurrentSortRule();
+    sortRuleKey.value = sortRuleToKey(rule);
+  }
+}
+function onSortRuleChanged(e) {
+  if (e.detail?.sortRule) sortRuleKey.value = sortRuleToKey(e.detail.sortRule);
+}
+function onAppStateLoadedForSort() {
+  nextTick(syncSortRuleKeyFromController);
+}
+
 onMounted(() => {
   updateSelectedCardSnapshot();
   selectionManager?.eventTarget?.addEventListener('card-selected', updateSelectedCardSnapshot);
@@ -440,7 +466,9 @@ onMounted(() => {
   selectionManager?.eventTarget?.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   window.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   document.addEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
-  // Global hook so selection manager can trigger append even if events don't reach this component
+  window.addEventListener('sort-rule-changed', onSortRuleChanged);
+  window.addEventListener('app-state-loaded', onAppStateLoadedForSort);
+  nextTick(() => { setTimeout(syncSortRuleKeyFromController, 100); });
   window.__resumeAppendSkillCardCopy = appendSkillCardCopyToResumeListing;
 });
 onUnmounted(() => {
@@ -450,6 +478,8 @@ onUnmounted(() => {
   selectionManager?.eventTarget?.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   window.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
   document.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
+  window.removeEventListener('sort-rule-changed', onSortRuleChanged);
+  window.removeEventListener('app-state-loaded', onAppStateLoadedForSort);
   delete window.__resumeAppendSkillCardCopy;
 });
 
@@ -482,8 +512,8 @@ function onResumeSkillCardClick(event) {
                 </select>
             </div>
             <div id="resume-divs-sorting-container" tabindex="-1">
-                <select id="resume-divs-sorting-selector" v-model="currentSortRule" tabindex="0">
-                    <option v-for="option in sortOptions" :key="option.text" :value="option.value">
+                <select id="resume-divs-sorting-selector" v-model="sortRuleKey" tabindex="0">
+                    <option v-for="option in sortOptions" :key="option.key" :value="option.key">
                         {{ option.text }}
                     </option>
                 </select>
@@ -554,7 +584,7 @@ function onResumeSkillCardClick(event) {
 
 #resume-content-div-wrapper {
     flex-grow: 1;
-    /* overflow-y is now controlled by the InfiniteScrollingContainer */
+    /* overflow-y is now controlled by the ResumeListScrollContainer */
     overflow-x: visible; /* bizCardLineItems (rDivs) must never be clipped by their container */
     background-color: var(--grey-medium);
     color: black; /* default for empty area; .biz-resume-div and .skill-resume-div set their own color */
@@ -562,7 +592,7 @@ function onResumeSkillCardClick(event) {
     /* 8px horizontal padding so selected rDiv box-shadow (8px ring) has room; matches cDiv selected border */
     padding-left: 8px;
     padding-right: 8px;
-    /* overflow is set by InfiniteScrollingContainer.setupContainer() to 'auto' */
+    /* overflow is set by ResumeListScrollContainer.setupContainer() to 'auto' */
 }
 
 /* Shared container for skill cards and rDiv list; same width/spacing for both */
@@ -800,7 +830,7 @@ function onResumeSkillCardClick(event) {
     background: rgba(255, 255, 255, 0.9);
 }
 
-/* Base rDiv layout and sizing only. Spacing between items from flex container gap (infiniteScrollingContainer contentHolder). */
+/* Base rDiv layout and sizing only. Spacing between items from flex container gap (ResumeListScrollContainer contentHolder). */
 .biz-resume-div {
     display: flex !important;
     flex-direction: column;

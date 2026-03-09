@@ -10,12 +10,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useBullsEyeService, useFocalPointService, useDebugFunctions } from '../core/globalServices'
 import { useLayoutToggle } from './useLayoutToggle.mjs'
 import * as zUtils from '../utils/zUtils.mjs'
+import { getRendering } from '../core/renderingConfig.mjs'
 
 // Parallax constants (flock-of-postcards–aligned: Z 1 = far, Z 14 = close; higher Z = more parallax)
 const PARALLAX_X_EXAGGERATION_FACTOR = 0.9
 const PARALLAX_Y_EXAGGERATION_FACTOR = 1.0
 const CLONE_Z_SCALE = 0
-const MAX_Z_SCALE = parseFloat(import.meta.env.VITE_PARALLAX_SCALE_AT_MAX_Z, 10) || 0.9
+function getMaxZScale() {
+  const r = getRendering()
+  const v = r.parallaxScaleAtMaxZ
+  return (typeof v === 'number' && !Number.isNaN(v)) ? v : 0.9
+}
 const PARALLAX_Z_MIN = zUtils.FLOCK_PARALLAX_Z_MIN
 const PARALLAX_Z_MAX = zUtils.FLOCK_PARALLAX_Z_MAX
 const PARALLAX_Z_RANGE = zUtils.FLOCK_PARALLAX_Z_RANGE
@@ -88,7 +93,7 @@ export function useParallaxEnhanced() {
 
     // Z = distance from viewer (high Z = far). Closeness = PARALLAX_Z_MAX - Z; more closeness = more parallax.
     const closeness = PARALLAX_Z_MAX - sceneZ
-    const zScale = (closeness / PARALLAX_Z_RANGE) * MAX_Z_SCALE
+    const zScale = (closeness / PARALLAX_Z_RANGE) * getMaxZScale()
 
     const translateX = bullsEyeCenterXSceneView + dh * zScale
     const translateY = dv * zScale

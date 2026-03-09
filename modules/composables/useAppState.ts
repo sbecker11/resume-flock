@@ -15,6 +15,8 @@ import { deepMerge } from '../utils/utils.mjs'
 import { reportError } from '../utils/errorReporting.mjs'
 // @ts-ignore - Legacy module imports with type declarations
 import type { AppState, UseAppStateReturn } from '../types/index'
+// @ts-ignore - Legacy module
+import { setFromAppState as setRenderingFromAppState } from '../core/renderingConfig.mjs'
 
 // Singleton state - shared across all component instances
 const appState: Ref<AppState | null> = ref(null)
@@ -187,6 +189,12 @@ function getDefaultState(): AppState {
                     hovered: { padding: '15px', innerBorderWidth: '1px', marginTop: '11px' },
                     selected: { padding: '15px', innerBorderWidth: '1px', marginTop: '11px' }
                 }
+            },
+            rendering: {
+                parallaxScaleAtMaxZ: 0.9,
+                saturationAtMaxZ: 1.0,
+                brightnessAtMaxZ: 1.0,
+                blurAtMaxZ: 0
             }
         }
     };
@@ -284,6 +292,24 @@ function migrateState(state: any): AppState {
         console.log('[AppState] Successfully migrated to v1.3 - restructured to user-settings/system-constants')
     }
 
+    // Ensure system-constants.rendering exists (parallax/depth constants; not user-editable)
+    const sc = state['system-constants']
+    const renderingDefaults = { parallaxScaleAtMaxZ: 0.9, saturationAtMaxZ: 1.0, brightnessAtMaxZ: 1.0, blurAtMaxZ: 0 }
+    const fromUserSettings = state['user-settings']?.rendering
+    if (sc) {
+        if (!sc.rendering) {
+            sc.rendering = fromUserSettings ? { ...renderingDefaults, ...fromUserSettings } : { ...renderingDefaults }
+            console.log('[AppState] Added missing system-constants.rendering (camelCase)')
+        } else {
+            const r = sc.rendering
+            if (r.parallaxScaleAtMaxZ === undefined) r.parallaxScaleAtMaxZ = renderingDefaults.parallaxScaleAtMaxZ
+            if (r.saturationAtMaxZ === undefined) r.saturationAtMaxZ = renderingDefaults.saturationAtMaxZ
+            if (r.brightnessAtMaxZ === undefined) r.brightnessAtMaxZ = renderingDefaults.brightnessAtMaxZ
+            if (r.blurAtMaxZ === undefined) r.blurAtMaxZ = renderingDefaults.blurAtMaxZ
+        }
+        if (state['user-settings']?.rendering) delete state['user-settings'].rendering
+    }
+
     return state
 }
 
@@ -301,19 +327,7 @@ async function loadStateFromServer(): Promise<AppState> {
             if (!response.ok) {
                 if (response.status === 404) {
                     console.log("No saved state found on server, using default state.")
-                    const defaultState = getDefaultState()
-                    try {
-                        const statusRes = await fetch('/api/status')
-                        if (statusRes.ok) {
-                            const status = await statusRes.json()
-                            const id = status['current-resume-id']
-                            if (id != null && defaultState['user-settings']) {
-                                defaultState['user-settings'].currentResumeId = id
-                                console.log("[AppState] Restored current-resume-id from app-status.json:", id)
-                            }
-                        }
-                    } catch (_) { /* ignore */ }
-                    return defaultState
+                    return getDefaultState()
                 } else {
                     throw new Error(`Server responded with status: ${response.status}`)
                 }
@@ -328,6 +342,19 @@ async function loadStateFromServer(): Promise<AppState> {
             // Merge with defaults to ensure all keys exist
             const finalState = deepMerge(getDefaultState(), migratedState)
             
+            // If saved state was missing system-constants.rendering, persist merged state so app_state.json gets the new keys
+            const r = rawState['system-constants']?.rendering
+            const renderingKeys = ['parallaxScaleAtMaxZ', 'saturationAtMaxZ', 'brightnessAtMaxZ', 'blurAtMaxZ'] as const
+            const hadMissingRendering = !r || renderingKeys.some(k => r[k] === undefined)
+            if (hadMissingRendering) {
+                try {
+                    await saveStateToServer(finalState)
+                    console.log('[AppState] Persisted state so app_state.json includes system-constants.rendering')
+                } catch (e) {
+                    reportError(e, '[AppState] Failed to persist state after adding rendering defaults', 'app_state.json will update on next normal save')
+                }
+            }
+
             console.log("✅ Final state after migration and merge:", finalState)
             return finalState
             
@@ -394,6 +421,7 @@ export function useAppState(): UseAppStateReturn {
                 appState.value = state
                 isLoaded.value = true
                 isLoading.value = false
+                setRenderingFromAppState(state['system-constants']?.rendering)
                 
                 // Dispatch event for backward compatibility
                 window.dispatchEvent(new CustomEvent('app-state-loaded', {

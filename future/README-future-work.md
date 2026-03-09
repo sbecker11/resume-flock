@@ -1,20 +1,5 @@
 # Future Work - Resume Flock
 
-## 🏷️ Project Renaming
-
-### Current Status
-- **Current Name**: `resume-flock`
-- **Proposed Name**: `resume-flock`
-- **Rationale**: The project has evolved from a postcard concept into a resume visualization system with business cards and skill chips
-
-### Implementation
-- Update `package.json` name field
-- Rename repository
-- Update all documentation references
-- Update import paths if necessary
-
----
-
 ## 📄 Resume Upload & LLM Parsing System
 
 ### Core Requirements
@@ -296,18 +281,18 @@ app.post('/api/generate-resume', async (req, res) => {
 
 **Potential Package**: `@vue-resize-handle`
 
-#### 2. InfiniteScrollingContainer ⭐⭐⭐⭐⭐
-**Current**: `modules/resume/infiniteScrollingContainer.mjs`
+#### 2. ResumeListScrollContainer ⭐⭐⭐⭐⭐
+**Current**: `modules/resume/resumeListScrollContainer.mjs`
 
 **Features**:
-- Infinite scrolling with item cloning
+- Resume list scroll (wrapping) with item cloning
 - Touch & mouse support
 - Momentum scrolling with physics
 - Smooth animations with easing
 - Resize handling
 - Performance optimized
 
-**Potential Package**: `@vue-infinite-scroll`
+**Potential Package**: `@vue-resume-list-scroll` (or similar)
 
 #### 3. CustomDropdown Component ⭐⭐⭐⭐
 **Current**: `modules/customDropdown/`
@@ -479,7 +464,7 @@ export const useResumeStore = defineStore('resume', {
 
 ### Phase 4 (Week 7-8): Component Extraction
 1. ResizeHandle component
-2. InfiniteScrollingContainer component
+2. ResumeListScrollContainer component
 3. CustomDropdown component
 4. NPM package preparation
 
@@ -503,7 +488,7 @@ export const useResumeStore = defineStore('resume', {
 - File size limits and compression
 - Caching for parsed resume data
 - Lazy loading for large datasets
-- Optimized rendering for infinite scroll
+- Optimized rendering for resume list scroll
 
 ### Accessibility
 - Keyboard navigation support
