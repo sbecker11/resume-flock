@@ -36,8 +36,9 @@ function enrichJobFromDescription(description, skillsMap) {
 
 /**
  * Enrich raw jobs with references and job-skills using the skills map.
- * @param {Array<object>} rawJobs - Jobs from API (jobs.mjs format)
- * @param {Record<string, { url?: string, img?: string }>} skills - Skills from API (skills.mjs format)
+ * Expects jobs as array and skills as name-keyed map (server normalizes parser output via parsedResumeAdapter).
+ * @param {Array<object>} rawJobs - Jobs from API (normalized to array; may be legacy array or parser jobID dict)
+ * @param {Record<string, { url?: string, img?: string }>} skills - Skills from API (name-keyed; may be legacy or normalized from parser skillID dict)
  * @returns {Array<object & { references: string[], 'job-skills': Record<string, string> }>}
  */
 export function enrichJobsWithSkills(rawJobs, skills) {

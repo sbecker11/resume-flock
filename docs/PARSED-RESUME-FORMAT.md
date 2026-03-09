@@ -2,6 +2,18 @@
 
 A **parsed resume** is a directory under `parsed_resumes/<id>/` containing the original resume file (optional), parser output files, and metadata. The app loads jobs/skills from these directories via `GET /api/resumes/:id/data`.
 
+## Resume-parser output format (current)
+
+The resume-parser writes a **flattened** output folder (no subfolders). All files sit in the output directory. The output folder also contains a **copy of the original resume file** (DOCX or PDF) under its **original filename**.
+
+**Data model (consistent across the three dicts):**
+
+- **Skills** dictionary uses **skillID** as primary key. Each skill item has: display name (`name`), optional list of `categoryIDs`, optional list of `jobIDs`. May also include `url`, `img`.
+- **Jobs** dictionary uses **jobID** as primary key. Each job item has: display name (role, employer, etc.), optional list of `skillIDs`.
+- **Categories** dictionary uses **categoryID** as primary key. Each category item has: display name (`name`), optional list of `skillIDs`.
+
+Files written: `jobs.mjs`, `skills.mjs`, `categories.mjs`, `other-sections.mjs`, `resume.html`, `resume_template.html`, plus the original `resume.docx` (or PDF) under its original filename.
+
 ## Directory layout
 
 **Preferred (resume-flock convention):**
@@ -11,26 +23,30 @@ parsed_resumes/
   <id>/                    # stable slug (e.g. parsed-resume-1, from-static-1734567890)
     meta.json              # optional for load; required for list UI
     jobs/
-      jobs.mjs             # required — parser output (export const jobs = [...];)
+      jobs.mjs             # required — parser output (export const jobs = {...}; keyed by jobID)
     skills/
-      skills.mjs           # optional — parser output (export const skills = {...};); default {}
-    resume.docx            # optional — original uploaded document (any name ok)
+      skills.mjs           # optional — parser output (export const skills = {...}; keyed by skillID)
+    categories.mjs         # optional — parser output (export const categories = {...}; keyed by categoryID)
+    resume.docx            # optional — original uploaded document (parser copies here under original filename)
     resume.pdf             # optional — original uploaded document (one of resume.*)
 ```
 
-**Alternate (flat):** Jobs file at folder root, skills optional:
+**Alternate (flat, matches parser output):** All parser files at folder root:
 
 ```
 parsed_resumes/
   <id>/
     jobs.mjs               # required — same format as above
     skills.mjs             # optional — at root; if missing, skills = {}
+    categories.mjs         # optional — at root
+    resume.docx            # optional — parser copies original file here
 ```
 
 - **`<id>`**: Opaque identifier. Use lowercase alphanumeric and hyphens (e.g. `parsed-resume-1`). Must not be `default` (reserved for static content).
-- **Jobs**: Either `jobs/jobs.mjs` or `jobs.mjs` at folder root. Same format as `static_content/jobs/jobs.mjs`. Parsed by `parseMjsExport(content, 'jobs')`.
-- **Skills**: Optional. Either `skills/skills.mjs` or (in flat layout) `skills.mjs`. If missing, the server returns `skills: {}`.
-- **Original doc**: Optional; any filename (e.g. `resume.docx`, `data-engineer.docx`).
+- **Jobs**: Either `jobs/jobs.mjs` or `jobs.mjs` at folder root. Parser format: dict keyed by jobID; each job has display fields and optional `skillIDs` array. Parsed by `parseMjsExport(content, 'jobs')`.
+- **Skills**: Optional. Either `skills/skills.mjs` or (in flat layout) `skills.mjs`. Parser format: dict keyed by skillID; each skill has `name`, optional `categoryIDs`, optional `jobIDs`. If missing, the server returns `skills: {}`.
+- **Categories**: Optional. Parser format: dict keyed by categoryID; each category has `name`, optional `skillIDs`. Not yet loaded by resume-flock server.
+- **Original doc**: Parser writes a copy of the input resume (DOCX/PDF) into the output folder under its original filename.
 
 ## meta.json schema
 
@@ -51,14 +67,15 @@ parsed_resumes/
 | `displayName` | string | yes      | Label for UI (e.g. "Default resume", "Shawn Becker 2025"). |
 | `createdAt`   | string | yes      | ISO 8601 (e.g. `2025-03-07T12:00:00.000Z`). |
 | `fileName`    | string | no       | Original file name if uploaded (e.g. `resume.docx`). Omit if no file. |
-| `jobCount`    | number | yes      | Length of `jobs` array in `jobs.mjs`. |
+| `jobCount`    | number | yes      | Number of jobs: length of `jobs` array if array, or `Object.keys(jobs).length` if dict keyed by jobID. |
 | `skillCount`  | number | yes      | Number of keys in `skills` object in `skills.mjs`. |
 
 ## Validation rules
 
-- Jobs file must parse to an array; each element has at least `index`, `role`, `employer`, `start`, `end`, `Description` (see resume-parser format).
-- If present, skills file must parse to an object; keys are skill names, values have `url` and optionally `img`.
-- Server returns 404 only if the resume folder or jobs file is missing for a given `id`. `meta.json` and `skills` are optional.
+- Jobs file must parse to an array or object. If object, keys are jobIDs; each job has display fields (role, employer, start, end, Description, etc.) and optional `skillIDs`. Legacy format: array with at least `index`, `role`, `employer`, `start`, `end`, `Description`.
+- If present, skills file must parse to an object keyed by skillID; each skill has display name (`name`) and optionally `url`, `img`, `categoryIDs`, `jobIDs`.
+- If present, categories file is an object keyed by categoryID; each category has `name` and optional `skillIDs`.
+- Server returns 404 only if the resume folder or jobs file is missing for a given `id`. `meta.json`, `skills`, and `categories` are optional.
 
 ## Using a parsed resume from another directory
 
@@ -103,7 +120,7 @@ Set and persist in `app_state.json` under `user-settings.currentResumeId`; the a
 
 ### Using a parsed resume (steps that work)
 
-1. **Parser output** (e.g. from `resume_to_flock.py` in workspace-resume/resume-parser): produces `jobs/jobs.mjs` and `skills/skills.mjs` in an output directory (e.g. `~/workspace-resume/parsed-resumes/parsed-resume-1/`).
+1. **Parser output** (e.g. from `resume_to_flock.py` in workspace-resume/resume-parser): writes a **flattened** output folder (no subfolders) with `jobs.mjs`, `skills.mjs`, `categories.mjs`, and a **copy of the original resume** (DOCX/PDF) under its original filename (e.g. `~/workspace-resume/parsed-resumes/parsed-resume-1/`).
 2. **Symlink into resume-flock** (from resume-flock repo root):  
    `ln -s ~/workspace-resume/parsed-resumes/parsed-resume-1 ./parsed_resumes/parsed-resume-1`
 3. **Set default resume in app state**: In `app_state.json`, set `user-settings.currentResumeId` to `"parsed-resume-1"` (or `null` for static default).
@@ -126,7 +143,7 @@ To run the parse-resume pipeline from resume-flock given a `resume.docx` path:
 
 - **Parser**: `resume_to_flock.py` (in a separate repo, e.g. `RESUME_PARSER_PATH` or `~/workspace-resume/resume-parser`).
 - **Invocation**: `python resume_to_flock.py <path-to-resume.docx> -o <output-dir>`.
-- **Output dir**: Typically `parsed_resumes/<id>/` (or an external path like `~/workspace-resume/parsed-resumes/parsed-resume-1`); the parser writes `jobs/jobs.mjs` and `skills/skills.mjs` inside it.
+- **Output dir**: Typically `parsed_resumes/<id>/` (or an external path like `~/workspace-resume/parsed-resumes/parsed-resume-1`). The parser writes a flattened folder: `jobs.mjs`, `skills.mjs`, `categories.mjs`, and a copy of the input resume file (original filename).
 
 **Script:** `scripts/run-parse-resume.mjs` (npm script `parse-resume`) invokes the parser subprocess.
 

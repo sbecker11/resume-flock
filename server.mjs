@@ -4,6 +4,7 @@ import path from 'path';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { parseMjsExport } from './modules/data/parseMjsExport.mjs';
+import { normalizeParserJobs, normalizeParserSkills, normalizeParserCategories } from './modules/data/parsedResumeAdapter.mjs';
 
 // Load .env from project root (see docs/REPLICATE-PORTS-CONFIG.md)
 dotenv.config({ path: path.join(process.cwd(), '.env') });
@@ -15,6 +16,7 @@ const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
 const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_state.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
+const STATIC_CATEGORIES_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'categories.mjs');
 const PARSED_RESUMES_DIR = path.resolve(PROJECT_ROOT, 'parsed_resumes');
 const SYNC_LOGS_DIR = path.resolve(PROJECT_ROOT, 'sync-logs');
 const SYNC_LOGS_INDEX_FILE = path.resolve(SYNC_LOGS_DIR, 'index.json');
@@ -32,17 +34,34 @@ app.use(express.json());
 // Parse text bodies for the CSS endpoint
 app.use(express.text());
 
-async function readJobsAndSkillsFromPaths(jobsPath, skillsPath) {
+/**
+ * Read jobs, skills, and optional categories from paths and return normalized data
+ * for API consumption (jobs array, name-keyed skills, categories dict).
+ * Supports both legacy (array jobs, name-keyed skills) and parser format (jobID/skillID dicts).
+ */
+async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath = null) {
     const jobsContent = await fs.readFile(jobsPath, 'utf-8');
-    const jobs = parseMjsExport(jobsContent, 'jobs');
-    let skills = {};
+    const rawJobs = parseMjsExport(jobsContent, 'jobs');
+    let rawSkills = {};
     try {
         const skillsContent = await fs.readFile(skillsPath, 'utf-8');
-        skills = parseMjsExport(skillsContent, 'skills') || {};
+        rawSkills = parseMjsExport(skillsContent, 'skills') || {};
     } catch (e) {
         if (e.code !== 'ENOENT') throw e;
     }
-    return { jobs, skills };
+    let rawCategories = {};
+    if (categoriesPath) {
+        try {
+            const categoriesContent = await fs.readFile(categoriesPath, 'utf-8');
+            rawCategories = parseMjsExport(categoriesContent, 'categories') || {};
+        } catch (e) {
+            if (e.code !== 'ENOENT') throw e;
+        }
+    }
+    const jobs = normalizeParserJobs(rawJobs);
+    const skills = normalizeParserSkills(rawSkills);
+    const categories = normalizeParserCategories(rawCategories);
+    return { jobs, skills, categories };
 }
 
 /** If app_state.json is missing, initialize it from app_state.example.json (safe defaults, no user data). */
@@ -105,8 +124,8 @@ app.get('/api/resumes/default/data', async (req, res) => {
     try {
         await fs.access(STATIC_JOBS_PATH);
         await fs.access(STATIC_SKILLS_PATH);
-        const { jobs, skills } = await readJobsAndSkillsFromPaths(STATIC_JOBS_PATH, STATIC_SKILLS_PATH);
-        res.json({ jobs, skills });
+        const { jobs, skills, categories } = await readAndNormalizeResumeData(STATIC_JOBS_PATH, STATIC_SKILLS_PATH, STATIC_CATEGORIES_PATH);
+        res.json({ jobs, skills, categories });
     } catch (error) {
         if (error.code === 'ENOENT') {
             res.status(404).json({ error: 'Default resume data not found (static_content/jobs, static_content/skills).' });
@@ -118,7 +137,7 @@ app.get('/api/resumes/default/data', async (req, res) => {
 });
 
 // GET /api/resumes/:id/data: Jobs and skills for a parsed resume (parsed_resumes/<id>/)
-// Supports two layouts: (1) jobs/jobs.mjs + skills/skills.mjs, (2) jobs.mjs at folder root (skills optional).
+// Supports (1) nested: jobs/jobs.mjs, skills/skills.mjs; (2) flat: jobs.mjs, skills.mjs, categories.mjs in folder root.
 app.get('/api/resumes/:id/data', async (req, res) => {
     const { id } = req.params;
     if (!id || id === 'default') {
@@ -136,10 +155,21 @@ app.get('/api/resumes/:id/data', async (req, res) => {
             throw e;
         }
     }
-    const skillsPath = path.join(dir, 'skills', 'skills.mjs');
+    let skillsPath = path.join(dir, 'skills', 'skills.mjs');
     try {
-        const { jobs, skills } = await readJobsAndSkillsFromPaths(jobsPath, skillsPath);
-        res.json({ jobs, skills });
+        await fs.access(skillsPath);
+    } catch (e) {
+        if (e.code === 'ENOENT') {
+            skillsPath = path.join(dir, 'skills.mjs');
+        } else {
+            throw e;
+        }
+    }
+    // skillsPath may not exist (skills optional); readAndNormalizeResumeData treats missing skills as {}
+    const categoriesPath = path.join(dir, 'categories.mjs');
+    try {
+        const { jobs, skills, categories } = await readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath);
+        res.json({ jobs, skills, categories });
     } catch (error) {
         if (error.code === 'ENOENT') {
             res.status(404).json({ error: `Resume "${id}" not found.` });

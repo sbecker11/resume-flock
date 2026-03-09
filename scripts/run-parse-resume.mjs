@@ -4,7 +4,7 @@
  * Usage:
  *   node scripts/run-parse-resume.mjs --docx <path-to.docx> [--out <output-dir>] [--id <id>] [--force]
  *   Or set RESUME_PARSER_PATH (default: ../../workspace-resume/resume-parser).
- * If --id is given, --out defaults to parsed_resumes/<id> (resume-flock repo).
+ * If --id is given, --out defaults to RESUME_PARSER_PATH/parsed_resumes/<id> (parser repo).
  * If output dir already has jobs (jobs/jobs.mjs or jobs.mjs), exit unless --force.
  */
 import 'dotenv/config';
@@ -21,6 +21,18 @@ const PARSER_SCRIPT = 'resume_to_flock.py';
 const DEFAULT_PARSER_PATH = path.resolve(PROJECT_ROOT, '..', '..', 'workspace-resume', 'resume-parser');
 const TIMEOUT_MS = 120_000;
 
+/** Env var names that should not be inherited so the parser uses its own .env (resume-parser repo). */
+const PARSER_STRIP_ENV_KEYS = ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'LLM_PROVIDER'];
+
+/** Return env for the parser subprocess: current env minus API keys so parser .env is used. */
+function getParserEnv() {
+  const env = { ...process.env };
+  for (const key of PARSER_STRIP_ENV_KEYS) {
+    delete env[key];
+  }
+  return env;
+}
+
 function printHelp() {
   console.log(`
 Parse a resume .docx into a parsed-resume folder (jobs/jobs.mjs, skills/skills.mjs, resume.docx).
@@ -34,8 +46,8 @@ Required:
   --docx <path>   Path to the resume .docx file to parse.
 
 Output (exactly one):
-  --id <id>       Output folder will be parsed_resumes/<id>. Example: --id my-2025-resume
-  --out <dir>     Exact output directory. (If both --id and --out are given, --out wins.)
+  --id <id>       Output folder will be <parser>/parsed_resumes/<id>. E.g. --id 6 → .../parsed_resumes/6; --id resume-6 → .../parsed_resumes/resume-6
+  --out <dir>     Output directory; relative paths are resolved from the parser repo (e.g. parsed_resumes/resume-6). (If both --id and --out are given, --out wins.)
 
 Options:
   --force         Overwrite output dir if it already contains jobs (default: exit with error).
@@ -47,8 +59,8 @@ Environment:
 Example:
   npm run parse-resume -- --docx ~/Documents/resume.docx --id my-resume
 
-After a successful run, set app_state.json user-settings.currentResumeId to the --id value
-to use this parsed resume in the app.
+After a successful run, set app_state.json user-settings.currentResumeId to the same <id> value (e.g. "6" or "resume-6")
+to use this parsed resume in the app. If resume-flock's parsed_resumes is a symlink to the parser's parsed_resumes, the folder will appear there.
 `);
 }
 
@@ -61,15 +73,16 @@ function parseArgs() {
     } else if (args[i] === '--docx' && args[i + 1]) {
       out.docx = path.resolve(process.cwd(), args[++i]);
     } else if (args[i] === '--out' && args[i + 1]) {
-      out.out = path.resolve(process.cwd(), args[++i]);
+      out.out = args[++i]; // resolved in main() relative to parser path if not absolute
     } else if (args[i] === '--id' && args[i + 1]) {
       out.id = args[++i];
     } else if (args[i] === '--force') {
       out.force = true;
     }
   }
+  // --id without --out: outDir is set in main() from parser's parsed_resumes/resume-<id>
   if (out.id && !out.out) {
-    out.out = path.join(PARSED_RESUMES_DIR, out.id);
+    out.out = null;
   }
   return out;
 }
@@ -90,8 +103,14 @@ async function outputDirHasJobs(outDir) {
   return false;
 }
 
+function getParserPath() {
+  return process.env.RESUME_PARSER_PATH
+    ? path.resolve(process.cwd(), process.env.RESUME_PARSER_PATH)
+    : DEFAULT_PARSER_PATH;
+}
+
 async function main() {
-  const { docx, out: outDir, id, force, help } = parseArgs();
+  const { docx, out: outArg, id, force, help } = parseArgs();
   if (help || (!docx && process.argv.length <= 2)) {
     printHelp();
     process.exit(help || !docx ? 0 : 1);
@@ -99,6 +118,12 @@ async function main() {
   if (!docx) {
     console.error('Missing --docx. Run with --help for usage.');
     process.exit(1);
+  }
+
+  const parserPath = getParserPath();
+  let outDir = outArg ?? (id != null ? path.join(parserPath, 'parsed_resumes', id) : null);
+  if (outDir && outArg && !path.isAbsolute(outArg)) {
+    outDir = path.resolve(parserPath, outArg);
   }
   if (!outDir) {
     console.error('Provide either --out <dir> or --id <id>. Run with --help for usage.');
@@ -121,9 +146,6 @@ async function main() {
     throw e;
   }
 
-  const parserPath = process.env.RESUME_PARSER_PATH
-    ? path.resolve(process.cwd(), process.env.RESUME_PARSER_PATH)
-    : DEFAULT_PARSER_PATH;
   const scriptPath = path.join(parserPath, PARSER_SCRIPT);
   let pythonBin = 'python3';
   for (const venvDir of ['venv']) {
@@ -155,6 +177,7 @@ async function main() {
     const child = spawn(pythonBin, [scriptPath, docx, '-o', outDir], {
       cwd: parserPath,
       stdio: ['ignore', 'inherit', 'inherit'],
+      env: getParserEnv(),
     });
     const t = setTimeout(() => {
       child.kill('SIGTERM');
@@ -170,7 +193,7 @@ async function main() {
       clearTimeout(t);
       if (code === 0) {
         console.log('Parser wrote output to:', outDir);
-        if (id) {
+        if (id != null) {
           console.log('To use in resume-flock, set app_state.json user-settings.currentResumeId to:', JSON.stringify(id));
         }
         resolve();
