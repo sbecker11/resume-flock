@@ -245,11 +245,23 @@ function persistFocalPoint(immediate = false) {
 }
 
 // Watchers for cross-system coordination
+// Throttle focal-point-changed to max once per frame to prevent parallax jitter
+let focalPointEventScheduled = false
+let pendingFocalPoint = null
+
 watch(() => appStore.focalPoint, (newFocalPoint) => {
-  // Emit custom event for systems that still need it during migration
-  window.dispatchEvent(new CustomEvent('focal-point-changed', {
-    detail: { x: newFocalPoint.x, y: newFocalPoint.y }
-  }))
+  pendingFocalPoint = { x: newFocalPoint.x, y: newFocalPoint.y }
+
+  if (!focalPointEventScheduled) {
+    focalPointEventScheduled = true
+    requestAnimationFrame(() => {
+      // Emit custom event for systems that still need it during migration
+      window.dispatchEvent(new CustomEvent('focal-point-changed', {
+        detail: pendingFocalPoint
+      }))
+      focalPointEventScheduled = false
+    })
+  }
 }, { deep: true })
 
 watch(() => appStore.orientation, (newOrientation) => {

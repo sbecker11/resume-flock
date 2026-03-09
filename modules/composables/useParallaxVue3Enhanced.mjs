@@ -11,6 +11,7 @@ import { useBullsEyeService, useFocalPointService, useDebugFunctions } from '../
 import { useLayoutToggle } from './useLayoutToggle.mjs'
 import * as zUtils from '../utils/zUtils.mjs'
 import { getRendering } from '../core/renderingConfig.mjs'
+import { logger } from '../utils/logger.mjs'
 
 // Parallax constants (flock-of-postcards–aligned: Z 1 = far, Z 14 = close; higher Z = more parallax)
 const PARALLAX_X_EXAGGERATION_FACTOR = 0.9
@@ -38,7 +39,6 @@ export function useParallaxEnhanced() {
   const lastRenderTime = ref(0)
   const renderCount = ref(0)
   const previousDisplacements = ref({ dh: null, dv: null, bullsEyeCenterXSceneView: null })
-  const previousCenterLog = ref({ bullsEyeCenterX2D: null, firstBizCardCenterX2D: null, diff: null })
   const previousSceneViewTopLeft = ref({ left: null, top: null })
   let rafScheduled = false
 
@@ -97,7 +97,9 @@ export function useParallaxEnhanced() {
 
     const translateX = bullsEyeCenterXSceneView + dh * zScale
     const translateY = dv * zScale
+
     cardDiv.style.transform = `translateX(${translateX}px) translateY(${translateY}px)`
+
     return true
   }
 
@@ -123,25 +125,26 @@ export function useParallaxEnhanced() {
     const sceneViewTopLeft = { left: sceneViewRect.left, top: sceneViewRect.top }
     const prevTopLeft = previousSceneViewTopLeft.value
     if (prevTopLeft.left !== sceneViewTopLeft.left || prevTopLeft.top !== sceneViewTopLeft.top) {
-      const layout = orientation.value === 'scene-left' ? 'scene-left' : 'scene-right'
-      console.log('** SCENEVIEW **', layout, 'topLeft:', sceneViewTopLeft.left.toFixed(0), sceneViewTopLeft.top.toFixed(0))
       previousSceneViewTopLeft.value = { left: sceneViewTopLeft.left, top: sceneViewTopLeft.top }
     }
+
     // SceneView-relative X so projection works for both scene-left and scene-right (viewport .x alone is wrong when scene is on the right).
     const bullsEyeCenterXSceneView = bullsEyeCenter.x - sceneViewRect.left
     const dh = (bullsEyeCenter.x - focal.x) * PARALLAX_X_EXAGGERATION_FACTOR
     const dv = (bullsEyeCenter.y - focal.y) * PARALLAX_Y_EXAGGERATION_FACTOR
 
-    const prev = previousDisplacements.value
-    if (prev.dh === dh && prev.dv === dv && prev.bullsEyeCenterXSceneView === bullsEyeCenterXSceneView) return
+    // DEBUG tracking disabled for performance (was causing sluggish hover motion)
 
-    const FOCAL_MATCH_TOLERANCE_PX = 1.0
-    const bullsEyeMatchesFocal = Math.abs(focal.x - bullsEyeCenter.x) <= FOCAL_MATCH_TOLERANCE_PX
+    const prev = previousDisplacements.value
+    const shouldSkipUpdate = prev.dh === dh && prev.dv === dv && prev.bullsEyeCenterXSceneView === bullsEyeCenterXSceneView
+
+    if (shouldSkipUpdate) {
+      return
+    }
 
     // Always query from the plane so every card gets the transform (no stale registry cache).
     const bizCardDivs = Array.from(plane.querySelectorAll('.biz-card-div'))
     const skillCardDivs = Array.from(plane.querySelectorAll('.skill-card-div'))
-    const firstBiz = bizCardDivs.find(div => div.getAttribute('data-job-number') === '0') || bizCardDivs[0]
 
     for (const div of bizCardDivs) {
       applyParallaxToCardDiv(div, bullsEyeCenterXSceneView, dh, dv)
@@ -149,25 +152,7 @@ export function useParallaxEnhanced() {
     for (const div of skillCardDivs) {
       applyParallaxToCardDiv(div, bullsEyeCenterXSceneView, dh, dv)
     }
-    if (firstBiz && bullsEyeMatchesFocal) {
-      const rect = firstBiz.getBoundingClientRect()
-      const firstBizCardCenterX2D = rect.left + rect.width / 2
-      const bullsEyeCenterX2D = bullsEyeCenter.x
-      const diff = firstBizCardCenterX2D - bullsEyeCenterX2D
-      const prev = previousCenterLog.value
-      const b1 = bullsEyeCenterX2D.toFixed(1)
-      const c1 = firstBizCardCenterX2D.toFixed(1)
-      const d1 = diff.toFixed(1)
-      const changed = prev.bullsEyeCenterX2D !== b1 || prev.firstBizCardCenterX2D !== c1 || prev.diff !== d1
-      if (changed) {
-        console.log('* CENTER * [Parallax] ------------------------------')
-        console.log('* CENTER * [Parallax] bullsEyeCenterX 2D :', bullsEyeCenterX2D.toFixed(1))
-        console.log('* CENTER * [Parallax] first bizCardCenterX 2D :', firstBizCardCenterX2D.toFixed(1))
-        console.log('* CENTER * [Parallax] error 2D: (' + firstBizCardCenterX2D.toFixed(1) + '-' + bullsEyeCenterX2D.toFixed(1) + ') =', diff.toFixed(1))
-        previousCenterLog.value = { bullsEyeCenterX2D: b1, firstBizCardCenterX2D: c1, diff: d1 }
-      }
-    }
-    previousDisplacements.value = { dh, dv, bullsEyeCenterXSceneView }
+    previousDisplacements.value = { dh, dv, bullsEyeCenterXSceneView, focal }
   }
 
   // Enhanced render function: apply parallax transforms directly
@@ -180,10 +165,10 @@ export function useParallaxEnhanced() {
       lastRenderTime.value = performance.now() - startTime
       renderCount.value++
       if (lastRenderTime.value > 16) {
-        console.warn(`[ParallaxEnhanced] Slow render: ${lastRenderTime.value.toFixed(2)}ms`)
+        logger.warn(`[ParallaxEnhanced] Slow render: ${lastRenderTime.value.toFixed(2)}ms`)
       }
     } catch (error) {
-      console.error('[ParallaxEnhanced] Render error:', error)
+      logger.error('[ParallaxEnhanced] Render error:', error)
       throw error
     }
   }
@@ -214,26 +199,16 @@ export function useParallaxEnhanced() {
   
   // Service availability checks
   const checkServices = () => {
-    const checks = {
+    return {
       'bullsEye service': !!bullsEye,
       'focalPoint service': !!focalPoint,
       'debugFunctions service': !!debugFunctions,
       'bullsEye ready': bullsEye?.isReady?.() || false
     }
-    
-    Object.entries(checks).forEach(([check, result]) => {
-      console.log(`[ParallaxEnhanced] ${check}: ${result ? '✅' : '❌'}`)
-    })
-    
-    return checks
   }
   
   // Initialization
   const initialize = () => {
-    console.log('[ParallaxEnhanced] Initializing with provide/inject services...')
-    
-    const serviceChecks = checkServices()
-    
     setupEventListeners()
     isInitialized.value = true
     // Initial parallax run when scene is ready (may be no-op if scene not ready yet)
@@ -244,15 +219,12 @@ export function useParallaxEnhanced() {
     window.getFocalPointPosition = getFocalPointPosition
     window.getViewportOrigin = getViewportOrigin
     // NOTE: Do NOT assign renderAllCDivs to window to avoid circular reference
-    
-    console.log('[ParallaxEnhanced] ✅ Initialization complete')
   }
-  
+
   const destroy = () => {
     removeEventListeners()
     isInitialized.value = false
     renderCount.value = 0
-    console.log('[ParallaxEnhanced] Destroyed')
   }
   
   // Lifecycle hooks

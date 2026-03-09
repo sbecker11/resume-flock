@@ -184,11 +184,11 @@ overflow and ensures consistent sizing.
     box-shadow:
         0 0 0 2px rgba(255, 255, 255, 0.3),
         0 4px 12px rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
+    transition: box-shadow 0.2s ease; /* NOT 'all' - transform updates 40-50x/sec, must not be transitioned */
 }
 .skill-card-div:not(.clone).hovered {
     box-shadow: none !important; /* Match resume: thin border/outline only from scene.css */
-    transition: all 0.2s ease;
+    /* No transition needed - box-shadow is set to none */
 }
 
 /* Hover effects for specific elements within cards (no text color change) */
