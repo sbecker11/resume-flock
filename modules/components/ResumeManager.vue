@@ -22,7 +22,7 @@
               <input
                 ref="fileInput"
                 type="file"
-                accept=".docx"
+                accept=".docx,.pdf"
                 @change="handleFileSelect"
                 class="file-input"
                 id="resume-file-input"
@@ -34,11 +34,29 @@
                   <line x1="12" y1="3" x2="12" y2="15" />
                 </svg>
                 <span class="file-label-text">
-                  {{ selectedFile ? selectedFile.name : 'Click to select .docx file' }}
+                  {{ selectedFile ? selectedFile.name : 'Click to select .docx or .pdf file' }}
                 </span>
               </label>
 
-              <div v-if="selectedFile" class="upload-controls">
+              <!-- OR Divider -->
+              <div class="divider">
+                <span class="divider-text">OR</span>
+              </div>
+
+              <!-- URL Input -->
+              <div class="url-input-section">
+                <input
+                  v-model="resumeUrl"
+                  type="url"
+                  placeholder="Enter resume URL (https://...)"
+                  class="url-input"
+                  @input="handleUrlInput"
+                />
+                <small class="url-hint">Paste a direct link to a .docx or .pdf file</small>
+              </div>
+
+              <!-- Upload Controls (shown when file OR URL is provided) -->
+              <div v-if="selectedFile || resumeUrl" class="upload-controls">
                 <input
                   v-model="displayName"
                   type="text"
@@ -50,7 +68,7 @@
                   :disabled="uploading"
                   class="upload-button"
                 >
-                  {{ uploading ? 'Uploading...' : 'Upload & Parse' }}
+                  {{ uploading ? 'Processing...' : (selectedFile ? 'Upload & Parse' : 'Fetch & Parse') }}
                 </button>
               </div>
 
@@ -67,7 +85,7 @@
                   <line x1="12" y1="8" x2="12" y2="12" />
                   <line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
-                {{ uploadError }}
+                <pre class="error-text">{{ uploadError }}</pre>
               </div>
             </div>
           </section>
@@ -91,7 +109,7 @@
                 <polyline points="14 2 14 8 20 8" />
               </svg>
               <p>No parsed resumes found</p>
-              <p class="empty-hint">Upload a .docx file to get started</p>
+              <p class="empty-hint">Upload a .docx or .pdf file to get started</p>
             </div>
 
             <div v-else class="resume-grid">
@@ -162,6 +180,7 @@ const resumes = ref([])
 const loadingResumes = ref(false)
 const loadError = ref(null)
 const selectedFile = ref(null)
+const resumeUrl = ref('')
 const displayName = ref('')
 const uploading = ref(false)
 const uploadProgress = ref(0)
@@ -205,36 +224,60 @@ async function loadResumeList() {
 function handleFileSelect(event) {
   const file = event.target.files[0]
   if (file) {
-    if (!file.name.endsWith('.docx')) {
-      uploadError.value = 'Please select a .docx file'
+    const isDocx = file.name.endsWith('.docx')
+    const isPdf = file.name.endsWith('.pdf')
+    if (!isDocx && !isPdf) {
+      uploadError.value = 'Please select a .docx or .pdf file'
       selectedFile.value = null
       return
     }
     selectedFile.value = file
-    displayName.value = file.name.replace('.docx', '')
+    resumeUrl.value = '' // Clear URL when file is selected
+    displayName.value = file.name.replace(/\.(docx|pdf)$/, '')
     uploadError.value = null
   }
 }
 
+function handleUrlInput() {
+  if (resumeUrl.value) {
+    selectedFile.value = null // Clear file when URL is entered
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+    uploadError.value = null
+
+    // Auto-populate display name from URL filename
+    try {
+      const url = new URL(resumeUrl.value)
+      const filename = url.pathname.split('/').pop()
+      if (filename) {
+        displayName.value = filename.replace(/\.(docx|pdf)$/i, '')
+      }
+    } catch (e) {
+      // Invalid URL, ignore
+    }
+  }
+}
+
 async function handleUpload() {
-  if (!selectedFile.value) {
-    uploadError.value = 'Please select a file first'
+  if (!selectedFile.value && !resumeUrl.value) {
+    uploadError.value = 'Please select a file or enter a URL'
     return
   }
 
   uploading.value = true
   uploadProgress.value = 0
-  uploadStatus.value = 'Uploading file...'
+  uploadStatus.value = selectedFile.value ? 'Uploading file...' : 'Fetching resume...'
   uploadError.value = null
 
   try {
     const result = await uploadResume(
-      selectedFile.value,
+      selectedFile.value || resumeUrl.value, // Pass file or URL
       displayName.value || null,
       (progress) => {
         uploadProgress.value = progress
         if (progress < 100) {
-          uploadStatus.value = 'Uploading file...'
+          uploadStatus.value = selectedFile.value ? 'Uploading file...' : 'Downloading resume...'
         } else {
           uploadStatus.value = 'Processing resume...'
         }
@@ -255,6 +298,7 @@ async function handleUpload() {
     // Reset form
     setTimeout(() => {
       selectedFile.value = null
+      resumeUrl.value = ''
       displayName.value = ''
       uploadProgress.value = 0
       uploadStatus.value = ''
@@ -284,6 +328,7 @@ async function handleResumeSelect(resume) {
 function handleClose() {
   // Reset upload state when closing
   selectedFile.value = null
+  resumeUrl.value = ''
   displayName.value = ''
   uploadError.value = null
   uploadProgress.value = 0
@@ -422,6 +467,61 @@ section h3 {
 
 .file-label-text {
   font-size: 14px;
+}
+
+/* Divider */
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+  color: #666;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #444;
+}
+
+.divider-text {
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* URL Input Section */
+.url-input-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.url-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: #1e1e1e;
+  border: 2px solid #444;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.url-input:focus {
+  outline: none;
+  border-color: #3498db;
+}
+
+.url-input::placeholder {
+  color: #666;
+}
+
+.url-hint {
+  color: #666;
+  font-size: 12px;
+  margin-left: 4px;
 }
 
 .upload-controls {
@@ -601,7 +701,7 @@ section h3 {
 /* Error Message */
 .error-message {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 16px;
   padding: 12px;
@@ -610,6 +710,20 @@ section h3 {
   border-radius: 6px;
   color: #dc3545;
   font-size: 14px;
+}
+
+.error-message svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.error-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Modal Transitions */

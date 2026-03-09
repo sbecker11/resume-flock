@@ -139,7 +139,7 @@ export async function initializeResumeSystem() {
         // Create a visual indicator that shows the resume system status
         const indicator = document.createElement('div');
         indicator.id = 'resume-system-indicator';
-        indicator.style.cssText = 'position: fixed; top: 10px; right: 10px; background: green; color: white; padding: 5px; z-index: 9999; font-size: 12px; line-height: 1.2;';
+        indicator.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background: green; color: white; padding: 5px; z-index: 9999; font-size: 12px; line-height: 1.2;';
         
         const totalJobs = jobsData.length;
         const createdDivs = resumeListController.bizResumeDivs?.length || 0;

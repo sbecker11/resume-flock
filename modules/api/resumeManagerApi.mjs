@@ -22,24 +22,36 @@ export async function listResumes() {
 }
 
 /**
- * Upload a .docx resume file for parsing
- * @param {File} file - The .docx file to upload
+ * Upload a resume file or fetch from URL for parsing
+ * @param {File|string} fileOrUrl - The resume file to upload OR a URL string
  * @param {string} displayName - Optional display name for the resume
  * @param {Function} onProgress - Optional callback for upload progress (0-100)
  * @returns {Promise<Object>} Resume metadata and parsing results
  */
-export async function uploadResume(file, displayName = null, onProgress = null) {
+export async function uploadResume(fileOrUrl, displayName = null, onProgress = null) {
     try {
-        if (!file) {
-            throw new Error('No file provided');
-        }
-
-        if (!file.name.endsWith('.docx')) {
-            throw new Error('Only .docx files are supported');
+        if (!fileOrUrl) {
+            throw new Error('No file or URL provided');
         }
 
         const formData = new FormData();
-        formData.append('resume', file);
+
+        // Check if it's a URL string or a File object
+        if (typeof fileOrUrl === 'string') {
+            // URL provided
+            if (!fileOrUrl.startsWith('http://') && !fileOrUrl.startsWith('https://')) {
+                throw new Error('Invalid URL: must start with http:// or https://');
+            }
+            formData.append('resumeUrl', fileOrUrl);
+        } else {
+            // File provided
+            const isDocx = fileOrUrl.name.endsWith('.docx');
+            const isPdf = fileOrUrl.name.endsWith('.pdf');
+            if (!isDocx && !isPdf) {
+                throw new Error('Only .docx and .pdf files are supported');
+            }
+            formData.append('resume', fileOrUrl);
+        }
 
         if (displayName) {
             formData.append('displayName', displayName);
@@ -71,7 +83,12 @@ export async function uploadResume(file, displayName = null, onProgress = null) 
                 } else {
                     try {
                         const error = JSON.parse(xhr.responseText);
-                        reject(new Error(error.error || error.details || `Upload failed with status ${xhr.status}`));
+                        // Combine error and details for better debugging
+                        let errorMessage = error.error || `Upload failed with status ${xhr.status}`;
+                        if (error.details) {
+                            errorMessage += `\n\nDetails: ${error.details}`;
+                        }
+                        reject(new Error(errorMessage));
                     } catch (e) {
                         reject(new Error(`Upload failed with status ${xhr.status}`));
                     }

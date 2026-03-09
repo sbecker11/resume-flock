@@ -6,8 +6,10 @@ import dotenv from 'dotenv';
 import multer from 'multer';
 import { spawn } from 'child_process';
 import sanitizeFilename from 'sanitize-filename';
+import fetch from 'node-fetch';
 import { parseMjsExport } from './modules/data/parseMjsExport.mjs';
 import { normalizeParserJobs, normalizeParserSkills, normalizeParserCategories } from './modules/data/parsedResumeAdapter.mjs';
+import { atomicWriteWithLock, cleanStaleLock } from './modules/utils/atomicFileUtils.mjs';
 
 // Load .env from project root (see docs/REPLICATE-PORTS-CONFIG.md)
 dotenv.config({ path: path.join(process.cwd(), '.env') });
@@ -112,7 +114,7 @@ app.get('/api/state', async (req, res) => {
 app.post('/api/state', async (req, res) => {
     try {
         const stateData = JSON.stringify(req.body, null, 2);
-        await fs.writeFile(STATE_FILE_PATH, stateData, 'utf-8');
+        await atomicWriteWithLock(STATE_FILE_PATH, stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
         console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
         res.json({ success: true });
@@ -270,35 +272,110 @@ const upload = multer({
     }
 });
 
-// POST /api/resumes/upload: Upload and parse a .docx resume
+// POST /api/resumes/upload: Upload and parse a .docx or .pdf resume (file or URL)
 app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+        let uploadedFile = req.file;
+        let originalFilename = null;
+        let fileSize = 0;
+        let tempFilePath = null;
+
+        // Check if URL is provided instead of file
+        if (!uploadedFile && req.body.resumeUrl) {
+            const resumeUrl = req.body.resumeUrl;
+            console.log(`🌐 Fetching resume from URL: ${resumeUrl}`);
+
+            try {
+                const response = await fetch(resumeUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                // Extract filename from URL or Content-Disposition header
+                const contentDisposition = response.headers.get('content-disposition');
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                    if (filenameMatch) {
+                        originalFilename = filenameMatch[1].replace(/['"]/g, '');
+                    }
+                }
+                if (!originalFilename) {
+                    originalFilename = path.basename(new URL(resumeUrl).pathname) || 'resume.pdf';
+                }
+
+                // Sanitize filename
+                originalFilename = sanitizeFilename(originalFilename);
+
+                // Ensure proper extension
+                if (!originalFilename.endsWith('.docx') && !originalFilename.endsWith('.pdf')) {
+                    // Try to detect from Content-Type
+                    const contentType = response.headers.get('content-type');
+                    if (contentType?.includes('pdf')) {
+                        originalFilename += '.pdf';
+                    } else {
+                        originalFilename += '.docx';
+                    }
+                }
+
+                // Create temp file
+                const buffer = Buffer.from(await response.arrayBuffer());
+                fileSize = buffer.length;
+                tempFilePath = path.join(PARSED_RESUMES_DIR, `temp-${Date.now()}-${originalFilename}`);
+                await fs.writeFile(tempFilePath, buffer);
+
+                console.log(`✅ Downloaded resume: ${originalFilename} (${fileSize} bytes)`);
+
+                // Create a file-like object for consistent handling
+                uploadedFile = {
+                    originalname: originalFilename,
+                    path: tempFilePath,
+                    size: fileSize
+                };
+            } catch (error) {
+                console.error('❌ Failed to fetch resume from URL:', error);
+                return res.status(400).json({
+                    error: 'Failed to fetch resume from URL',
+                    details: error.message
+                });
+            }
         }
 
-        const uploadedFile = req.file;
-        const displayName = req.body.displayName || path.basename(uploadedFile.originalname, '.docx');
+        if (!uploadedFile) {
+            return res.status(400).json({ error: 'No file uploaded or URL provided' });
+        }
+
+        const displayName = req.body.displayName || path.basename(uploadedFile.originalname, path.extname(uploadedFile.originalname));
         const timestamp = Date.now();
         const resumeId = `resume-${timestamp}`;
         const outputDir = path.join(PARSED_RESUMES_DIR, resumeId);
 
-        console.log(`📤 Processing uploaded resume: ${uploadedFile.originalname}`);
+        console.log(`📤 Processing resume: ${uploadedFile.originalname}`);
         console.log(`   Output directory: ${outputDir}`);
 
         // Create output directory
         await fs.mkdir(outputDir, { recursive: true });
 
-        // Move uploaded file to output directory
-        const targetDocxPath = path.join(outputDir, sanitizeFilename(uploadedFile.originalname));
-        await fs.rename(uploadedFile.path, targetDocxPath);
+        // Move/copy uploaded file to output directory
+        const targetPath = path.join(outputDir, sanitizeFilename(uploadedFile.originalname));
+        if (tempFilePath) {
+            // URL fetch: move temp file
+            await fs.rename(uploadedFile.path, targetPath);
+        } else {
+            // Regular upload: move uploaded file
+            await fs.rename(uploadedFile.path, targetPath);
+        }
 
-        // Look for Python parser in the project or sibling directory
+        // Look for Python parser using RESUME_PARSER_PATH or default locations
+        const defaultParserPath = process.env.RESUME_PARSER_PATH
+            ? path.resolve(PROJECT_ROOT, process.env.RESUME_PARSER_PATH, 'resume_to_flock.py')
+            : null;
+
         const possibleParserPaths = [
+            defaultParserPath,
             path.join(PROJECT_ROOT, 'resume_to_flock.py'),
             path.join(PROJECT_ROOT, '..', 'resume-parser', 'resume_to_flock.py'),
             path.join(PROJECT_ROOT, 'scripts', 'resume_to_flock.py')
-        ];
+        ].filter(Boolean);
 
         let parserPath = null;
         for (const p of possibleParserPaths) {
@@ -312,17 +389,46 @@ app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
         }
 
         if (!parserPath) {
-            throw new Error('Python parser (resume_to_flock.py) not found. Please ensure it is in the project root or ../resume-parser/ directory.');
+            const envHint = process.env.RESUME_PARSER_PATH
+                ? `RESUME_PARSER_PATH is set to: ${process.env.RESUME_PARSER_PATH}`
+                : 'Set RESUME_PARSER_PATH in .env to specify parser location';
+            throw new Error(`Python parser (resume_to_flock.py) not found. ${envHint}. Also checked: project root, ../resume-parser/, scripts/ directories.`);
         }
 
         console.log(`   Using parser: ${parserPath}`);
 
-        // Run Python parser
-        const pythonProcess = spawn('python3', [
+        // Check for venv Python in the parser directory
+        const parserDir = path.dirname(parserPath);
+        const venvPython = path.join(parserDir, 'venv', 'bin', 'python');
+        let pythonCommand = 'python3';
+
+        try {
+            await fs.access(venvPython);
+            pythonCommand = venvPython;
+            console.log(`   Using venv Python: ${venvPython}`);
+        } catch (e) {
+            console.log(`   Using system Python: python3`);
+        }
+
+        // Run Python parser with -o flag for output directory
+        // Clean environment: remove API-related env vars so parser uses its own .env
+        const cleanEnv = {};
+        for (const [key, value] of Object.entries(process.env)) {
+            // Skip env vars with 'API' in the name to avoid conflicts
+            if (!key.includes('API')) {
+                cleanEnv[key] = value;
+            }
+        }
+
+        const pythonProcess = spawn(pythonCommand, [
             parserPath,
-            targetDocxPath,
+            targetPath,
+            '-o',
             outputDir
-        ]);
+        ], {
+            env: cleanEnv,
+            cwd: path.dirname(parserPath)  // Run from parser directory so it finds its .env
+        });
 
         let stdout = '';
         let stderr = '';
@@ -356,6 +462,8 @@ app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
             id: resumeId,
             displayName: displayName,
             originalFilename: uploadedFile.originalname,
+            sourceUrl: req.body.resumeUrl || null, // Original URL if fetched from web
+            sourceType: req.body.resumeUrl ? 'url' : 'upload', // 'url' or 'upload'
             createdAt: new Date().toISOString(),
             uploadedBy: req.body.uploadedBy || 'user',
             fileSize: uploadedFile.size
@@ -2004,6 +2112,9 @@ function startServer(port) {
         console.log(`Serving dynamic palette manifest at /api/palette-manifest`);
         console.log(`Palette directory path: ${PALETTE_DIR_PATH}`);
         
+        // Clean up any stale lock files from previous crashed processes
+        await cleanStaleLock(STATE_FILE_PATH, 30000);
+
         // Initialize sync logs directory and index
         await initializeSyncLogsDirectory();
         console.log(`📝 Sync logs available at /sync-logs-dashboard`);
