@@ -198,14 +198,15 @@ app.get('/api/resumes', async (req, res) => {
             const dir = path.join(PARSED_RESUMES_DIR, resumeId);
 
             try {
-                // Read meta.json if it exists
+                // Read meta.json - skip if it doesn't exist (not a valid parsed resume)
                 let metadata = {};
                 const metaPath = path.join(dir, 'meta.json');
                 try {
                     const metaContent = await fs.readFile(metaPath, 'utf-8');
                     metadata = JSON.parse(metaContent);
                 } catch (e) {
-                    // meta.json doesn't exist - will generate from data
+                    // meta.json doesn't exist - skip this folder (not a parsed resume)
+                    continue;
                 }
 
                 // Get jobs and skills data to count items
@@ -232,6 +233,11 @@ app.get('/api/resumes', async (req, res) => {
 
                 // Get folder creation time
                 const stats = await fs.stat(dir);
+
+                // Skip hidden resumes (e.g., guide documents that aren't actual resumes)
+                if (metadata.hidden) {
+                    continue;
+                }
 
                 resumes.push({
                     id: resumeId,
@@ -260,11 +266,14 @@ app.get('/api/resumes', async (req, res) => {
 const upload = multer({
     dest: path.join(PROJECT_ROOT, 'uploads'),
     fileFilter: (req, file, cb) => {
-        if (file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-            file.originalname.endsWith('.docx')) {
+        const isDocx = file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                       file.originalname.endsWith('.docx');
+        const isPdf = file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf');
+
+        if (isDocx || isPdf) {
             cb(null, true);
         } else {
-            cb(new Error('Only .docx files are allowed'));
+            cb(new Error('Only .docx and .pdf files are allowed'));
         }
     },
     limits: {

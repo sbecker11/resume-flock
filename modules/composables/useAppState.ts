@@ -394,14 +394,18 @@ async function loadStateFromServer(): Promise<AppState> {
 async function saveStateToServer(state: AppState): Promise<void> {
     try {
         state.lastUpdated = new Date().toISOString()
-        await fetch('/api/state', {
+        console.log('[AppState] 💾 Saving state to server - currentResumeId:', state['user-settings']?.currentResumeId)
+        const response = await fetch('/api/state', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(state),
         })
-        // console.log("Saved state to server:", state)
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`)
+        }
+        console.log('[AppState] ✅ State saved to server successfully')
     } catch (error) {
         reportError(error, '[AppState] Failed to save state to server', '')
         throw error
@@ -520,9 +524,14 @@ export function useAppState(): UseAppStateReturn {
         if (!appState.value) {
             throw new Error('Cannot update AppState - not loaded yet')
         }
-        
+
+        console.log('[AppState] 🔄 updateAppState called with updates:', JSON.stringify(updates, null, 2))
+        console.log('[AppState] 🔄 Before merge - currentResumeId:', appState.value['user-settings']?.currentResumeId)
+
         // Deep merge updates immediately (UI updates are instant)
         appState.value = deepMerge(appState.value as AppState, updates)
+
+        console.log('[AppState] 🔄 After merge - currentResumeId:', appState.value['user-settings']?.currentResumeId)
         
         if (immediate) {
             // Save immediately for critical updates (step operations, final drag position)

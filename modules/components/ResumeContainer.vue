@@ -16,21 +16,59 @@ const emit = defineEmits(['open-resume-manager']);
 const { scenePercentage } = useResizeHandle();
 const { appState, updateAppState } = useAppState();
 
-// Current resume display name
-const currentResumeDisplay = computed(() => {
-  const resumeId = appState.value?.['user-settings']?.currentResumeId;
-  if (!resumeId || resumeId === 'default') {
-    return 'Default Resume';
-  }
-  // Extract number from "resume-3" → "Resume 3"
-  const match = resumeId.match(/resume-(\d+)/);
-  return match ? `Resume ${match[1]}` : resumeId;
-});
-
-// Available resume count (for badge on Manager button)
+// Current resume metadata
+const currentResumeMetadata = ref(null);
 const availableResumeCount = ref(1);
 
-// Fetch resume count on mount
+// Fetch current resume displayName from API
+async function fetchCurrentResumeMetadata() {
+  let resumeId = appState.value?.['user-settings']?.currentResumeId;
+  console.log('[ResumeContainer] 📋 fetchCurrentResumeMetadata called, resumeId:', resumeId);
+
+  // Map 'default' to the actual default resume ID
+  if (!resumeId || resumeId === 'default') {
+    resumeId = 'resume-6';
+    console.log('[ResumeContainer] Mapped to default resume-6');
+  }
+
+  try {
+    const response = await fetch('/api/resumes');
+    if (response.ok) {
+      const resumes = await response.json();
+      const resume = Array.isArray(resumes) ? resumes.find(r => r.id === resumeId) : null;
+      if (resume) {
+        currentResumeMetadata.value = resume.metadata || resume;
+        console.log('[ResumeContainer] ✅ Updated currentResumeMetadata:', currentResumeMetadata.value.displayName);
+      } else {
+        // Fallback if resume not found in list
+        currentResumeMetadata.value = { displayName: resumeId };
+        console.warn('[ResumeContainer] ⚠️ Resume not found in API list, using ID as display name');
+      }
+    }
+  } catch (error) {
+    console.error('[ResumeContainer] Failed to fetch current resume metadata:', error);
+    currentResumeMetadata.value = { displayName: resumeId || 'Unknown Resume' };
+  }
+}
+
+// Computed property for display name
+const currentResumeDisplay = computed(() => {
+  return currentResumeMetadata.value?.displayName || 'Loading...';
+});
+
+// Watch for currentResumeId changes and update metadata
+watch(
+  () => appState.value?.['user-settings']?.currentResumeId,
+  async (newId, oldId) => {
+    console.log('[ResumeContainer] 👁️ Watcher triggered - oldId:', oldId, '-> newId:', newId);
+    if (newId !== undefined) {
+      await fetchCurrentResumeMetadata();
+    }
+  },
+  { immediate: true }
+);
+
+// Fetch resume count and metadata on mount
 onMounted(async () => {
   try {
     const response = await fetch('/api/resumes');
@@ -38,8 +76,10 @@ onMounted(async () => {
       const resumes = await response.json();
       availableResumeCount.value = Array.isArray(resumes) ? resumes.length : 1;
     }
+    // Fetch current resume metadata
+    await fetchCurrentResumeMetadata();
   } catch (error) {
-    console.error('[ResumeContainer] Failed to fetch resume count:', error);
+    console.error('[ResumeContainer] Failed to fetch resume data:', error);
   }
 });
 const resumeContentWrapperRef = ref(null);
@@ -1035,17 +1075,20 @@ function onResumeSkillCardClick(event) {
     flex-direction: column;
     align-items: stretch;
     justify-content: flex-start;
-    
+
     /* Auto-sizing */
     width: 100%;
     height: auto;
     min-height: fit-content;
-    
+
     /* Flex child behavior */
     flex-shrink: 0;
     flex-grow: 1; /* Grow to fill parent rDiv */
     flex-basis: auto;
-    
+
+    /* Positioning context for close button */
+    position: relative;
+
     /* Styling */
     background-color: transparent !important;
     border-radius: 25px !important;
@@ -1055,6 +1098,47 @@ function onResumeSkillCardClick(event) {
 /* Force all nested children to have transparent backgrounds */
 .biz-resume-div .biz-resume-details-div * {
     background-color: transparent !important;
+}
+
+/* Close button styling - positioned at top right */
+/* IMPORTANT: Must be more specific than .biz-resume-div .biz-resume-details-div * to override transparent */
+.biz-resume-div .biz-resume-details-div .biz-resume-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    min-height: 24px !important;
+    background: rgba(0, 0, 0, 0.8) !important; /* Override transparent - darker for better contrast */
+    border: 2px solid rgba(255, 255, 255, 0.5) !important; /* Thicker border */
+    border-radius: 4px;
+    padding: 0 !important; /* Remove padding so SVG fills button */
+    margin: 0 !important;
+    cursor: pointer;
+    color: #fff !important;
+    transition: all 0.2s;
+    opacity: 1 !important; /* Full opacity */
+    z-index: 1000;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto !important;
+    overflow: visible !important;
+}
+
+.biz-resume-div .biz-resume-details-div .biz-resume-close-btn:hover {
+    background: rgba(255, 0, 0, 0.9) !important; /* Bright red */
+    border-color: rgba(255, 255, 255, 0.8) !important;
+    transform: scale(1.1); /* Slight zoom on hover */
+}
+
+.biz-resume-div .biz-resume-details-div .biz-resume-close-btn svg {
+    display: block !important;
+    width: 16px !important;
+    height: 16px !important;
+    pointer-events: none;
+    flex-shrink: 0;
 }
 
 .job-description-item {

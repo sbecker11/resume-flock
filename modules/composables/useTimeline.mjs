@@ -35,7 +35,8 @@ function computeBoundsFromJobs(jobsData) {
     const start = dateToFractionalYear(timelineStartDate);
     const end = dateToFractionalYear(timelineEndDate);
     const totalYearSpan = end - start;
-    const height = totalYearSpan * YEAR_HEIGHT + TIMELINE_PADDING_TOP;
+    // Add 50px padding at top for year labels (used in linearInterp)
+    const height = totalYearSpan * YEAR_HEIGHT + TIMELINE_PADDING_TOP + 50;
     return { start, end, height };
 }
 

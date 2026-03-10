@@ -20,7 +20,7 @@ import { applyPaletteToElement } from '../composables/useColorPalette.mjs';
 // Import fundamental components to ensure they're registered with IM
 // import '../core/jobsDataManager.mjs'; // No longer exists - using Vue composables
 // import '../core/colorPaletteManager.mjs'; // No longer exists - using Vue composables
-// import * as BizDetailsDivModule from '../scene/bizDetailsDivModule.mjs'; // Module doesn't exist - needs to be recreated
+import * as BizDetailsDivModule from '../scene/bizDetailsDivModule.mjs';
 import * as utils from '../utils/utils.mjs';
 
 /**
@@ -1718,24 +1718,9 @@ class ResumeListController extends BaseComponent {
       bizResumeDiv.setAttribute('data-color-index', cDivColorIndex);
       console.log(`[DEBUG] ResumeListController - Color index sync - Job ${jobNumber}: cDiv=${cDivColorIndex}, rDiv=${cDivColorIndex}`);
       bizResumeDiv.style.pointerEvents = 'auto';
-      
-      // const bizResumeDetailsDiv = BizDetailsDivModule.createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv);
-      // if (bizResumeDetailsDiv instanceof Node) {
-      //   bizResumeDiv.appendChild(bizResumeDetailsDiv);
-      
-      // Placeholder: Create basic resume content div
-      const bizResumeDetailsDiv = document.createElement('div');
-      bizResumeDetailsDiv.className = 'biz-resume-details-div';
-      bizResumeDetailsDiv.textContent = `Resume item ${jobNumber} - Details to be implemented`;
-      const sceneZSpan = document.createElement('span');
-      sceneZSpan.className = 'r-div-scene-z';
-      const cDiv = typeof document !== 'undefined' ? document.getElementById(`biz-card-div-${jobNumber}`) : null;
-      sceneZSpan.textContent = cDiv ? ` cZ:${cDiv.getAttribute('data-sceneZ') ?? '?'}` : '';
-      const debugRow = document.createElement('div');
-      debugRow.className = 'biz-details-debug-row';
-      debugRow.appendChild(document.createTextNode(`#${jobNumber}`));
-      debugRow.appendChild(sceneZSpan);
-      bizResumeDetailsDiv.appendChild(debugRow);
+
+      // Create resume details div with job information
+      const bizResumeDetailsDiv = BizDetailsDivModule.createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv);
       if (bizResumeDetailsDiv instanceof Node) {
         bizResumeDiv.appendChild(bizResumeDetailsDiv);
       } else {

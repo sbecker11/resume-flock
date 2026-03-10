@@ -302,6 +302,8 @@ export function useCardsController() {
         card.id = cardId
         card.setAttribute('data-job-number', jobNumber)
         card.setAttribute('data-biz-card-title', (job.employer || job.role || `Job ${jobNumber}`).trim())
+        card.setAttribute('data-role', job.role || 'Unknown Role')
+        card.setAttribute('data-employer', job.employer || 'Unknown Employer')
         
         // Z from job "z-index" (1–3) for depth only
         const jobZIndex = (job['z-index'] != null && job['z-index'] !== '') ? parseInt(String(job['z-index']), 10) : (jobNumber % 3) + 1

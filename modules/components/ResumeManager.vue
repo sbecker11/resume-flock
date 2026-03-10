@@ -317,12 +317,24 @@ async function handleUpload() {
 }
 
 async function handleResumeSelect(resume) {
-  console.log('[ResumeManager] 🎯 Resume selected:', resume.id)
+  console.log('═'.repeat(80))
+  console.log('[ResumeManager] 🎯 RESUME CLICK DETECTED')
+  console.log('[ResumeManager] Resume ID:', resume.id)
   console.log('[ResumeManager] Display name:', resume.displayName)
   console.log('[ResumeManager] Job count:', resume.jobCount)
   console.log('[ResumeManager] Skill count:', resume.skillCount)
+
+  // Count current cards before switch
+  const currentBizCards = document.querySelectorAll('.biz-card-div').length
+  const currentSkillCards = document.querySelectorAll('.skill-card-div').length
+  console.log('[ResumeManager] Current cards before switch:', {
+    bizCards: currentBizCards,
+    skillCards: currentSkillCards
+  })
+
   emit('resume-selected', resume.id)
   console.log('[ResumeManager] ✅ Emitted resume-selected event with ID:', resume.id)
+  console.log('═'.repeat(80))
 }
 
 function handleClose() {

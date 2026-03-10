@@ -132,6 +132,9 @@ const { restoreSelectionFromState } = useSelectedElementIdPersistence()
 // Color palette management
 const { loadPalettes } = useColorPalette()
 
+// App state management (needed for currentResumeId computed property)
+const { appState, updateAppState } = useAppState()
+
 // Vue 3 bulls-eye system (must run before useFocalPoint so global ref can be set first)
 const {
   setBullsEyeElement,
@@ -259,7 +262,10 @@ const focalPointRef = ref(null)
 
 // Resume Manager state
 const isResumeManagerOpen = ref(false)
-const currentResumeId = ref('default')
+// currentResumeId is a computed property that reads from appState
+const currentResumeId = computed(() => {
+  return appState.value?.['user-settings']?.currentResumeId || 'default'
+})
 
 // Make template refs reactive - watch for changes and update systems
 watch(focalPointRef, (newRef) => {
@@ -391,33 +397,52 @@ async function handleResumeSelected(resumeId) {
       console.log('[AppContent] ✅ Cleared card registry')
     }
 
-    // STEP 2: Update current resume ID
-    currentResumeId.value = resumeId
-    console.log('[AppContent] Updated currentResumeId.value to:', currentResumeId.value)
-
-    // STEP 3: Clear selection state (prevents restoring old resume's selections)
+    // STEP 2: Clear selection state (prevents restoring old resume's selections)
     if (window.selectionManager) {
       window.selectionManager.clearSelection?.()
       console.log('[AppContent] ✅ Cleared selection state')
     }
 
-    // STEP 4: Update app state and persist to disk
-    const { appState, saveAppState } = useAppState()
-    if (appState.value && appState.value['user-settings']) {
-      appState.value['user-settings'].currentResumeId = resumeId
-      // Clear persisted selection state for new resume
-      appState.value['user-settings'].selectedJobNumber = null
-      appState.value['user-settings'].selectedElementId = null
-      appState.value['user-settings'].selectedDualElementId = null
-      console.log('[AppContent] Saving app state with resumeId:', resumeId)
-      await saveAppState()
-      console.log('[AppContent] ✅ App state saved with cleared selection')
-    }
+    // STEP 3: Update app state and persist to disk
+    await updateAppState({
+      'user-settings': {
+        currentResumeId: resumeId,
+        selectedJobNumber: null,
+        selectedElementId: null,
+        selectedDualElementId: null
+      }
+    }, true) // immediate = true to save right away
+    console.log('[AppContent] ✅ App state updated and saved with cleared selection')
 
     // STEP 4: Reinitialize the resume system with the new resume
     console.log('[AppContent] Calling reinitializeResumeSystem with:', resumeId === 'default' ? null : resumeId)
     await reinitializeResumeSystem(resumeId === 'default' ? null : resumeId)
     console.log('[AppContent] ✅ Resume system reinitialized')
+
+    // STEP 5: Scroll scene to show the most recent job card
+    await nextTick() // Wait for DOM to update
+    const sceneContentEl = document.getElementById('scene-content')
+    const scenePlaneEl = document.getElementById('scene-plane')
+    if (sceneContentEl && scenePlaneEl) {
+      // Find all biz-card-divs
+      const bizCards = Array.from(scenePlaneEl.querySelectorAll('.biz-card-div'))
+      if (bizCards.length > 0) {
+        // Find the card with the lowest top position (most recent/latest job at top of timeline)
+        const latestCard = bizCards.reduce((latest, card) => {
+          const cardTop = parseInt(card.style.top || '0')
+          const latestTop = parseInt(latest.style.top || '0')
+          return cardTop < latestTop ? card : latest // Lower top = more recent
+        })
+
+        if (latestCard) {
+          console.log('[AppContent] 📍 Scrolling to latest job card:', latestCard.id)
+          // Scroll to show the latest card with some padding
+          const cardTop = parseInt(latestCard.style.top || '0')
+          const scrollPadding = 100 // Add some padding above the card
+          sceneContentEl.scrollTop = Math.max(0, cardTop - scrollPadding)
+        }
+      }
+    }
 
     // Close the modal after successful switch
     closeResumeManager()
@@ -448,15 +473,12 @@ onMounted(async () => {
     
     // PHASE 1: Load AppState from server FIRST
     console.log('[AppContent] 📊 Loading AppState from server...')
-    const { loadAppState, appState } = useAppState()
+    const { loadAppState } = useAppState()
     await loadAppState()
     console.log('[AppContent] ✅ AppState loaded successfully')
 
-    // Load current resume ID from app state
-    if (appState.value && appState.value['user-settings']?.currentResumeId) {
-      currentResumeId.value = appState.value['user-settings'].currentResumeId
-      console.log('[AppContent] 📋 Current resume ID from state:', currentResumeId.value)
-    }
+    // currentResumeId computed property will automatically reflect the loaded state
+    console.log('[AppContent] 📋 Current resume ID from state:', currentResumeId.value)
     
     // PHASE 2: Initialize app store
     console.log('[AppContent] 📊 Initializing app store...')
