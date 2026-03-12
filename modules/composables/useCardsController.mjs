@@ -302,8 +302,8 @@ export function useCardsController() {
      * Groups of 1 are untouched.
      */
     function applyConcurrentJobOffsets(jobs, cards) {
-        const X_STEP = 35  // px between adjacent concurrent cards horizontally
-        const Y_STEP = 22  // px per rank downward
+        const X_STEP = appState.value?.['system-constants']?.cards?.concurrentJobsOffsetX ?? 35
+        const Y_STEP = appState.value?.['system-constants']?.cards?.concurrentJobsOffsetY ?? 22
 
         // Build a map: normalizedPeriod → array of card indices
         const groups = new Map()

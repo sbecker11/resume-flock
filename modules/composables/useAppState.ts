@@ -84,7 +84,9 @@ function getDefaultState(): AppState {
                 maxXOffset: 100,
                 maxWidthOffset: 30,
                 minZDiff: 2,
-                skillMinDistance: 150
+                skillMinDistance: 150,
+                concurrentJobsOffsetX: 35,
+                concurrentJobsOffsetY: 22
             },
             timeline: {
                 pixelsPerYear: 200,
