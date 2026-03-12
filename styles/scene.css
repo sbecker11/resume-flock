@@ -100,9 +100,10 @@ body .biz-resume-div,
     flex-direction: column;
 }
 
-/* Skills section inside biz-card-div: flows after content, fade-clip overflow at card edge */
+/* Skills section inside biz-card-div: expands to fill remaining card height, fades only at bottom edge */
 .biz-card-div .resume-skills {
     overflow: hidden;
+    flex-grow: 1;
     flex-shrink: 1;
     min-height: 0;
     -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1em), transparent 100%);

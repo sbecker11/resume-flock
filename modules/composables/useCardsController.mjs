@@ -685,7 +685,6 @@ export function useCardsController() {
             <div class="skill-card-content" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%;">
                 <span class="skill-card-label">${escapeHtml(skillName)}</span>
                 ${backIconsHtml ? `<div class="skill-card-back-icons" style="display: flex; flex-wrap: wrap; gap: 2px; justify-content: flex-start; align-items: center;">${backIconsHtml}</div>` : ''}
-                <span class="skill-card-z" style="opacity: 0.8;">z:${sceneZ}</span>
             </div>`
 
         skillCard.addEventListener('click', (e) => {
