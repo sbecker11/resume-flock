@@ -95,8 +95,9 @@ watch(
 
 // Fetch resume list on mount
 onMounted(async () => {
-  await fetchResumeList();
-  document.addEventListener('click', handleOutsideClick);
+  try {
+    await fetchResumeList();
+    document.addEventListener('click', handleOutsideClick);
   } catch (error) {
     console.error('[ResumeContainer] Failed to initialize resume container:', error);
   }
