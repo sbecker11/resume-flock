@@ -122,7 +122,7 @@ export async function initializeResumeSystem() {
         
         const waitForDOMElements = async () => {
             while (attempts < maxAttempts) {
-                const resumeContentWrapper = document.getElementById('resume-content-div-wrapper');
+                const resumeContentWrapper = document.getElementById('resume-content-listing');
                 const resumeContentDivList = document.getElementById('resume-content-div-list');
                 
                 if (resumeContentDivList && resumeContentWrapper) {
@@ -260,8 +260,8 @@ export function checkResumeDivs() {
 export function testScrolling() {
     console.log('=== SCROLLING TEST ===');
     
-    const wrapper = document.getElementById('resume-content-div-wrapper');
-    console.log('resume-content-div-wrapper exists:', !!wrapper);
+    const wrapper = document.getElementById('resume-content-listing');
+    console.log('resume-content-listing exists:', !!wrapper);
     
     if (wrapper) {
         console.log('Wrapper scroll properties:');

@@ -388,7 +388,7 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
       copy.remove();
       if (nextSibling) {
         nextTick(() => {
-          const scrollport = document.getElementById('resume-content-div-wrapper');
+          const scrollport = document.getElementById('resume-content-listing');
           if (scrollport) {
             const elTop = nextSibling.getBoundingClientRect().top;
             const portTop = scrollport.getBoundingClientRect().top;
@@ -451,7 +451,7 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
   applyPaletteToElement(copy).catch((e) => console.warn('[ResumeContainer] applyPaletteToElement for appended copy:', e));
   nextTick(() => {
     syncSkillResumeDivSelection();
-    const scrollport = document.getElementById('resume-content-div-wrapper');
+    const scrollport = document.getElementById('resume-content-listing');
     if (scrollport && copy.offsetParent) {
       const copyRect = copy.getBoundingClientRect();
       const portRect = scrollport.getBoundingClientRect();
@@ -606,7 +606,7 @@ function onResumeSkillCardClick(event) {
                 <button @click="clearAllResumeDivs" class="resume-divs-control-button">Clear</button>
             </div>
         </div>
-        <div id="resume-content-div-wrapper" ref="resumeContentWrapperRef" class="scrollable-container" @scroll="onResumeContentWrapperScroll">
+        <div id="resume-content-listing" ref="resumeContentWrapperRef" class="scrollable-container" @scroll="onResumeContentWrapperScroll">
             <div id="resume-content-div" class="resume-content-div-container">
                 <!-- Skill cards only appear as appended copies in the list below; top panel hidden to avoid duplicate. -->
                 <div v-if="false" id="skill-resume-divs-panel" class="skill-resume-divs-panel">
@@ -662,7 +662,7 @@ function onResumeSkillCardClick(event) {
     margin-block-end: 0.5em;
 }
 
-#resume-content-div-wrapper {
+#resume-content-listing {
     flex-grow: 1;
     /* overflow-y is now controlled by the ResumeListScrollContainer */
     overflow-x: visible; /* bizCardLineItems (rDivs) must never be clipped by their container */
@@ -694,22 +694,22 @@ function onResumeSkillCardClick(event) {
 }
 
 /* Custom scrollbar to match the cDiv scrollbar */
-#resume-content-div-wrapper::-webkit-scrollbar {
+#resume-content-listing::-webkit-scrollbar {
     width: 5px;
 }
 
-#resume-content-div-wrapper::-webkit-scrollbar-track {
+#resume-content-listing::-webkit-scrollbar-track {
     background: rgba(0, 0, 0, 0.1);
     border-radius: 4px;
     cursor: ns-resize;
 }
 
-#resume-content-div-wrapper::-webkit-scrollbar-thumb {
+#resume-content-listing::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.3);
     border-radius: 4px;
 }
 
-#resume-content-div-wrapper::-webkit-scrollbar-thumb:hover {
+#resume-content-listing::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.5);
 }
 
@@ -1346,5 +1346,16 @@ function onResumeSkillCardClick(event) {
     opacity: 0.85;
     word-wrap: break-word;
     overflow-wrap: break-word;
+}
+
+/* Clickable skill titles inside biz-card-div and biz-resume-div skills sections */
+.biz-card-skill-title {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.biz-card-skill-title:hover {
+    font-weight: bold;
+    font-style: italic;
 }
 </style> 

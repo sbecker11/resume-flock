@@ -245,13 +245,20 @@ export function useCardsController() {
                             container.innerHTML = skillIds.map(skillCardId => {
                                 const el = document.getElementById(skillCardId)
                                 const title = el ? (el.getAttribute('data-skill-name') || skillCardId) : skillCardId
-                                return `<span class="biz-card-skill-title" data-skill-card-id="${escapeHtml(skillCardId)}" style="cursor: pointer; text-decoration: underline;">${escapeHtml(title)}</span>`
-                            }).join(', ')
+                                return `<span class="biz-card-skill-title" data-skill-card-id="${escapeHtml(skillCardId)}">${escapeHtml(title)}</span>`
+                            }).join(' • ')
                         }
                     }
                 }
                 console.log('[SkillCard] Created', Object.keys(skillCardIdsBySkillName).length, 'skill cards')
                 if (window.resumeFlock?.allDivs) window.resumeFlock.allDivs.skillCardDivs = [...skillCardsCreated]
+
+                // Stamp data-skill-card-id onto all biz-resume-div skill spans now that the ID map is complete
+                document.querySelectorAll('.biz-resume-div .biz-card-skill-title[data-skill-name]').forEach(span => {
+                    const skillName = span.getAttribute('data-skill-name')
+                    const skillCardId = skillCardIdsBySkillName[skillName]
+                    if (skillCardId) span.setAttribute('data-skill-card-id', skillCardId)
+                })
 
                 // Yearly grid lines removed per user request
 
@@ -575,18 +582,22 @@ export function useCardsController() {
             <div class="job-stats" style="font-size: 10px; color: #666; margin-top: 4px;">
                 Skills: ${skillCount} | References: ${job.references ? job.references.length : 0}
             </div>
-            ${hasSkills ? '<div class="biz-card-skill-titles" style="font-size: 9px; color: #555; margin-top: 2px; line-height: 1.2;"></div>' : ''}
+            ${hasSkills ? `
+            <div class="resume-skills">
+                <h4>Technologies &amp; Skills</h4>
+                <div class="skills-list">
+                    <span class="bullet">&bull;</span>
+                    <span class="biz-card-skill-titles skills-text"></span>
+                </div>
+            </div>` : ''}
         `
 
         // Add click handler: select this card or deselect if it is the selected card (one at a time). Clicking a skill title (by element id) selects that skill card.
         card.addEventListener('click', (event) => {
             event.stopPropagation()
             const skillTitleEl = event.target.closest('.biz-card-skill-title')
-            if (skillTitleEl && selectionManager) {
-                const skillCardId = skillTitleEl.getAttribute('data-skill-card-id')
-                if (skillCardId) {
-                    selectionManager.selectCard({ type: 'skill', skillCardId }, 'CardsController.bizCardSkillTitleClick')
-                }
+            if (skillTitleEl) {
+                selectSkillCardById(skillTitleEl.getAttribute('data-skill-card-id'), 'CardsController.bizCardSkillTitleClick')
                 return
             }
             if (!selectionManager) return
@@ -971,6 +982,22 @@ export function useCardsController() {
         }
     })
     
+    /**
+     * Select or deselect a skill card by ID — single source of truth used by all skill-tag click paths.
+     * Identical to clicking the skill-card-div directly: toggle selection + scroll scene element into view.
+     */
+    function selectSkillCardById(skillCardId, caller) {
+        if (!selectionManager || !skillCardId) return
+        const sel = selectionManager.selectedCard
+        if (sel?.type === 'skill' && sel.skillCardId === skillCardId) {
+            selectionManager.clearSelection(caller)
+        } else {
+            selectionManager.selectCard({ type: 'skill', skillCardId }, caller)
+            const sceneEl = document.getElementById(skillCardId)
+            if (sceneEl) sceneEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+        }
+    }
+
     // Clone management: one selected card at a time
     /** job-selected: resume list sync; scroll cDiv into view. Clone display is in handleCardSelected. */
     function handleJobSelected(event) {
@@ -1575,6 +1602,14 @@ export function useCardsController() {
         clone.addEventListener('click', (event) => {
             event.stopPropagation()
             if (!selectionManager) return
+
+            // Skill title link inside selected biz card clone
+            const skillTitleEl = event.target.closest('.biz-card-skill-title')
+            if (skillTitleEl) {
+                selectSkillCardById(skillTitleEl.getAttribute('data-skill-card-id'), 'CardsController.cloneSkillTitleClick')
+                return
+            }
+
             const sel = selectionManager.selectedCard
             if (sel?.type === 'biz' && sel.jobNumber === jobNumber) {
                 selectionManager.clearSelection('CardsController.cloneClick')
@@ -1704,6 +1739,21 @@ export function useCardsController() {
         clone.addEventListener('click', (e) => {
             e.stopPropagation()
             if (!selectionManager) return
+
+            // Back arrow inside selected skill card clone
+            const bizTitleEl = e.target.closest('.skill-card-biz-title')
+            if (bizTitleEl) {
+                const bizCardId = bizTitleEl.getAttribute('data-biz-card-id')
+                if (bizCardId) {
+                    const bizEl = document.getElementById(bizCardId)
+                    const jobNum = bizEl != null ? parseInt(bizEl.getAttribute('data-job-number'), 10) : NaN
+                    if (!Number.isNaN(jobNum)) {
+                        selectionManager.selectCard({ type: 'biz', jobNumber: jobNum }, 'CardsController.skillCardCloneBizTitleClick')
+                    }
+                }
+                return
+            }
+
             if (selectionManager.selectedCard?.type === 'skill' && selectionManager.selectedCard.skillCardId === skillCardId) {
                 selectionManager.clearSelection('CardsController.skillCardCloneClick')
                 return
@@ -2001,6 +2051,7 @@ export function useCardsController() {
         isInitialized,
         bizCardDivs,
         initializeCardsController,
-        reinitializeResumeData
+        reinitializeResumeData,
+        selectSkillCardById
     }
 }

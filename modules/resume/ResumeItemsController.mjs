@@ -125,7 +125,7 @@ class ResumeItemsController {
         console.log(`[DEBUG] Color index set - Job ${jobNumber}: rDiv data-color-index=${jobNumber}`);
 
         // Create enhanced resume content with job details
-        const bizResumeDetailsDiv = this.createEnhancedResumeDetailsDiv(jobNumber);
+        const bizResumeDetailsDiv = this.createEnhancedResumeDetailsDiv(jobNumber, bizCardDiv);
         bizResumeDiv.appendChild(bizResumeDetailsDiv);
 
         // Red X: remove this rDiv from the resume listing (same behavior as skill card red X)
@@ -204,7 +204,7 @@ class ResumeItemsController {
         return document.getElementById(`biz-card-div-${jobNumber}`);
     }
 
-    createEnhancedResumeDetailsDiv(jobNumber) {
+    createEnhancedResumeDetailsDiv(jobNumber, bizCardDiv = null) {
         // Get job data for this job number (from resume API via jobs dependency)
         const jobs = getGlobalJobsDependency().getJobsData();
         const jobData = jobs[jobNumber];
@@ -297,10 +297,14 @@ class ResumeItemsController {
             const skillsList = document.createElement('div');
             skillsList.className = 'skills-list';
             
-            // Create single-line bulleted skills
-            const skillNames = Object.values(jobData['job-skills']);
-            const skillsText = skillNames.join(' • ');
-            skillsList.innerHTML = '<span class="bullet">•</span><span class="skills-text">' + skillsText + '</span>';
+            // Create skill spans: store data-skill-name (key) for reliable runtime lookup.
+            // data-skill-card-id may be absent at init time (skill cards not yet in DOM) — resolved lazily on click.
+            const skillSpans = Object.entries(jobData['job-skills']).map(([skillKey, displayName]) => {
+                const skillCardEl = document.querySelector(`.skill-card-div[data-skill-name="${skillKey}"]`);
+                const idAttr = skillCardEl ? ` data-skill-card-id="${skillCardEl.id}"` : '';
+                return `<span class="biz-card-skill-title" data-skill-name="${skillKey}"${idAttr}>${displayName}</span>`;
+            }).join(' • ');
+            skillsList.innerHTML = '<span class="bullet">•</span><span class="skills-text">' + skillSpans + '</span>';
 
             skillsDiv.appendChild(skillsList);
             detailsDiv.appendChild(skillsDiv);
@@ -392,13 +396,31 @@ class ResumeItemsController {
 
     _setupMouseListeners(bizResumeDiv) {
         if (!bizResumeDiv) return;
-        bizResumeDiv.addEventListener('click', () => this.handleBizResumeDivClickEvent(bizResumeDiv));
+        bizResumeDiv.addEventListener('click', (e) => this.handleBizResumeDivClickEvent(bizResumeDiv, e));
         bizResumeDiv.addEventListener('mouseenter', () => this.handleMouseEnterEvent(bizResumeDiv));
         bizResumeDiv.addEventListener('mouseleave', () => this.handleMouseLeaveEvent(bizResumeDiv));
     }
 
-    handleBizResumeDivClickEvent(bizResumeDiv) {
+    handleBizResumeDivClickEvent(bizResumeDiv, event) {
         if (!bizResumeDiv) return;
+
+        // Check if click was on a skill title link
+        const skillTitleEl = event?.target?.closest('.biz-card-skill-title');
+        if (skillTitleEl) {
+            event.stopPropagation();
+            const skillCardId = skillTitleEl.getAttribute('data-skill-card-id');
+            if (!skillCardId) return;
+            const sel = selectionManager.selectedCard;
+            if (sel?.type === 'skill' && sel.skillCardId === skillCardId) {
+                selectionManager.clearSelection('ResumeItemsController.skillTitleClick');
+            } else {
+                selectionManager.selectCard({ type: 'skill', skillCardId }, 'ResumeItemsController.skillTitleClick');
+                const sceneEl = document.getElementById(skillCardId);
+                if (sceneEl) sceneEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+            }
+            return;
+        }
+
         const jobNumber = parseInt(bizResumeDiv.getAttribute('data-job-number'), 10);
         const isSelected = selectionManager.getSelectedJobNumber() === jobNumber;
 
@@ -407,7 +429,7 @@ class ResumeItemsController {
         } else {
             // Select the job
             selectionManager.selectJobNumber(jobNumber, 'ResumeItemsController.handleBizResumeDivClickEvent');
-            
+
             // Scroll the rDiv into view in its parent container
             this._scrollRDivIntoView(bizResumeDiv, jobNumber);
         }

@@ -78,7 +78,7 @@ html[native-dark-active] #scene-container,
 .biz-resume-div,
 body .biz-resume-div,
 #resume-container .biz-resume-div,
-#resume-content-div-wrapper .biz-resume-div {
+#resume-content-listing .biz-resume-div {
     box-sizing: border-box;
     background-color: var(--data-background-color);
     color: var(--data-foreground-color);
@@ -95,6 +95,21 @@ body .biz-resume-div,
     cursor: pointer;
     pointer-events: auto;
     font-family: Arial, sans-serif !important;
+    overflow: hidden;
+}
+
+/* Skills section inside biz-card-div: truncate to card height */
+.biz-card-div .resume-skills {
+    overflow: hidden;
+    flex-shrink: 1;
+    min-height: 0;
+}
+
+.biz-card-div .biz-card-skill-titles.skills-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
 }
 /* High-contrast icon set: matches high-contrast text for the given background (white on dark, black on light). Always transparent background. */
 .url-icon,
@@ -325,7 +340,7 @@ body .biz-resume-div[data-icon-set-variant="white"] .img-icon,
 .biz-resume-div,
 body .biz-resume-div,
 #resume-container .biz-resume-div,
-#resume-content-div-wrapper .biz-resume-div {
+#resume-content-listing .biz-resume-div {
     background-color: var(--data-background-color) !important;
     color: var(--data-foreground-color) !important;
     width: 100%;
@@ -338,7 +353,7 @@ body .biz-resume-div,
 .biz-resume-div.hovered,
 body .biz-resume-div.hovered,
 #resume-container .biz-resume-div.hovered,
-#resume-content-div-wrapper .biz-resume-div.hovered {
+#resume-content-listing .biz-resume-div.hovered {
     background-color: var(--data-background-color-hovered) !important;
     color: var(--data-foreground-color-hovered) !important;
     padding: var(--data-normal-padding);
@@ -366,7 +381,7 @@ body .biz-resume-div.hovered[data-icon-set-hovered-variant="white"] .img-icon,
 .biz-resume-div.selected,
 body .biz-resume-div.selected,
 #resume-container .biz-resume-div.selected,
-#resume-content-div-wrapper .biz-resume-div.selected {
+#resume-content-listing .biz-resume-div.selected {
     background-color: var(--data-background-color-selected) !important;
     color: var(--data-foreground-color-selected) !important;
     padding: var(--data-normal-padding);
@@ -403,9 +418,9 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex {
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="white"] .resume-header,
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row,
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="white"] .biz-details-debug-row .biz-details-id-and-hex {
     color: #ffffff !important;
 }
 .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
@@ -416,9 +431,9 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
 #resume-container .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
-#resume-content-div-wrapper .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex {
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="black"] .resume-header,
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row,
+#resume-content-listing .biz-resume-div.selected[data-icon-set-selected-variant="black"] .biz-details-debug-row .biz-details-id-and-hex {
     color: #000000 !important;
 }
 .biz-card-div.clone .biz-details-debug-row,
@@ -670,5 +685,14 @@ body.focal-point-locked .biz-card-div .scroll-caret,
 }
 
 /* Removed z-index from hovered state - DOM order determines rendering */
+
+/* Hide focal point while hovering interactive skill/back-arrow links */
+body:has(.biz-card-skill-title:hover) #focal-point,
+body:has(.skill-card-back-icon:hover) #focal-point,
+body:has(.skill-resume-div-back-link:hover) #focal-point {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease-out;
+}
 
 

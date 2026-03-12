@@ -30,8 +30,8 @@ class ResumeListController {
 
     this.resumeContentDiv = document.getElementById('resume-content-div');
     if ( !this.resumeContentDiv ) throw new Error('ResumeListController: initialize: resume-content-div not found in DOM');
-    this.resumeContentWrapper = document.getElementById('resume-content-div-wrapper');
-    if ( !this.resumeContentWrapper ) throw new Error('ResumeListController: initialize: resume-content-div-wrapper not found in DOM');
+    this.resumeContentWrapper = document.getElementById('resume-content-listing');
+    if ( !this.resumeContentWrapper ) throw new Error('ResumeListController: initialize: resume-content-listing not found in DOM');
 
     this.originalJobsData = originalJobsData;
     this.bizResumeDivs = bizResumeDivs;

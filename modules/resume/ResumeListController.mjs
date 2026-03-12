@@ -111,13 +111,13 @@ class ResumeListController extends BaseComponent {
     }
 
     /**
-     * Template ref injection for resume-content-div-wrapper element
+     * Template ref injection for resume-content-listing element
      * Replaces resumecontentdivwrapperElement calls
      * @param {HTMLElement} element - The DOM element from template ref
      */
     setResumeContentDivWrapperElement(element) {
         this.resumecontentdivwrapperElement = element;
-        console.debug('[ResumeListController] resume-content-div-wrapper ref set');
+        console.debug('[ResumeListController] resume-content-listing ref set');
         
         // Apply any setup that was waiting for this element
         if (this.resumecontentdivwrapperElement) {
@@ -126,7 +126,7 @@ class ResumeListController extends BaseComponent {
     }
 
     /**
-     * Setup logic for resume-content-div-wrapper element
+     * Setup logic for resume-content-listing element
      * Called when element becomes available via template ref
      */
     _setupResumeContentDivWrapper() {
@@ -157,7 +157,7 @@ class ResumeListController extends BaseComponent {
         if (!this.resumeContentDiv) throw new Error('ResumeListController: setupDom: resume-content-div not available via template ref - ensure setResumeContentDivElement() was called');
         
         this.resumeContentWrapper = this.resumecontentdivwrapperElement;
-        if (!this.resumeContentWrapper) throw new Error('ResumeListController: setupDom: resume-content-div-wrapper not available via template ref - ensure setResumeContentDivWrapperElement() was called');
+        if (!this.resumeContentWrapper) throw new Error('ResumeListController: setupDom: resume-content-listing not available via template ref - ensure setResumeContentDivWrapperElement() was called');
         
         // Create resume divs using same path as initial load (ResumeItemsController) for consistent structure/styling
         if (this.cardsController && this.cardsController.bizCardDivs) {
