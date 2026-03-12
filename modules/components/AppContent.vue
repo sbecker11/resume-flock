@@ -20,7 +20,7 @@
     >
       <div class="resume-content">
         <div class="resume-wrapper">
-          <ResumeContainer :currentResumeId="currentResumeId" @open-resume-manager="openResumeManager" />
+          <ResumeContainer :currentResumeId="currentResumeId" @resume-selected="handleResumeSelected" />
         </div>
       </div>
       <!-- Resume Viewer Label - positioned inside resume container like Scene Viewer -->
@@ -57,13 +57,6 @@
       />
     </div>
 
-    <!-- Resume Manager Modal -->
-    <ResumeManager
-      :isOpen="isResumeManagerOpen"
-      :currentResumeId="currentResumeId"
-      @close="closeResumeManager"
-      @resume-selected="handleResumeSelected"
-    />
   </div>
 </template>
 
@@ -74,7 +67,6 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick, provide, inject
 import SceneContainer from './SceneContainer.vue'
 import ResizeHandle from './ResizeHandle.vue'
 import ResumeContainer from './ResumeContainer.vue'
-import ResumeManager from './ResumeManager.vue'
 
 // Global element registry now provided from main.ts - no need to provide again
 
@@ -261,7 +253,6 @@ const bullsEyeRef = ref(null)
 const focalPointRef = ref(null)
 
 // Resume Manager state
-const isResumeManagerOpen = ref(false)
 // currentResumeId tracks which resume is loaded at runtime — not persisted to app_state
 const currentResumeId = ref('default')
 
@@ -337,15 +328,6 @@ watch(percentageVerification, (newVerification) => {
 const handleSceneContainerClick = (event) => {
   // Handle scene container clicks
   console.log('Scene container clicked:', event)
-}
-
-// Resume Manager handlers
-function openResumeManager() {
-  isResumeManagerOpen.value = true
-}
-
-function closeResumeManager() {
-  isResumeManagerOpen.value = false
 }
 
 async function handleResumeSelected(resumeId) {

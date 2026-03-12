@@ -7,6 +7,8 @@ import { applyPaletteToElement } from '@/modules/composables/useColorPalette.mjs
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useResumeListController } from '@/modules/core/globalServices';
 import { parseFlexibleDateString } from '@/modules/utils/dateUtils.mjs';
+import { listResumes } from '@/modules/api/resumeManagerApi.mjs';
+import ResumeManager from './ResumeManager.vue';
 
 // Define props
 const props = defineProps({
@@ -14,74 +16,89 @@ const props = defineProps({
 });
 
 // Define emits for parent communication
-const emit = defineEmits(['open-resume-manager']);
+const emit = defineEmits(['resume-selected']);
 
 // Get the same percentage as the resize handle
 const { scenePercentage } = useResizeHandle();
-// Current resume metadata
-const currentResumeMetadata = ref(null);
-const availableResumeCount = ref(1);
 
-// Fetch current resume displayName from API
-async function fetchCurrentResumeMetadata() {
-  let resumeId = props.currentResumeId;
-  console.log('[ResumeContainer] 📋 fetchCurrentResumeMetadata called, resumeId:', resumeId);
+// --- Resume dropdown state ---
+const resumeList = ref([]);
+const isDropdownOpen = ref(false);
+const isUploadModalOpen = ref(false);
+const resumeSelectorRef = ref(null);
 
-  // Map 'default' to the actual default resume ID
-  if (!resumeId || resumeId === 'default') {
-    resumeId = 'resume-6';
-    console.log('[ResumeContainer] Mapped to default resume-6');
-  }
-
+async function fetchResumeList() {
   try {
-    const response = await fetch('/api/resumes');
-    if (response.ok) {
-      const resumes = await response.json();
-      const resume = Array.isArray(resumes) ? resumes.find(r => r.id === resumeId) : null;
-      if (resume) {
-        currentResumeMetadata.value = resume.metadata || resume;
-        console.log('[ResumeContainer] ✅ Updated currentResumeMetadata:', currentResumeMetadata.value.displayName);
-      } else {
-        // Fallback if resume not found in list
-        currentResumeMetadata.value = { displayName: resumeId };
-        console.warn('[ResumeContainer] ⚠️ Resume not found in API list, using ID as display name');
-      }
-    }
+    const data = await listResumes();
+    resumeList.value = Array.isArray(data) ? data : (data.resumes || []);
   } catch (error) {
-    console.error('[ResumeContainer] Failed to fetch current resume metadata:', error);
-    currentResumeMetadata.value = { displayName: resumeId || 'Unknown Resume' };
+    console.error('[ResumeContainer] Failed to fetch resume list:', error);
   }
 }
 
-// Computed property for display name
+function toggleDropdown() {
+  isDropdownOpen.value = !isDropdownOpen.value;
+}
+
+function closeDropdown() {
+  isDropdownOpen.value = false;
+}
+
+function selectResume(resumeId) {
+  closeDropdown();
+  if (!isCurrentResume(resumeId)) {
+    emit('resume-selected', resumeId);
+  }
+}
+
+function isCurrentResume(resumeId) {
+  const current = props.currentResumeId;
+  if (current === 'default' || !current) return resumeId === 'resume-6';
+  return resumeId === current;
+}
+
+function openUploadModal() {
+  closeDropdown();
+  isUploadModalOpen.value = true;
+}
+
+function closeUploadModal() {
+  isUploadModalOpen.value = false;
+}
+
+async function handleUploadSuccess(resumeId) {
+  closeUploadModal();
+  await fetchResumeList();
+  emit('resume-selected', resumeId);
+}
+
+// Close dropdown when clicking outside
+function handleOutsideClick(event) {
+  if (resumeSelectorRef.value && !resumeSelectorRef.value.contains(event.target)) {
+    closeDropdown();
+  }
+}
+
+// Computed display name for current resume
 const currentResumeDisplay = computed(() => {
-  return currentResumeMetadata.value?.displayName || 'Loading...';
+  const current = props.currentResumeId;
+  const effectiveId = (!current || current === 'default') ? 'resume-6' : current;
+  const found = resumeList.value.find(r => r.id === effectiveId);
+  return found?.displayName || current || 'Select Resume';
 });
 
-// Watch for currentResumeId prop changes and update metadata
+// Watch for currentResumeId prop changes
 watch(
   () => props.currentResumeId,
-  async (newId, oldId) => {
-    console.log('[ResumeContainer] 👁️ Watcher triggered - oldId:', oldId, '-> newId:', newId);
-    if (newId !== undefined) {
-      await fetchCurrentResumeMetadata();
-    }
-  },
-  { immediate: true }
+  () => { /* display updates reactively via currentResumeDisplay */ }
 );
 
-// Fetch resume count and metadata on mount
+// Fetch resume list on mount
 onMounted(async () => {
-  try {
-    const response = await fetch('/api/resumes');
-    if (response.ok) {
-      const resumes = await response.json();
-      availableResumeCount.value = Array.isArray(resumes) ? resumes.length : 1;
-    }
-    // Fetch current resume metadata
-    await fetchCurrentResumeMetadata();
+  await fetchResumeList();
+  document.addEventListener('click', handleOutsideClick);
   } catch (error) {
-    console.error('[ResumeContainer] Failed to fetch resume data:', error);
+    console.error('[ResumeContainer] Failed to initialize resume container:', error);
   }
 });
 const resumeContentWrapperRef = ref(null);
@@ -525,6 +542,7 @@ onMounted(() => {
   window.__resumeAppendSkillCardCopy = appendSkillCardCopyToResumeListing;
 });
 onUnmounted(() => {
+  document.removeEventListener('click', handleOutsideClick);
   if (resumeContentScrollTimeoutId) clearTimeout(resumeContentScrollTimeoutId);
   selectionManager?.eventTarget?.removeEventListener('card-selected', updateSelectedCardSnapshot);
   selectionManager?.eventTarget?.removeEventListener('selection-cleared', updateSelectedCardSnapshot);
@@ -553,30 +571,54 @@ function onResumeSkillCardClick(event) {
     <div id="resume-content">
         <div id="resume-content-header">
             <p class="intro">Welcome to your resume-flock!</p>
-            <!-- Resume Manager Row -->
-            <div class="resume-controls-row">
-                <div class="current-resume-indicator" :title="`Currently viewing: ${currentResumeDisplay}`">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                    <span>{{ currentResumeDisplay }}</span>
-                </div>
-                <button
-                    @click="$emit('open-resume-manager')"
-                    class="resume-manager-button"
-                    title="Resume Manager - Upload, switch, and manage resumes"
+            <!-- Resume Selector Dropdown -->
+            <div class="resume-selector" ref="resumeSelectorRef">
+                <div
+                    class="resume-selector-trigger"
+                    :class="{ open: isDropdownOpen }"
+                    @click.stop="toggleDropdown"
+                    :title="currentResumeDisplay"
                 >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" flex-shrink="0">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                         <polyline points="14 2 14 8 20 8" />
-                        <line x1="12" y1="11" x2="12" y2="17" />
-                        <polyline points="9 14 12 11 15 14" />
                     </svg>
-                    <span class="button-label">Manager</span>
-                    <span class="button-count" v-if="availableResumeCount > 1">({{ availableResumeCount }})</span>
-                </button>
+                    <span class="selector-name">{{ currentResumeDisplay }}</span>
+                    <svg class="chevron" :class="{ up: isDropdownOpen }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                </div>
+                <div v-if="isDropdownOpen" class="resume-selector-menu">
+                    <div
+                        v-for="resume in resumeList"
+                        :key="resume.id"
+                        class="resume-selector-item"
+                        :class="{ active: isCurrentResume(resume.id) }"
+                        @click.stop="selectResume(resume.id)"
+                    >
+                        <span class="item-name">{{ resume.displayName }}</span>
+                        <svg v-if="isCurrentResume(resume.id)" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                    </div>
+                    <div class="resume-selector-divider"></div>
+                    <div class="resume-selector-item upload-option" @click.stop="openUploadModal">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span>Upload Resume…</span>
+                    </div>
+                </div>
             </div>
+
+            <!-- Upload Resume Modal -->
+            <ResumeManager
+                :isOpen="isUploadModalOpen"
+                @close="closeUploadModal"
+                @resume-selected="handleUploadSuccess"
+            />
             <!-- Color Palette Row -->
             <div class="header-controls-row">
                 <div id="color-palette-container" tabindex="-1">
@@ -761,15 +803,6 @@ function onResumeSkillCardClick(event) {
 }
 
 /* Resume controls row - current resume indicator and resume manager button */
-.resume-controls-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    padding: 5px 0;
-    width: 100%;
-    justify-content: space-between;
-}
-
 /* Header controls row - color palette selector */
 .header-controls-row {
     display: flex;
@@ -792,87 +825,108 @@ function onResumeSkillCardClick(event) {
     width: 100%;
 }
 
-/* Resume Manager button - matches other control styling */
-.current-resume-indicator {
+/* Resume selector dropdown */
+.resume-selector {
+    position: relative;
+    width: 100%;
+}
+
+.resume-selector-trigger {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 8px 10px;
     background: linear-gradient(135deg, #2a5298 0%, #1e3a70 100%);
-    color: white;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 13px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
-    white-space: nowrap;
-    flex-shrink: 0;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    cursor: help;
-}
-
-.current-resume-indicator svg {
-    flex-shrink: 0;
-    opacity: 0.9;
-}
-
-.resume-manager-button {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
-    background: linear-gradient(135deg, #28a745 0%, #20803a 100%);
     color: white;
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 4px;
     cursor: pointer;
     font-weight: bold;
-    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
-    white-space: nowrap;
-    transition: all 0.2s ease;
-    flex-shrink: 0;
+    font-size: 13px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    user-select: none;
+    transition: background 0.15s ease;
 }
 
-.resume-manager-button:hover {
-    background: linear-gradient(135deg, #32c252 0%, #28a745 100%);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
-    transform: translateY(-1px);
+.resume-selector-trigger:hover,
+.resume-selector-trigger.open {
+    background: linear-gradient(135deg, #3464b8 0%, #2a4e8a 100%);
 }
 
-.resume-manager-button:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+.resume-selector-trigger .selector-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.resume-manager-button svg {
+.resume-selector-trigger .chevron {
     flex-shrink: 0;
+    transition: transform 0.2s ease;
+    opacity: 0.8;
 }
 
-.resume-manager-button .button-label {
-    font-size: 14px;
+.resume-selector-trigger .chevron.up {
+    transform: rotate(180deg);
 }
 
-.resume-manager-button .button-count {
-    font-size: 12px;
-    opacity: 0.9;
-    font-weight: normal;
+.resume-selector-menu {
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+    z-index: 500;
+    max-height: 280px;
+    overflow-y: auto;
 }
 
-/* Hide button label and resume indicator on very small containers */
-@container (max-width: 300px) {
-    .resume-manager-button .button-label,
-    .resume-manager-button .button-count {
-        display: none;
-    }
-    .current-resume-indicator {
-        font-size: 11px;
-        padding: 6px 10px;
-    }
-    .current-resume-indicator svg {
-        width: 12px;
-        height: 12px;
-    }
+.resume-selector-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+    transition: background 0.1s ease;
+}
+
+.resume-selector-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.resume-selector-item.active {
+    color: #6ab0f5;
+    font-weight: bold;
+}
+
+.resume-selector-item .item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.resume-selector-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 3px 0;
+}
+
+.resume-selector-item.upload-option {
+    color: #7ec8a0;
+    font-style: italic;
+}
+
+.resume-selector-item.upload-option:hover {
+    color: #9ee0b8;
+    background: rgba(126, 200, 160, 0.08);
 }
 #color-palette-selector,
 #resume-divs-sorting-selector {

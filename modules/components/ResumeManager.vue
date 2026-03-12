@@ -17,7 +17,7 @@
         <div class="modal-content">
           <!-- Upload Section -->
           <section class="upload-section">
-            <h3>Upload New Resume</h3>
+            <h3>Upload Resume</h3>
             <div class="upload-area">
               <input
                 ref="fileInput"
@@ -89,68 +89,6 @@
               </div>
             </div>
           </section>
-
-          <!-- Library Section -->
-          <section class="library-section">
-            <h3>Resume Library</h3>
-
-            <div v-if="loadingResumes" class="loading-state">
-              <div class="spinner"></div>
-              <p>Loading resumes...</p>
-            </div>
-
-            <div v-else-if="loadError" class="error-message">
-              Failed to load resumes: {{ loadError }}
-            </div>
-
-            <div v-else-if="resumes.length === 0" class="empty-state">
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              <p>No parsed resumes found</p>
-              <p class="empty-hint">Upload a .docx or .pdf file to get started</p>
-            </div>
-
-            <div v-else class="resume-grid">
-              <div
-                v-for="resume in resumes"
-                :key="resume.id"
-                :class="['resume-card', { active: resume.id === currentResumeId }]"
-                @click="handleResumeSelect(resume)"
-              >
-                <div class="resume-card-header">
-                  <h4 class="resume-title">{{ resume.displayName }}</h4>
-                  <span v-if="resume.id === currentResumeId" class="active-badge">Active</span>
-                </div>
-                <div class="resume-card-meta">
-                  <div class="meta-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                      <line x1="16" y1="2" x2="16" y2="6" />
-                      <line x1="8" y1="2" x2="8" y2="6" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                    </svg>
-                    <span>{{ formatDate(resume.createdAt) }}</span>
-                  </div>
-                  <div class="meta-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-                      <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-                    </svg>
-                    <span>{{ resume.jobCount }} jobs</span>
-                  </div>
-                  <div class="meta-item">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                      <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
-                    </svg>
-                    <span>{{ resume.skillCount }} skills</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
       </div>
     </div>
@@ -158,27 +96,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
-import { listResumes, uploadResume } from '../api/resumeManagerApi.mjs'
-import { useAppState } from '../composables/useAppState.ts'
+import { ref } from 'vue'
+import { uploadResume } from '../api/resumeManagerApi.mjs'
 
 const props = defineProps({
-  isOpen: {
-    type: Boolean,
-    required: true
-  },
-  currentResumeId: {
-    type: String,
-    default: 'default'
-  }
+  isOpen: { type: Boolean, required: true }
 })
 
 const emit = defineEmits(['close', 'resume-selected'])
 
 // State
-const resumes = ref([])
-const loadingResumes = ref(false)
-const loadError = ref(null)
 const selectedFile = ref(null)
 const resumeUrl = ref('')
 const displayName = ref('')
@@ -187,39 +114,6 @@ const uploadProgress = ref(0)
 const uploadStatus = ref('')
 const uploadError = ref(null)
 const fileInput = ref(null)
-
-// Load resumes when modal opens
-watch(() => props.isOpen, async (isOpen) => {
-  if (isOpen) {
-    await loadResumeList()
-  }
-})
-
-onMounted(async () => {
-  if (props.isOpen) {
-    await loadResumeList()
-  }
-})
-
-async function loadResumeList() {
-  console.log('[ResumeManager] Loading resume list...')
-  loadingResumes.value = true
-  loadError.value = null
-
-  try {
-    const data = await listResumes()
-    console.log('[ResumeManager] Received resume data:', data)
-    console.log('[ResumeManager] Data type:', Array.isArray(data) ? 'array' : typeof data)
-    console.log('[ResumeManager] Resume count:', Array.isArray(data) ? data.length : 'N/A')
-    resumes.value = Array.isArray(data) ? data : (data.resumes || [])
-    console.log('[ResumeManager] ✅ Loaded', resumes.value.length, 'resumes')
-  } catch (error) {
-    loadError.value = error.message
-    console.error('[ResumeManager] ❌ Failed to load resumes:', error)
-  } finally {
-    loadingResumes.value = false
-  }
-}
 
 function handleFileSelect(event) {
   const file = event.target.files[0]
@@ -287,10 +181,7 @@ async function handleUpload() {
     uploadStatus.value = 'Resume parsed successfully!'
     uploadProgress.value = 100
 
-    // Reload resume list
-    await loadResumeList()
-
-    // Auto-select the new resume
+    // Auto-select the new resume after a brief pause
     setTimeout(() => {
       handleResumeSelect(result)
     }, 500)
@@ -316,25 +207,8 @@ async function handleUpload() {
   }
 }
 
-async function handleResumeSelect(resume) {
-  console.log('═'.repeat(80))
-  console.log('[ResumeManager] 🎯 RESUME CLICK DETECTED')
-  console.log('[ResumeManager] Resume ID:', resume.id)
-  console.log('[ResumeManager] Display name:', resume.displayName)
-  console.log('[ResumeManager] Job count:', resume.jobCount)
-  console.log('[ResumeManager] Skill count:', resume.skillCount)
-
-  // Count current cards before switch
-  const currentBizCards = document.querySelectorAll('.biz-card-div').length
-  const currentSkillCards = document.querySelectorAll('.skill-card-div').length
-  console.log('[ResumeManager] Current cards before switch:', {
-    bizCards: currentBizCards,
-    skillCards: currentSkillCards
-  })
-
+function handleResumeSelect(resume) {
   emit('resume-selected', resume.id)
-  console.log('[ResumeManager] ✅ Emitted resume-selected event with ID:', resume.id)
-  console.log('═'.repeat(80))
 }
 
 function handleClose() {
@@ -351,14 +225,7 @@ function handleClose() {
   emit('close')
 }
 
-function formatDate(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  })
-}
+
 </script>
 
 <style scoped>
