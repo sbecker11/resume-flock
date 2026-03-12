@@ -84,6 +84,7 @@ export interface AppState {
       maxXOffset: number;
       maxWidthOffset: number;
       minZDiff: number;
+      skillMinDistance: number;
     };
     timeline: {
       pixelsPerYear: number;

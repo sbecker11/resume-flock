@@ -2,7 +2,7 @@ import { ref, onMounted, onUnmounted, watch, inject, computed, watchEffect } fro
 import { getGlobalJobsDependency } from '@/modules/composables/useJobsDependency.mjs'
 import { selectionManager } from '@/modules/core/selectionManager.mjs'
 import { useTimeline, initialize } from '@/modules/composables/useTimeline.mjs'
-import { useColorPalette, applyPaletteToElement, readyPromise } from '@/modules/composables/useColorPalette.mjs'
+import { useColorPalette, applyPaletteToElement, updateContrastForBrightness, readyPromise } from '@/modules/composables/useColorPalette.mjs'
 import * as dateUtils from '@/modules/utils/dateUtils.mjs'
 import { createBizCardDivId } from '@/modules/utils/bizCardUtils.mjs'
 import { linearInterp } from '@/modules/utils/mathUtils.mjs'
@@ -25,6 +25,7 @@ import {
 import { useCardRegistry } from '@/modules/composables/useCardRegistry.mjs'
 import { injectGlobalElementRegistry } from '@/modules/composables/useGlobalElementRegistry.mjs'
 import { reportError } from '@/modules/utils/errorReporting.mjs'
+import { useAppState } from '@/modules/composables/useAppState.ts'
 
 // Timeline constants (matching Timeline.vue)
 const TIMELINE_PADDING_TOP = 0;
@@ -44,6 +45,8 @@ export function useCardsController() {
     const bizCardDivs = ref([])
     // Declare early to avoid TDZ when effects call functions that reference this variable
     let scenePlaneElement = null
+
+    const { appState } = useAppState()
 
     // CRITICAL: Inject services - throw error if not provided (no fallbacks)
     const bullsEyeService = inject('bullsEyeService')
@@ -173,6 +176,7 @@ export function useCardsController() {
                     cardRegistry.registerCardElement(index, card)
                     try {
                         await applyPaletteToElement(card)
+                        updateContrastForBrightness(card)
                     } catch (error) {
                         console.error(`[CardsController] ❌ Could not apply palette to job ${index}:`, error)
                         throw error
@@ -211,13 +215,15 @@ export function useCardsController() {
                     if (referencingBizCardIds.length === 0) continue
                     const skillCard = createSkillCardDiv(skillName, scenePlaneEl, referencingBizCardIds)
                     if (!skillCard) continue
-                    const { left, top } = placeOneSkillCard(placementParams, placedCenters, skillCardWidth, skillCardHeight, SKILL_REPOSITION_MIN_DISTANCE, skillCardsCreated.length, skillCard.id)
+                    const skillMinDistance = appState.value?.['system-constants']?.cards?.skillMinDistance ?? SKILL_REPOSITION_MIN_DISTANCE
+                    const { left, top } = placeOneSkillCard(placementParams, placedCenters, skillCardWidth, skillCardHeight, skillMinDistance, skillCardsCreated.length, skillCard.id)
                     skillCard.style.left = `${left}px`
                     skillCard.style.top = `${Math.max(0, top)}px`
                     placedCenters.push({ cx: left + skillCardWidth / 2, cy: top + skillCardHeight / 2 })
                     scenePlaneEl.appendChild(skillCard)
                     try {
                         await applyPaletteToElement(skillCard)
+                        updateContrastForBrightness(skillCard)
                     } catch (e) {
                         console.error(`[CardsController] Palette for skill card:`, e)
                         throw e
@@ -572,17 +578,10 @@ export function useCardsController() {
         }
         
         card.innerHTML = `
-            <div class="biz-details-employer" style="font-weight: bold; padding: 2px;">
-                ${job.employer || 'Unknown Employer'}
-            </div>
-            <div class="biz-details-role" style="font-weight: bold; padding: 2px;">
-                ${job.role || 'Unknown Role'}
-            </div>
-            <div class="biz-details-dates" style="font-weight: bold; padding: 2px;">${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${isEndPresent ? 'Present' : (originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A')}</div>
+            <div class="biz-details-employer">${job.employer || 'Unknown Employer'}</div>
+            <div class="biz-details-role">${job.role || 'Unknown Role'}</div>
+            <div class="biz-details-dates">${originalJobStartDate ? originalJobStartDate.toISOString().slice(0, 10) : 'N/A'} - ${isEndPresent ? 'Present' : (originalJobEndDate ? originalJobEndDate.toISOString().slice(0, 10) : 'N/A')}</div>
             <div class="biz-details-debug-row"><span class="biz-details-id-and-hex">#${jobNumber} z:${sceneZ} <span class="hex-normal"></span> <span class="hex-highlighted"></span></span></div>
-            <div class="job-stats" style="font-size: 10px; color: #666; margin-top: 4px;">
-                Skills: ${skillCount} | References: ${job.references ? job.references.length : 0}
-            </div>
             ${hasSkills ? `
             <div class="resume-skills">
                 <h4>Technologies &amp; Skills</h4>

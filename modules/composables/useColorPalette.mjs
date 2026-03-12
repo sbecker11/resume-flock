@@ -692,6 +692,54 @@ export async function applyPaletteToElement(element) {
     // For useCssVarsOnly, color comes from CSS (var(--data-foreground-color), -hovered, -selected) so clone and rDiv selected states match
 }
 
+/**
+ * Re-compute icon variant and text color using the visually effective background color,
+ * which is the palette color dimmed by the card's Z-depth brightness filter.
+ * Must be called after applyPaletteToElement() and after style.filter is set on the element.
+ */
+export function updateContrastForBrightness(element) {
+    const rawBg = element.getAttribute('data-background-color')
+    if (!rawBg || !rawBg.startsWith('#')) return
+
+    const sceneZ = parseFloat(element.getAttribute('data-sceneZ'))
+    if (isNaN(sceneZ)) return
+
+    // Derive brightness factor from the same filter function used when rendering
+    // brightness() CSS filter: 1.0 = full, <1.0 = darker
+    const rgb = hexToRgb(rawBg)
+    if (!rgb) return
+
+    // Import brightness value inline to avoid circular deps — matches filters.get_brightness_value_from_z
+    // brightness is stored as a CSS filter string; read it from style.filter instead
+    const filterStr = element.style.filter || ''
+    const brightnessMatch = filterStr.match(/brightness\((\d+(?:\.\d+)?)%\)/)
+    const brightness = brightnessMatch ? parseFloat(brightnessMatch[1]) / 100 : 1.0
+
+    const effectiveRgb = {
+        r: Math.min(255, Math.round(rgb.r * brightness)),
+        g: Math.min(255, Math.round(rgb.g * brightness)),
+        b: Math.min(255, Math.round(rgb.b * brightness)),
+    }
+    const effectiveHex = rgbToHex(effectiveRgb.r, effectiveRgb.g, effectiveRgb.b)
+    const contrast = getHighContrastForBackground(effectiveHex, { iconBase: ICON_BASE })
+
+    // Update normal-state icon variant and text color from effective background
+    element.setAttribute('data-icon-set-variant', contrast.iconSet.variant)
+    element.style.setProperty('--data-icon-set-variant', contrast.iconSet.variant)
+    element.style.setProperty('--data-foreground-color', contrast.textColor)
+
+    // Directly set filter on icon elements — CSS attribute selector approach is unreliable
+    const iconFilter = contrast.iconSet.variant === 'white' ? 'invert(1)' : 'none'
+    element.querySelectorAll('.back-icon, .url-icon, .img-icon').forEach(icon => {
+        icon.style.filter = iconFilter
+    })
+
+    const isBizOrRDiv = element.classList.contains('biz-card-div') || element.classList.contains('biz-resume-div')
+    if (!isBizOrRDiv) {
+        element.style.color = contrast.textColor
+    }
+}
+
 export function applySelectedStateColorsToElement(element) {
     const selectedBgColor = element.getAttribute('data-background-color-selected');
     const selectedFgColor = element.getAttribute('data-foreground-color-selected');

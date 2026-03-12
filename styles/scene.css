@@ -469,8 +469,9 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
 }
 
 /* display headers for both div-card-details and div-resume-details */
-.biz-details-role {
+.biz-details-employer {
     font-size: 16px;
+    font-weight: bold;
     display: block;
     margin: 0 0 4px 0;
     line-height: 1.2;
@@ -478,8 +479,10 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
     overflow-wrap: break-word;
 }
 
-.biz-details-employer {
+.biz-details-role {
     font-size: 14px;
+    font-style: italic;
+    opacity: 0.9;
     display: block;
     margin: 0 0 4px 0;
     line-height: 1.2;
@@ -489,6 +492,8 @@ body .biz-resume-div.selected[data-icon-set-selected-variant="white"] .img-icon,
 
 .biz-details-dates {
     font-size: 12px;
+    font-weight: normal;
+    opacity: 0.8;
     display: block;
     margin: 0 0 4px 0;
     line-height: 1.2;

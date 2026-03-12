@@ -83,7 +83,8 @@ function getDefaultState(): AppState {
                 minHeight: 180,
                 maxXOffset: 100,
                 maxWidthOffset: 30,
-                minZDiff: 2
+                minZDiff: 2,
+                skillMinDistance: 150
             },
             timeline: {
                 pixelsPerYear: 200,
