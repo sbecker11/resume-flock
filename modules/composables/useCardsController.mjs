@@ -1580,7 +1580,7 @@ export function useCardsController() {
         clone.style.removeProperty('visibility')
         clone.style.removeProperty('opacity')
         clone.style.removeProperty('pointer-events')
-        clone.style.setProperty('display', 'block', 'important')
+        clone.style.setProperty('display', 'flex', 'important')
         clone.style.setProperty('visibility', 'visible', 'important')
         clone.style.setProperty('opacity', '1', 'important')
         clone.style.setProperty('z-index', '99', 'important')
@@ -1626,7 +1626,7 @@ export function useCardsController() {
             throw error
         }
         // Re-assert visibility after palette (ensures clone stays visible)
-        clone.style.setProperty('display', 'block', 'important')
+        clone.style.setProperty('display', 'flex', 'important')
         clone.style.setProperty('visibility', 'visible', 'important')
         clone.style.setProperty('opacity', '1', 'important')
     }
@@ -1648,7 +1648,7 @@ export function useCardsController() {
                 const jobNum = card.id.replace('biz-card-div-', '')
                 updateResumeDivSceneZForJob(parseInt(jobNum, 10))
             }
-            card.style.setProperty('display', 'block', 'important')
+            card.style.removeProperty('display')
             card.style.setProperty('visibility', 'visible', 'important')
             card.style.setProperty('opacity', '1', 'important')
             card.style.removeProperty('pointer-events')
@@ -1683,15 +1683,15 @@ export function useCardsController() {
             originalCard.classList.remove('hasClone')
             originalCard.classList.remove('force-hidden-for-clone')
             updateResumeDivSceneZForJob(jobNumber)
-            // Fully restore original card visibility (override !important declarations)
-            originalCard.style.setProperty('display', 'block', 'important')
+            // Fully restore original card visibility (let CSS decide display mode: flex for biz, block for skill)
+            originalCard.style.removeProperty('display')
             originalCard.style.setProperty('visibility', 'visible', 'important')
             originalCard.style.setProperty('opacity', '1', 'important')
             originalCard.style.removeProperty('pointer-events')
             originalCard.style.removeProperty('z-index')
             console.log(`[useCardsController] ✅ Restored original card: ${originalId}`)
         }
-        
+
         // CRITICAL: Clear element registry cache after removing clone
         elementRegistry.clearAllCache()
     }

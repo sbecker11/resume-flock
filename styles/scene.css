@@ -96,20 +96,23 @@ body .biz-resume-div,
     pointer-events: auto;
     font-family: Arial, sans-serif !important;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Skills section inside biz-card-div: truncate to card height */
+/* Skills section inside biz-card-div: flows after content, fade-clip overflow at card edge */
 .biz-card-div .resume-skills {
     overflow: hidden;
     flex-shrink: 1;
     min-height: 0;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1em), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 1em), transparent 100%);
 }
 
 .biz-card-div .biz-card-skill-titles.skills-text {
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     display: block;
+    white-space: normal;
 }
 /* High-contrast icon set: matches high-contrast text for the given background (white on dark, black on light). Always transparent background. */
 .url-icon,
