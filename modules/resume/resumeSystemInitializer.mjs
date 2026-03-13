@@ -84,8 +84,8 @@ async function createBasicResumeDivs(jobsData) {
  * Initialize the resume system controllers using Vue 3 dependency management
  * This replaces the direct jobs import with reactive dependency pattern
  */
-export async function initializeResumeSystem() {
-    console.debug('[ResumeSystemInitializer] initializing');
+export async function initializeResumeSystem(resumeId = null) {
+    console.debug('[ResumeSystemInitializer] initializing', resumeId ? `resumeId=${resumeId}` : '(default)');
     
     try {
         // Get the global jobs dependency manager
@@ -114,7 +114,7 @@ export async function initializeResumeSystem() {
         
         // Start jobs loading (this will trigger controller initialization when complete)
         console.debug('[ResumeSystemInitializer] loading jobs');
-        const jobsData = await jobsDependency.loadJobs();
+        const jobsData = await jobsDependency.loadJobs(resumeId ? { forceResumeId: resumeId } : {});
         
         // Wait for DOM elements to be available (retry with delays)
         let attempts = 0;

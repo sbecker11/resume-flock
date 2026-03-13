@@ -54,6 +54,8 @@ export interface AppState {
     /** Persisted focal point position and mode (restored on load) */
     focalPoint?: { x: number; y: number; mode: 'locked' | 'following' | 'dragging' };
 
+    currentResumeId: string;
+
     resume: {
       sortRule: SortRule;
     };

@@ -40,7 +40,7 @@ function applySceneBackgroundFromCurrentPalette() {
             return getPerceivedBrightness(current) < getPerceivedBrightness(darkest) ? current : darkest;
         }, colorPalette[0]);
     const darkHex = baseBackgroundHex || '#333333';
-    const darkerHex = getHighlightColor(darkHex, { highlightPercent: 45 });
+    const darkerHex = getHighlightColor(darkHex, { highlightPercent: 75 });
     const darkestHex = getHighlightColor(darkHex, { highlightPercent: 15 });
     const darkerRgb = hexToRgb(darkerHex) || { r: 51, g: 51, b: 51 };
     const darkestRgb = hexToRgb(darkestHex) || { r: 26, g: 26, b: 26 };

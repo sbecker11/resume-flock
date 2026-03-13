@@ -28,7 +28,22 @@ function computeBoundsFromJobs(jobsData) {
     const timelineStartDate = new Date(earliestStartDate);
     timelineStartDate.setFullYear(timelineStartDate.getFullYear() - 1);
     const today = new Date();
-    const timelineEndDate = new Date(today);
+    let latestEndDate = null;
+    let hasCurrentDate = false;
+    for (const job of jobsData) {
+        const endStr = job.end || job.endDate;
+        if (!endStr || endStr === 'CURRENT_DATE') {
+            hasCurrentDate = true;
+            continue;
+        }
+        try {
+            const endDate = dateUtils.parseFlexibleDateString(endStr);
+            if (!latestEndDate || endDate > latestEndDate) latestEndDate = endDate;
+        } catch (e) { /* ignore unparseable end dates */ }
+    }
+    // If any job uses CURRENT_DATE (or has no end), use today; otherwise use the max job end date
+    const referenceDate = hasCurrentDate ? today : (latestEndDate ?? today);
+    const timelineEndDate = new Date(referenceDate);
     timelineEndDate.setFullYear(timelineEndDate.getFullYear() + 1);
     const dateToFractionalYear = (date) =>
         date.getFullYear() + date.getMonth() / 12 + date.getDate() / 365.25 / 12;

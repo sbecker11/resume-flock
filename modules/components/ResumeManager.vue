@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <Transition name="modal">
     <div v-if="isOpen" class="modal-overlay" @click.self="handleClose">
       <div class="modal-container">
@@ -93,6 +94,7 @@
       </div>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script setup>

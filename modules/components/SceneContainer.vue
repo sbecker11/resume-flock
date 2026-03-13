@@ -6,8 +6,6 @@
     @click="handleSceneContainerClick"
     :class="{ 'container-first': firstContainer === 'scene-container', 'container-second': secondContainer === 'scene-container' }"
   >
-    <div id="scene-container-top-gradient"></div>
-    <div id="scene-container-btm-gradient"></div>
     <div id="scene-content" ref="sceneContentRef" @scroll="onSceneContentScroll">
       <div id="scene-plane" ref="scenePlaneRef" @click="handleScenePlaneClick">
         <Timeline :alignment="timelineAlignment" />
@@ -201,6 +199,13 @@ watch(elementCounts, (newCounts) => {
 // Scene-specific composables
 const timelineComposable = useTimeline()
 const { timelineHeight, reinitialize: timelineReinitialize } = timelineComposable
+
+// Keep --timeline-height CSS var in sync with computed timeline height
+watch(timelineHeight, (newHeight) => {
+  if (newHeight) {
+    document.documentElement.style.setProperty('--timeline-height', `${newHeight}px`)
+  }
+}, { immediate: true })
 // Cards controller will auto-initialize when scene-plane-ready event fires
 console.log(`🎬 [SceneContainer #${sceneContainerInstanceId}] Creating CardsController...`)
 const cardsController = useCardsController()
@@ -278,8 +283,7 @@ defineExpose({
 #scene-container {
   position: relative;
   overflow: visible;
-  background: linear-gradient(to bottom, var(--background-light, #2a2a2a), var(--background-dark, #1a1a1a));
-  /* border-right: 1px solid #333; */ /* Removed - creating unwanted vertical line */
+  background: var(--background-dark, #1a1a1a);
   flex-shrink: 0;
   /* Ensure gradients position relative to this container */
 }
@@ -291,7 +295,7 @@ defineExpose({
 #scene-container.container-second {
   order: 3 !important;
   border-right: none;
-  border-left: 1px solid #333;
+  border-left: none;
 }
 
 #scene-content {
@@ -347,28 +351,6 @@ defineExpose({
   box-sizing: border-box;
 }
 
-/* Scene gradients - positioned to fill full scene-container width */
-#scene-container-top-gradient {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50vh; /* Use viewport-relative height instead of fixed 1000px */
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(to bottom, var(--background-light, rgba(24,24,111,1)), rgba(0, 0, 77, 0));
-}
-
-#scene-container-btm-gradient {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 50vh;
-  pointer-events: none;
-  z-index: 2;
-  background: linear-gradient(to top, var(--background-dark, rgba(0,0,77,1)), rgba(0, 0, 77, 0));
-}
 
 /* =============================================================================
    BIZ CARD DIV STYLES (Scene-specific)

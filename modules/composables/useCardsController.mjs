@@ -19,7 +19,6 @@ import {
   MAX_CARD_POSITION_OFFSET,
   CARD_BORDER_WIDTH,
   SKILL_REPOSITION_MIN_DISTANCE,
-  MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS,
   SKILL_PLACEMENT_X_STDDEV
 } from '@/modules/core/cardConstants.mjs'
 import { useCardRegistry } from '@/modules/composables/useCardRegistry.mjs'
@@ -138,7 +137,7 @@ export function useCardsController() {
 
         const jobs = getGlobalJobsDependency().getJobsData()
         if (!Array.isArray(jobs) || jobs.length === 0) {
-            console.warn(`[CardsController #${instanceId}] No jobs data yet, skipping init`)
+            console.debug(`[CardsController #${instanceId}] No jobs data yet, skipping init`)
             return
         }
 
@@ -237,9 +236,7 @@ export function useCardsController() {
                     skillCardsCreated.push(skillCard)
                 }
                 if (skillCardsCreated.length === 0) {
-                    const err = new Error('[CardsController] Skill cards list is empty after creation loop')
-                    reportError(err, '[CardsController] No skill cards created', '')
-                    throw err
+                    console.warn('[CardsController] No skill cards created — resume may have no job-skills entries.')
                 }
                 // Each biz card: only list of skill card element ids; titles come from those elements
                 for (let index = 0; index < cards.length; index++) {
@@ -843,16 +840,17 @@ export function useCardsController() {
     }
 
     /**
-     * Place one skill card by trial-and-rejection. center.x is 3D scene-relative (can be negative or positive).
-     * FAIL FAST: if rejections exceed threshold, error is logged and app exits.
+     * Place one skill card by trial-and-rejection with progressive distance relaxation.
+     * Tries full minDistance first, then relaxes in phases (75%→50%→25%→0%) so dense
+     * resumes with many skill cards never exhaust attempts.
      * @returns {{ left: number, top: number }}
      */
     function placeOneSkillCard(params, placedCenters, cardWidth, cardHeight, minDistance, cardIndex, cardId) {
         const halfCardWidth = cardWidth / 2
         const halfCardHeight = cardHeight / 2
         const { minCenterY, maxCenterY, meanLeftCenterX, meanRightCenterX, minCenterX, maxCenterX } = params
-        let rejections = 0
-        while (true) {
+
+        function samplePosition() {
             const cy = minCenterY + Math.random() * (maxCenterY - minCenterY)
             const useLeft = Math.random() < 0.5
             const cx = clampedNormal(
@@ -861,31 +859,33 @@ export function useCardsController() {
                 minCenterX,
                 maxCenterX
             )
-            let tooClose = false
+            return { cx, cy }
+        }
+
+        function isTooClose(cx, cy, threshold) {
             for (const p of placedCenters) {
                 const dx = cx - p.cx
                 const dy = cy - p.cy
-                if (Math.sqrt(dx * dx + dy * dy) < minDistance) {
-                    tooClose = true
-                    rejections++
-                    if (rejections > MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS) {
-                        // FALLBACK: When threshold exceeded, accept the position with overlap
-                        console.warn(
-                            `⚠️ [CardsController] Skill card placement exceeded ${MAX_SKILL_PLACEMENT_TRIAL_REJECTIONS} attempts for card index ${cardIndex}, id=${cardId ?? 'unknown'}. Using fallback position (may overlap).`
-                        )
-                        const left = cx - halfCardWidth
-                        const top = cy - halfCardHeight
-                        return { left, top }  // Accept position despite overlap
-                    }
-                    break
+                if (Math.sqrt(dx * dx + dy * dy) < threshold) return true
+            }
+            return false
+        }
+
+        // Progressive relaxation: 1000 attempts per phase, threshold shrinks each phase
+        const PHASE_ATTEMPTS = 1000
+        for (const factor of [1.0, 0.75, 0.5, 0.25]) {
+            const threshold = minDistance * factor
+            for (let i = 0; i < PHASE_ATTEMPTS; i++) {
+                const { cx, cy } = samplePosition()
+                if (!isTooClose(cx, cy, threshold)) {
+                    return { left: cx - halfCardWidth, top: cy - halfCardHeight }
                 }
             }
-            if (!tooClose) {
-                const left = cx - halfCardWidth
-                const top = cy - halfCardHeight
-                return { left, top }
-            }
         }
+
+        // Final pass: accept any position (threshold = 0 always succeeds)
+        const { cx, cy } = samplePosition()
+        return { left: cx - halfCardWidth, top: cy - halfCardHeight }
     }
 
     /**

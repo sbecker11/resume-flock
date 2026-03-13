@@ -56,6 +56,7 @@ function getDefaultState(): AppState {
             },
             focalPointMode: 'locked',
             focalPoint: { x: 0, y: 0, mode: 'locked' as const },
+            currentResumeId: 'default',
             resume: {
                 sortRule: { field: 'startDate', direction: 'asc' }
             },

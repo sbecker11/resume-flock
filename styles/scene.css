@@ -7,9 +7,7 @@
     scrollbar-width: none; /* Hide scrollbar for Firefox */
     position: relative;
     isolation: isolate;
-    background-color: var(--background-dark);
     z-index: 0;
-    /* transition: width 0.3s ease; Add matching transition */
     margin: 0;
     padding: 0;
 }
@@ -31,43 +29,27 @@
 html[native-dark-active][native-dark-active] #scene-container,
 html[native-dark-active] #scene-container,
 #scene-container {
-   background-color: var(--background-dark) !important;
+   background: var(--background-dark, #1a1a1a) !important;
 }
 
 
 #scene-plane {
     position: relative;
     transform-style: preserve-3d;
-    background-color: var(--background-dark);
+    /* Gradient attached to scroll content: bright edges only visible at top/bottom of scroll.
+       Fades to transparent (not a color) so no hard demarcation edge — container dark shows through. */
+    background: linear-gradient(in oklch to bottom,
+      var(--background-light, #2a2a2a) 0%,
+      transparent 40%,
+      transparent 60%,
+      var(--background-light, #2a2a2a) 100%
+    );
     width: 100%;
-    min-height: 200vh; /* Ensure content is taller than viewPort */
     scroll-behavior: smooth;
-    z-index: 2; /* Higher than gradients */
+    z-index: 2;
     isolation: isolate;
-    padding-top: 50px; /* Add padding to align with timeline */
+    padding-top: 50px;
     /* Note: No flexbox - ConnectionLines use absolute positioning */
-}
-
-#scene-plane-top-gradient {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 50vh;
-    background: linear-gradient(to bottom, var(--background-light) 0%, var(--background-dark) 100%);
-    pointer-events: none;
-    z-index: 1; /* Lower than scene-plane */
-}
-
-#scene-plane-btm-gradient {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 50vh;
-    background: linear-gradient(to top, var(--background-light) 0%, var(--background-dark) 100%);
-    pointer-events: none;
-    z-index: 1; /* Lower than scene-plane */
 }
     
 /* scene/scene.css */

@@ -17,7 +17,8 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "noEmit": true
   },
   "include": ["modules/**/*.ts", "modules/**/*.d.ts", "modules/**/*.vue", "main.ts", "vite.config.js", "modules/**/*.mjs", "static_content/**/*.mjs", "env.d.ts"],
 } 

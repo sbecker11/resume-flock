@@ -33,13 +33,13 @@ export function useJobsDependency() {
       return jobsState.value.data
     }
 
-    // Always load the default resume unless an explicit forceResumeId is provided.
-    // currentResumeId is not persisted in app_state (content-scoped, not app shell state).
     const resumeId = forceResumeId ?? null
+    if (!resumeId) {
+      console.warn('[useJobsDependency] loadJobs called with no resumeId — no jobs loaded')
+      return []
+    }
 
-    const url = resumeId
-      ? `/api/resumes/${encodeURIComponent(resumeId)}/data`
-      : '/api/resumes/default/data'
+    const url = `/api/resumes/${encodeURIComponent(resumeId)}/data`
     console.log('[useJobsDependency] 🔄 Loading jobs from resume API:', url)
     jobsState.value.isLoading = true
     jobsState.value.error = null

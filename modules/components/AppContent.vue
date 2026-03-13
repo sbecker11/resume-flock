@@ -20,7 +20,7 @@
     >
       <div class="resume-content">
         <div class="resume-wrapper">
-          <ResumeContainer :currentResumeId="currentResumeId" @resume-selected="handleResumeSelected" />
+          <ResumeContainer :currentResumeId="currentResumeId" :noJobsLoaded="noJobsLoaded" @resume-selected="handleResumeSelected" />
         </div>
       </div>
       <!-- Resume Viewer Label - positioned inside resume container like Scene Viewer -->
@@ -85,6 +85,7 @@ import { useAppState } from '../composables/useAppState.ts'
 import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
 import { registerResumeListReinit, reinitializeResumeSystem } from '../resume/resumeReinitializer.mjs'
 import { buildResumeListFromCards } from '../resume/resumeSystemInitializer.mjs'
+import { getGlobalJobsDependency } from '../composables/useJobsDependency.mjs'
 
 // Vue 3 keyboard navigation (replaces legacy keyDownModule)
 import { useKeyboardNavigation } from '../composables/useKeyboardNavigation.mjs'
@@ -252,9 +253,9 @@ const sceneContainerRef = ref(null)  // Reference to SceneContainer component
 const bullsEyeRef = ref(null)
 const focalPointRef = ref(null)
 
-// Resume Manager state
-// currentResumeId tracks which resume is loaded at runtime — not persisted to app_state
-const currentResumeId = ref('default')
+// Resume Manager state — initialized from persisted app_state
+const currentResumeId = computed(() => appState.value?.['user-settings']?.currentResumeId || 'default')
+const noJobsLoaded = ref(false)
 
 // Make template refs reactive - watch for changes and update systems
 watch(focalPointRef, (newRef) => {
@@ -322,6 +323,41 @@ watch(percentageVerification, (newVerification) => {
 }, { immediate: true });
 
 // =============================================================================
+// HELPERS
+// =============================================================================
+
+/**
+ * Scroll scene-content so the first card in the current sort order is visible.
+ * Falls back to the card with the lowest top px if sort info is unavailable.
+ * Must be called after nextTick so cards are positioned in the DOM.
+ */
+async function scrollSceneToLatestCard() {
+  await nextTick()
+  const sceneContentEl = document.getElementById('scene-content')
+  const scenePlaneEl = document.getElementById('scene-plane')
+  if (!sceneContentEl || !scenePlaneEl) return
+  const bizCards = Array.from(scenePlaneEl.querySelectorAll('.biz-card-div'))
+  if (bizCards.length === 0) return
+
+  // Use first card in sorted order if available
+  const rlc = window.resumeFlock?.resumeListController
+  const firstJobIndex = rlc?.sortedIndices?.[0] ?? null
+  let targetCard = firstJobIndex !== null
+    ? document.getElementById(`biz-card-div-${firstJobIndex}`)
+    : null
+
+  // Fallback: card with lowest top px
+  if (!targetCard) {
+    targetCard = bizCards.reduce((best, card) =>
+      parseInt(card.style.top || '0') < parseInt(best.style.top || '0') ? card : best
+    )
+  }
+
+  const cardTop = parseInt(targetCard.style.top || '0')
+  sceneContentEl.scrollTop = Math.max(0, cardTop - 100)
+}
+
+// =============================================================================
 // EVENT HANDLERS
 // =============================================================================
 
@@ -383,9 +419,10 @@ async function handleResumeSelected(resumeId) {
       console.log('[AppContent] ✅ Cleared selection state')
     }
 
-    // STEP 3: Track which resume is loaded (runtime only — not persisted to app_state)
-    currentResumeId.value = resumeId || 'default'
-    console.log('[AppContent] ✅ currentResumeId updated to:', currentResumeId.value)
+    // STEP 3: Persist the selected resume ID to app_state and clear no-jobs flag
+    noJobsLoaded.value = false
+    await updateAppState({ 'user-settings': { currentResumeId: resumeId || 'default' } }, true)
+    console.log('[AppContent] ✅ currentResumeId persisted:', resumeId || 'default')
 
     // STEP 4: Reinitialize the resume system with the new resume
     console.log('[AppContent] Calling reinitializeResumeSystem with:', resumeId === 'default' ? null : resumeId)
@@ -393,29 +430,7 @@ async function handleResumeSelected(resumeId) {
     console.log('[AppContent] ✅ Resume system reinitialized')
 
     // STEP 5: Scroll scene to show the most recent job card
-    await nextTick() // Wait for DOM to update
-    const sceneContentEl = document.getElementById('scene-content')
-    const scenePlaneEl = document.getElementById('scene-plane')
-    if (sceneContentEl && scenePlaneEl) {
-      // Find all biz-card-divs
-      const bizCards = Array.from(scenePlaneEl.querySelectorAll('.biz-card-div'))
-      if (bizCards.length > 0) {
-        // Find the card with the lowest top position (most recent/latest job at top of timeline)
-        const latestCard = bizCards.reduce((latest, card) => {
-          const cardTop = parseInt(card.style.top || '0')
-          const latestTop = parseInt(latest.style.top || '0')
-          return cardTop < latestTop ? card : latest // Lower top = more recent
-        })
-
-        if (latestCard) {
-          console.log('[AppContent] 📍 Scrolling to latest job card:', latestCard.id)
-          // Scroll to show the latest card with some padding
-          const cardTop = parseInt(latestCard.style.top || '0')
-          const scrollPadding = 100 // Add some padding above the card
-          sceneContentEl.scrollTop = Math.max(0, cardTop - scrollPadding)
-        }
-      }
-    }
+    await scrollSceneToLatestCard()
 
     console.log('[AppContent] ✅ Successfully switched to resume:', resumeId)
   } catch (error) {
@@ -472,10 +487,20 @@ onMounted(async () => {
     checkServices()
     console.log('[AppContent] 📊 Parallax stats:', parallaxStats.value)
     
-    // PHASE 5: Resume system — always loads default resume on startup
-    console.log('[AppContent] 📋 Initializing resume system...')
-    await initializeResumeSystem()
-    console.log('[AppContent] ✅ Resume system initialized with saved resume')
+    // PHASE 5: Resume system — load persisted resume, or show upload modal if none
+    const persistedResumeId = appState.value?.['user-settings']?.currentResumeId
+    const startupResumeId = persistedResumeId && persistedResumeId !== 'default' ? persistedResumeId : null
+    if (!startupResumeId) {
+      console.log('[AppContent] 📋 No persisted resume — showing upload modal')
+      noJobsLoaded.value = true
+    } else {
+      console.log('[AppContent] 📋 Initializing resume system with:', startupResumeId)
+      await initializeResumeSystem(startupResumeId)
+      console.log('[AppContent] ✅ Resume system initialized')
+      const startupJobs = getGlobalJobsDependency().getJobsData()
+      noJobsLoaded.value = !Array.isArray(startupJobs) || startupJobs.length === 0
+      if (!noJobsLoaded.value) await scrollSceneToLatestCard()
+    }
 
     // Register resume list reinit: same process as initial load (buildResumeListFromCards)
     registerResumeListReinit(async (bizCardDivs) => {

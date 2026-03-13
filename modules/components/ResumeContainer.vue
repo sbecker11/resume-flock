@@ -12,7 +12,8 @@ import ResumeManager from './ResumeManager.vue';
 
 // Define props
 const props = defineProps({
-  currentResumeId: { type: String, default: 'default' }
+  currentResumeId: { type: String, default: 'default' },
+  noJobsLoaded: { type: Boolean, default: false }
 });
 
 // Define emits for parent communication
@@ -61,6 +62,11 @@ function openUploadModal() {
   closeDropdown();
   isUploadModalOpen.value = true;
 }
+
+// Auto-open upload modal when no jobs are loaded
+watch(() => props.noJobsLoaded, (val) => {
+  if (val) openUploadModal();
+});
 
 function closeUploadModal() {
   isUploadModalOpen.value = false;
