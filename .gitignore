@@ -13,7 +13,7 @@ app_state.json
 # Local-only Cursor command (do not push)
 .cursor/commands/env.md
 
-# Generated parsed resumes (runtime output - symlink)
+# Generated parsed resumes (runtime output)
 parsed_resumes
 
 # Schema validator test venv

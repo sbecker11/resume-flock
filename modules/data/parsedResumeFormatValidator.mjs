@@ -1,8 +1,8 @@
 /**
- * Validate parsed resume data against docs/PARSED-RESUME-FORMAT.md.
+ * Validate parsed resume data against the parsed-resume format (schema in resume-parser package).
+ * Canonical schema: resume-parser contracts/parsed-resume-format-v1.0.json (versioned).
  * FAIL FAST: throws immediately on any format violation.
- *
- * @see docs/PARSED-RESUME-FORMAT.md
+ * Source of truth: resume-parser package; updates there may require changes here.
  */
 
 /**

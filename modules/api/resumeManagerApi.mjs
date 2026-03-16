@@ -129,7 +129,7 @@ export async function uploadResume(fileOrUrl, displayName = null, onProgress = n
 }
 
 /**
- * Update skillIDs for a single job, syncing skills.mjs jobIDs on the server.
+ * Update skillIDs for a single job, syncing skills.json jobIDs on the server.
  * @param {string} resumeId
  * @param {number} jobIndex
  * @param {string[]} skillIDs

@@ -84,7 +84,7 @@ describe('resume-details-editor api', () => {
         });
 
         it('returns empty object on 404', async () => {
-            fetchMock.mockResolvedValue(errJson(404, 'other-sections.mjs not found'));
+            fetchMock.mockResolvedValue(errJson(404, 'other-sections.json not found'));
             const result = await getResumeOtherSections('r1');
             expect(result).toEqual({});
         });

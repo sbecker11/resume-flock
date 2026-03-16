@@ -1,5 +1,5 @@
 /**
- * Canonical fixtures conforming to docs/PARSED-RESUME-FORMAT.md.
+ * Canonical fixtures conforming to the parsed-resume format (schema: resume-parser contracts/parsed-resume-format-v1.0.json).
  * Used for format conformance tests.
  */
 

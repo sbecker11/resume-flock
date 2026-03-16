@@ -44,6 +44,7 @@ Unit tests exist for modules that can run in Node without a browser or Vue:
 
 ### Resume and resume-parser compatibility
 
+- **Source of truth:** Schema docs, schema definitions, and parser CLIs live in the **resume-parser** package. The schema is versioned (e.g. `contracts/parsed-resume-format-v1.0.json`); the validator is at `contracts/validate_parsed_resume.py`. This repo may retain unit tests for parsed-resume format; **future resume-parser package updates may require updates to local tests and code**.
 - **Unit:** `parseMjsExport` parses `.mjs` content in resume-parser format (`export const jobs = [...];`, `export const skills = {...};`). `enrichedJobs` is tested with parser-style job shape (index, role, employer, start, end, Description) and edge cases (null Description, empty url, dedup brackets).
 - **Integration:** `resumeParserCompat.integration.test.mjs` checks that the pipeline (parseMjsExport + enrichJobsWithSkills) consumes parser output correctly. When `static_content/jobs/jobs.mjs` and `static_content/skills/skills.mjs` exist, tests read and parse them to ensure compatibility with real parser output. resume-parser has its own unit tests; these tests ensure resume-flock stays compatible with the format it produces.
 
@@ -66,7 +67,8 @@ The current Vitest config uses `environment: 'node'`. Switching to `environment:
 
 ## Test layout
 
-- App tests: `modules/**/*.test.mjs` (including `*.integration.test.mjs`)
+- App tests: `modules/**/*.test.mjs` and `scripts/**/*.test.mjs`
+- **Integration tests** are named `*.integration.test.mjs` (e.g. `resumeParserCompat.integration.test.mjs`). All other `*.test.mjs` files are unit tests.
 - Config: `vitest.config.js`
 - Global mocks (e.g. `window.CONSOLE_LOG_IGNORE`, globals used by `mathUtils`): `vitest.setup.mjs`
 
@@ -75,6 +77,8 @@ The current Vitest config uses `environment: 'node'`. Switching to `environment:
 | File | Purpose |
 |------|---------|
 | `modules/data/parseMjsExport.test.mjs` | Unit tests for .mjs parsing (resume-parser format). |
+| `modules/data/parsedResumeFormat.test.mjs` | Format conformance (parsed-resume); may need updates when resume-parser package changes. |
 | `modules/data/enrichedJobs.test.mjs` | Unit tests for job enrichment (references, job-skills, parser job shape). |
 | `modules/data/resumeParserCompat.integration.test.mjs` | Integration: parse + enrich pipeline; optional read from static_content. |
 | `modules/composables/useJobsDependency.test.mjs` | Unit tests for loadJobs (URL, 404, non-array), getJobsData (mocked fetch). |
+

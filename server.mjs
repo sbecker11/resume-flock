@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs/promises'; // Use promises for async/await
 import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
@@ -22,7 +23,8 @@ const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_state.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
 const STATIC_CATEGORIES_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'categories.mjs');
-const PARSED_RESUMES_DIR = path.resolve(PROJECT_ROOT, 'parsed_resumes');
+/** Overridable via process.env.PARSED_RESUMES_DIR for integration tests */
+const PARSED_RESUMES_DIR = process.env.PARSED_RESUMES_DIR || path.resolve(PROJECT_ROOT, 'parsed_resumes');
 const SYNC_LOGS_DIR = path.resolve(PROJECT_ROOT, 'sync-logs');
 const SYNC_LOGS_INDEX_FILE = path.resolve(SYNC_LOGS_DIR, 'index.json');
 const EVENT_DATA_DIR = path.resolve(PROJECT_ROOT, 'event-data');
@@ -75,18 +77,24 @@ async function generateUniqueResumeId(displayName) {
     }
 }
 
+/** Parse resume data file: JSON.parse for .json, parseMjsExport for .mjs. */
+function parseResumeFile(content, filePath, varName) {
+    if (filePath.endsWith('.json')) return JSON.parse(content);
+    return parseMjsExport(content, varName);
+}
+
 /**
  * Read jobs, skills, and optional categories from paths and return normalized data
  * for API consumption (jobs array, name-keyed skills, categories dict).
- * Supports both legacy (array jobs, name-keyed skills) and parser format (jobID/skillID dicts).
+ * Supports .json (parsed_resumes) and .mjs (static_content) formats.
  */
 async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath = null) {
     const jobsContent = await fs.readFile(jobsPath, 'utf-8');
-    const rawJobs = parseMjsExport(jobsContent, 'jobs');
+    const rawJobs = parseResumeFile(jobsContent, jobsPath, 'jobs');
     let rawSkills = {};
     try {
         const skillsContent = await fs.readFile(skillsPath, 'utf-8');
-        rawSkills = parseMjsExport(skillsContent, 'skills') || {};
+        rawSkills = parseResumeFile(skillsContent, skillsPath, 'skills') || {};
     } catch (e) {
         if (e.code !== 'ENOENT') throw e;
     }
@@ -94,7 +102,7 @@ async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath =
     if (categoriesPath) {
         try {
             const categoriesContent = await fs.readFile(categoriesPath, 'utf-8');
-            rawCategories = parseMjsExport(categoriesContent, 'categories') || {};
+            rawCategories = parseResumeFile(categoriesContent, categoriesPath, 'categories') || {};
         } catch (e) {
             if (e.code !== 'ENOENT') throw e;
         }
@@ -178,7 +186,7 @@ app.get('/api/resumes/default/data', async (req, res) => {
 });
 
 // GET /api/resumes/:id/data: Jobs and skills for a parsed resume (parsed_resumes/<id>/)
-// Flat layout only: jobs.mjs, skills.mjs, categories.mjs at folder root.
+// Flat layout, JSON format: jobs.json, skills.json, categories.json at folder root.
 app.get('/api/resumes/:id/data', async (req, res) => {
     const { id } = req.params;
     if (!id || id === 'default') {
@@ -186,11 +194,10 @@ app.get('/api/resumes/:id/data', async (req, res) => {
     }
     const dir = path.join(PARSED_RESUMES_DIR, id);
     try {
-        const jobsPath = path.join(dir, 'jobs.mjs');
+        const jobsPath = path.join(dir, 'jobs.json');
         await fs.access(jobsPath);
-        const skillsPath = path.join(dir, 'skills.mjs');
-        // skillsPath may not exist (skills optional); readAndNormalizeResumeData treats missing skills as {}
-        const categoriesPath = path.join(dir, 'categories.mjs');
+        const skillsPath = path.join(dir, 'skills.json');
+        const categoriesPath = path.join(dir, 'categories.json');
         const { jobs, skills, categories } = await readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath);
         res.json({ jobs, skills, categories });
     } catch (error) {
@@ -203,7 +210,7 @@ app.get('/api/resumes/:id/data', async (req, res) => {
     }
 });
 
-// PATCH /api/resumes/:id/jobs/:jobIndex/skills: Update skillIDs for one job, sync skills.mjs jobIDs
+// PATCH /api/resumes/:id/jobs/:jobIndex/skills: Update skillIDs for one job, sync skills.json jobIDs
 app.patch('/api/resumes/:id/jobs/:jobIndex/skills', async (req, res) => {
     const { id, jobIndex } = req.params;
     const { skillIDs } = req.body;
@@ -211,15 +218,15 @@ app.patch('/api/resumes/:id/jobs/:jobIndex/skills', async (req, res) => {
         return res.status(400).json({ error: 'Missing id, jobIndex, or skillIDs array.' });
     }
     const dir = path.join(PARSED_RESUMES_DIR, id);
-    const jobsPath = path.join(dir, 'jobs.mjs');
-    const skillsPath = path.join(dir, 'skills.mjs');
+    const jobsPath = path.join(dir, 'jobs.json');
+    const skillsPath = path.join(dir, 'skills.json');
     try {
         const [jobsContent, skillsContent] = await Promise.all([
             fs.readFile(jobsPath, 'utf-8'),
             fs.readFile(skillsPath, 'utf-8'),
         ]);
-        const jobs = parseMjsExport(jobsContent, 'jobs');
-        const skills = parseMjsExport(skillsContent, 'skills');
+        const jobs = parseResumeFile(jobsContent, jobsPath, 'jobs');
+        const skills = parseResumeFile(skillsContent, skillsPath, 'skills');
 
         const idx = String(jobIndex);
         if (!jobs[idx]) return res.status(404).json({ error: `Job index ${jobIndex} not found.` });
@@ -240,8 +247,8 @@ app.patch('/api/resumes/:id/jobs/:jobIndex/skills', async (req, res) => {
         }
 
         await Promise.all([
-            atomicWriteWithLock(jobsPath, `const jobs = ${JSON.stringify(jobs)};`),
-            atomicWriteWithLock(skillsPath, `const skills = ${JSON.stringify(skills)};`),
+            atomicWriteWithLock(jobsPath, JSON.stringify(jobs, null, 2)),
+            atomicWriteWithLock(skillsPath, JSON.stringify(skills, null, 2)),
         ]);
         res.json({ ok: true, skillIDs: newSkillIDs });
     } catch (err) {
@@ -289,32 +296,31 @@ app.patch('/api/resumes/:id/meta', async (req, res) => {
     }
 });
 
-// GET /api/resumes/:id/other-sections: Return other-sections.mjs data as JSON (contact, title, summary, etc.)
+// GET /api/resumes/:id/other-sections: Return other-sections.json data (contact, title, summary, etc.)
 app.get('/api/resumes/:id/other-sections', async (req, res) => {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: 'Invalid resume id.' });
-    const filePath = path.join(PARSED_RESUMES_DIR, id, 'other-sections.mjs');
+    const filePath = path.join(PARSED_RESUMES_DIR, id, 'other-sections.json');
     try {
         const content = await fs.readFile(filePath, 'utf-8');
-        const data = parseMjsExport(content, 'otherSections');
+        const data = JSON.parse(content);
         res.json(data || {});
     } catch {
-        res.status(404).json({ error: 'other-sections.mjs not found for this resume.' });
+        res.status(404).json({ error: 'other-sections.json not found for this resume.' });
     }
 });
 
-// PATCH /api/resumes/:id/other-sections: Update or create other-sections.mjs
+// PATCH /api/resumes/:id/other-sections: Update or create other-sections.json
 app.patch('/api/resumes/:id/other-sections', async (req, res) => {
     const { id } = req.params;
     if (!id || id === 'default') return res.status(400).json({ error: 'Cannot update other-sections for default resume.' });
     const payload = req.body;
     if (!payload || typeof payload !== 'object') return res.status(400).json({ error: 'Invalid payload.' });
     const dir = path.join(PARSED_RESUMES_DIR, id);
-    const filePath = path.join(dir, 'other-sections.mjs');
+    const filePath = path.join(dir, 'other-sections.json');
     try {
         await fs.mkdir(dir, { recursive: true });
-        const mjsContent = `export const otherSections = ${JSON.stringify(payload, null, 2)};\n`;
-        await atomicWriteWithLock(filePath, mjsContent);
+        await atomicWriteWithLock(filePath, JSON.stringify(payload, null, 2));
         res.json(payload);
     } catch (err) {
         console.error('[PATCH other-sections]', err);
@@ -322,66 +328,21 @@ app.patch('/api/resumes/:id/other-sections', async (req, res) => {
     }
 });
 
-// PATCH /api/resumes/:id/categories: Update or create categories.mjs
+// PATCH /api/resumes/:id/categories: Update or create categories.json
 app.patch('/api/resumes/:id/categories', async (req, res) => {
     const { id } = req.params;
     if (!id || id === 'default') return res.status(400).json({ error: 'Cannot update categories for default resume.' });
     const { categories } = req.body;
     if (!categories || typeof categories !== 'object') return res.status(400).json({ error: 'Invalid categories payload.' });
     const dir = path.join(PARSED_RESUMES_DIR, id);
-    const filePath = path.join(dir, 'categories.mjs');
+    const filePath = path.join(dir, 'categories.json');
     try {
         await fs.mkdir(dir, { recursive: true });
-        const mjsContent = `/** @type {Record<string, { name: string, skillIDs?: string[] }>} */\nexport const categories = ${JSON.stringify(categories, null, 2)};\n`;
-        await atomicWriteWithLock(filePath, mjsContent);
+        await atomicWriteWithLock(filePath, JSON.stringify(categories, null, 2));
         res.json({ categories });
     } catch (err) {
         console.error('[PATCH categories]', err);
         res.status(500).json({ error: err.message });
-    }
-});
-
-// POST /api/resumes/:id/render-external: Invoke external HTML renderer script, then return URL to view result.
-// Env: RESUME_HTML_RENDERER_SCRIPT = path to script (receives resume folder path as first arg).
-// Script should write output to <resume-folder>/rendered.html.
-app.post('/api/resumes/:id/render-external', async (req, res) => {
-    const { id } = req.params;
-    if (!id || id === 'default') return res.status(400).json({ error: 'Invalid resume id.' });
-    const scriptPath = process.env.RESUME_HTML_RENDERER_SCRIPT;
-    if (!scriptPath) {
-        return res.status(501).json({
-            error: 'External HTML renderer not configured. Set RESUME_HTML_RENDERER_SCRIPT to the path of your renderer script.'
-        });
-    }
-    const dir = path.resolve(PARSED_RESUMES_DIR, id);
-    try {
-        await fs.access(dir);
-    } catch {
-        return res.status(404).json({ error: 'Resume folder not found.' });
-    }
-    try {
-        await new Promise((resolve, reject) => {
-            const child = spawn(process.execPath, [scriptPath, dir], { stdio: 'inherit' });
-            child.on('close', (code) => (code === 0 ? resolve() : reject(new Error(`Script exited with code ${code}`))));
-            child.on('error', reject);
-        });
-        res.json({ url: `/api/resumes/${encodeURIComponent(id)}/rendered` });
-    } catch (err) {
-        console.error('[render-external]', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// GET /api/resumes/:id/rendered: Serve the externally rendered HTML (written by render script to rendered.html)
-app.get('/api/resumes/:id/rendered', async (req, res) => {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ error: 'Invalid resume id.' });
-    const htmlPath = path.join(PARSED_RESUMES_DIR, id, 'rendered.html');
-    try {
-        await fs.access(htmlPath);
-        res.sendFile(path.resolve(htmlPath));
-    } catch {
-        res.status(404).json({ error: 'rendered.html not found. Run the external renderer first (POST /api/resumes/:id/render-external).' });
     }
 });
 
@@ -439,11 +400,10 @@ app.get('/api/resumes', async (req, res) => {
                     continue;
                 }
 
-                // Get jobs and skills data to count items (flat layout)
-                const jobsPath = path.join(dir, 'jobs.mjs');
-                const skillsPath = path.join(dir, 'skills.mjs');
-
-                const categoriesPath = path.join(dir, 'categories.mjs');
+                // Get jobs and skills data to count items (flat layout, JSON format)
+                const jobsPath = path.join(dir, 'jobs.json');
+                const skillsPath = path.join(dir, 'skills.json');
+                const categoriesPath = path.join(dir, 'categories.json');
                 const { jobs, skills } = await readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath);
 
                 // Get folder creation time
@@ -588,69 +548,26 @@ app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
             await fs.rename(uploadedFile.path, targetPath);
         }
 
-        // Look for Python parser using RESUME_PARSER_PATH or default locations
-        const defaultParserPath = process.env.RESUME_PARSER_PATH
-            ? path.resolve(PROJECT_ROOT, process.env.RESUME_PARSER_PATH, 'resume_to_flock.py')
-            : null;
-
-        const possibleParserPaths = [
-            defaultParserPath,
-            path.join(PROJECT_ROOT, 'resume_to_flock.py'),
-            path.join(PROJECT_ROOT, '..', 'resume-parser', 'resume_to_flock.py'),
-            path.join(PROJECT_ROOT, 'scripts', 'resume_to_flock.py')
-        ].filter(Boolean);
-
-        let parserPath = null;
-        for (const p of possibleParserPaths) {
-            try {
-                await fs.access(p);
-                parserPath = p;
-                break;
-            } catch (e) {
-                // File doesn't exist, try next
-            }
-        }
-
-        if (!parserPath) {
-            const envHint = process.env.RESUME_PARSER_PATH
-                ? `RESUME_PARSER_PATH is set to: ${process.env.RESUME_PARSER_PATH}`
-                : 'Set RESUME_PARSER_PATH in .env to specify parser location';
-            throw new Error(`Python parser (resume_to_flock.py) not found. ${envHint}. Also checked: project root, ../resume-parser/, scripts/ directories.`);
-        }
-
-        console.log(`   Using parser: ${parserPath}`);
-
-        // Check for venv Python in the parser directory
-        const parserDir = path.dirname(parserPath);
-        const venvPython = path.join(parserDir, 'venv', 'bin', 'python');
-        let pythonCommand = 'python3';
-
-        try {
-            await fs.access(venvPython);
-            pythonCommand = venvPython;
-            console.log(`   Using venv Python: ${venvPython}`);
-        } catch (e) {
-            console.log(`   Using system Python: python3`);
-        }
-
-        // Run Python parser with -o flag for output directory
-        // Clean environment: remove API-related env vars so parser uses its own .env
+        // Invoke resume-parser package (pip install -r requirements.txt). Module override via RESUME_PARSER_MODULE.
+        const parserModule = process.env.RESUME_PARSER_MODULE || 'resume_parser.resume_to_flock';
+        const pythonCommand = 'python3';
         const cleanEnv = {};
         for (const [key, value] of Object.entries(process.env)) {
-            // Skip env vars with 'API' in the name to avoid conflicts
             if (!key.includes('API')) {
                 cleanEnv[key] = value;
             }
         }
 
+        console.log(`   Using parser: python -m ${parserModule}`);
+
         const pythonProcess = spawn(pythonCommand, [
-            parserPath,
+            '-m',
+            parserModule,
             targetPath,
             '-o',
             outputDir
         ], {
             env: cleanEnv,
-            cwd: path.dirname(parserPath)  // Run from parser directory so it finds its .env
         });
 
         let stdout = '';
@@ -697,10 +614,10 @@ app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
 
         console.log(`✅ Resume parsed successfully: ${resumeId}`);
 
-        // Read the parsed data to return in response
-        const jobsPath = path.join(outputDir, 'jobs.mjs');
-        const skillsPath = path.join(outputDir, 'skills.mjs');
-        const categoriesPath = path.join(outputDir, 'categories.mjs');
+        // Read the parsed data to return in response (parser outputs jobs.json, skills.json, categories.json)
+        const jobsPath = path.join(outputDir, 'jobs.json');
+        const skillsPath = path.join(outputDir, 'skills.json');
+        const categoriesPath = path.join(outputDir, 'categories.json');
 
         const { jobs, skills } = await readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath);
 
@@ -2362,5 +2279,9 @@ function startServer(port) {
     });
 }
 
-// Initial call to start the server process
-startServer(START_PORT);
+export { app };
+
+// Start server only when this file is run as the main module (not when imported by tests)
+const __filename = fileURLToPath(import.meta.url);
+const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename);
+if (isMain) startServer(START_PORT);

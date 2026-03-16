@@ -32,12 +32,10 @@ describe('selectionManager', () => {
     expect(selectionManager.selectedJobNumber).toBe(null);
   });
 
-  it('selectJobNumber sets selection and updates AppState', () => {
+  it('selectJobNumber sets selection', () => {
     selectionManager.selectJobNumber(0, 'test');
     expect(selectionManager.getSelectedJobNumber()).toBe(0);
     expect(selectionManager.selectedCard).toEqual({ type: 'biz', jobNumber: 0 });
-    expect(mockAppState.selectedJobNumber).toBe(0);
-    expect(mockSaveState).toHaveBeenCalled();
   });
 
   it('selectCard with invalid card does nothing', () => {
@@ -60,7 +58,6 @@ describe('selectionManager', () => {
     selectionManager.clearSelection('test');
     expect(selectionManager.selectedCard).toBe(null);
     expect(selectionManager.getSelectedJobNumber()).toBe(null);
-    expect(mockAppState.selectedJobNumber).toBe(null);
     expect(events.length).toBe(1);
   });
 

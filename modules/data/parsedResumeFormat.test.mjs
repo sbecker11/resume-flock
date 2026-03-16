@@ -1,6 +1,7 @@
 /**
- * Format conformance tests: verify parsed resume data meets docs/PARSED-RESUME-FORMAT.md.
+ * Format conformance tests: verify parsed resume data meets the parsed-resume format (schema in resume-parser package).
  * FAIL FAST: invalid format must throw.
+ * Note: resume-parser package is the source of truth; future package updates may require updates to these tests and related code.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -22,7 +23,7 @@ import {
   FIXTURE_OTHER_SECTIONS_PARSED
 } from './parsedResumeFormatFixtures.mjs';
 
-describe('parsedResumeFormat (PARSED-RESUME-FORMAT conformance)', () => {
+describe('parsedResumeFormat (parsed-resume format conformance)', () => {
   describe('validator - spec-compliant fixtures pass', () => {
     it('accepts valid jobs (object keyed by jobID)', () => {
       expect(() => validateJobs(FIXTURE_JOBS_PARSED)).not.toThrow();

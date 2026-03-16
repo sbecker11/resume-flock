@@ -6,14 +6,14 @@ beforeEach(() => {
 });
 
 describe('useJobsDependency', () => {
-  it('loadJobs fetches /api/resumes/default/data when no resume id', async () => {
+  it('loadJobs fetches /api/resumes/default/data when forceResumeId is default', async () => {
     const apiPayload = { jobs: [{ index: 0, Description: '' }], skills: {} };
     fetch.mockResolvedValueOnce({
       ok: true,
       json: async () => apiPayload,
     });
     const { loadJobs, getJobsData } = useJobsDependency();
-    await loadJobs({ force: true, forceResumeId: null });
+    await loadJobs({ force: true, forceResumeId: 'default' });
     expect(fetch).toHaveBeenCalledWith('/api/resumes/default/data');
     expect(getJobsData()).toHaveLength(1);
     expect(getJobsData()[0]).toHaveProperty('references');
@@ -36,13 +36,13 @@ describe('useJobsDependency', () => {
       json: async () => ({ jobs: 'not-an-array', skills: {} }),
     });
     const { loadJobs } = useJobsDependency();
-    await expect(loadJobs({ force: true })).rejects.toThrow('not an array');
+    await expect(loadJobs({ force: true, forceResumeId: 'x' })).rejects.toThrow('not an array');
   });
 
   it('loadJobs throws when API returns 404', async () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'Not found' });
     const { loadJobs } = useJobsDependency();
-    await expect(loadJobs({ force: true })).rejects.toThrow(/Resume data not found|404/);
+    await expect(loadJobs({ force: true, forceResumeId: 'missing' })).rejects.toThrow(/Resume data not found|404/);
   });
 
   it('getJobsData returns an array', () => {
@@ -53,7 +53,7 @@ describe('useJobsDependency', () => {
   it('registerController initializes immediately when jobs already loaded', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ index: 0, Description: '' }], skills: {} }) });
     const { loadJobs, registerController } = useJobsDependency();
-    await loadJobs({ force: true });
+    await loadJobs({ force: true, forceResumeId: 'default' });
     const initFn = vi.fn();
     registerController('TestCtrl', initFn);
     await new Promise((r) => setTimeout(r, 20));
@@ -65,14 +65,14 @@ describe('useJobsDependency', () => {
     const initFn = vi.fn();
     const { loadJobs, registerController } = useJobsDependency();
     registerController('TestCtrl2', initFn);
-    await loadJobs({ force: true });
+    await loadJobs({ force: true, forceResumeId: 'default' });
     expect(initFn).toHaveBeenCalledWith([]);
   });
 
   it('waitForJobs resolves when jobs are ready', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [], skills: {} }) });
     const { loadJobs, waitForJobs } = useJobsDependency();
-    const p = loadJobs({ force: true }).then(() => waitForJobs());
+    const p = loadJobs({ force: true, forceResumeId: 'default' }).then(() => waitForJobs());
     const data = await p;
     expect(data).toEqual([]);
   });
@@ -80,14 +80,14 @@ describe('useJobsDependency', () => {
   it('waitForJobs rejects when there is an error', async () => {
     fetch.mockResolvedValueOnce({ ok: false, status: 404, text: async () => 'Not found' });
     const { loadJobs, waitForJobs } = useJobsDependency();
-    await expect(loadJobs({ force: true })).rejects.toThrow();
+    await expect(loadJobs({ force: true, forceResumeId: 'missing' })).rejects.toThrow();
     await expect(waitForJobs()).rejects.toBeDefined();
   });
 
   it('loadJobs returns cached data when not force and already loaded', async () => {
     fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ jobs: [{ index: 0, Description: '' }], skills: {} }) });
     const { loadJobs, getJobsData } = useJobsDependency();
-    await loadJobs({ force: true });
+    await loadJobs({ force: true, forceResumeId: 'default' });
     const first = getJobsData();
     const result = await loadJobs(); // no force
     expect(fetch).toHaveBeenCalledTimes(1);

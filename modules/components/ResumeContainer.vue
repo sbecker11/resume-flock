@@ -95,27 +95,6 @@ function handleOpenUploadFromManage() {
   isUploadModalOpen.value = true;
 }
 
-const viewRenderedResumeLoading = ref(false);
-async function viewRenderedResume() {
-  const id = props.currentResumeId;
-  if (!id || id === 'default') return;
-  viewRenderedResumeLoading.value = true;
-  try {
-    const res = await fetch(`/api/resumes/${encodeURIComponent(id)}/render-external`, { method: 'POST' });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      alert(data.error || `Failed to run external renderer (${res.status})`);
-      return;
-    }
-    window.open(data.url || `/api/resumes/${encodeURIComponent(id)}/rendered`, '_blank');
-  } catch (err) {
-    console.error('[ResumeContainer] viewRenderedResume failed:', err);
-    alert('Failed to run external renderer: ' + err.message);
-  } finally {
-    viewRenderedResumeLoading.value = false;
-  }
-}
-
 async function printResume() {
   const id = props.currentResumeId;
   if (!id || id === 'default') return;
@@ -192,7 +171,7 @@ watch(
   () => { /* display updates reactively via currentResumeDisplay */ }
 );
 
-// Fetch resume list on mount
+// Fetch resume list and renderer config on mount
 onMounted(async () => {
   try {
     await fetchResumeList();
@@ -787,21 +766,6 @@ function onResumeSkillCardClick(event) {
                 </button>
                 <button
                     v-if="currentResumeId && currentResumeId !== 'default'"
-                    class="render-external-btn"
-                    :disabled="viewRenderedResumeLoading"
-                    @click="viewRenderedResume"
-                    title="Run external HTML renderer and view result in new tab"
-                >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" y1="13" x2="8" y2="13" />
-                        <line x1="16" y1="17" x2="8" y2="17" />
-                    </svg>
-                    {{ viewRenderedResumeLoading ? 'Rendering…' : 'Render' }}
-                </button>
-                <button
-                    v-if="currentResumeId && currentResumeId !== 'default'"
                     class="print-resume-btn"
                     @click="printResume"
                     title="Open printable resume in new tab"
@@ -1167,7 +1131,6 @@ function onResumeSkillCardClick(event) {
 }
 
 .resume-details-btn,
-.render-external-btn,
 .print-resume-btn {
     display: flex;
     align-items: center;
@@ -1184,15 +1147,10 @@ function onResumeSkillCardClick(event) {
     flex-shrink: 0;
 }
 .resume-details-btn:hover,
-.render-external-btn:hover,
 .print-resume-btn:hover {
     background: rgba(255, 255, 255, 0.08);
     color: white;
     border-color: rgba(255, 255, 255, 0.4);
-}
-.render-external-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
 }
 
 #color-palette-selector,

@@ -6,3 +6,4 @@ dist/
 *.json
 parsed_resumes/
 input_resumes/
+parsed_json_resumes/
