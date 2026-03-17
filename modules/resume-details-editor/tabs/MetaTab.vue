@@ -1,17 +1,22 @@
 <template>
   <div class="rde-tab-content">
     <div class="rde-field">
-      <label class="rde-label">Display name</label>
+      <label class="rde-label" for="rde-meta-display-name">Display name</label>
       <input
+        id="rde-meta-display-name"
+        name="displayName"
         v-model="local.displayName"
         type="text"
         class="rde-input"
         placeholder="e.g. Shawn Becker 2025"
+        autocomplete="name"
       />
     </div>
     <div class="rde-field">
-      <label class="rde-label">File name</label>
+      <label class="rde-label" for="rde-meta-file-name">File name</label>
       <input
+        id="rde-meta-file-name"
+        name="fileName"
         v-model="local.fileName"
         type="text"
         class="rde-input"

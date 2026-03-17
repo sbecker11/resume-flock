@@ -3,13 +3,15 @@
     <!-- 1. Summary -->
     <section class="rde-section">
       <h3 class="rde-section-title">Summary</h3>
-      <textarea v-model="local.summary" class="rde-textarea" rows="4" placeholder="Professional summary…"></textarea>
+      <label class="rde-sr-only" for="rde-other-summary">Professional summary</label>
+      <textarea id="rde-other-summary" name="summary" v-model="local.summary" class="rde-textarea" rows="4" placeholder="Professional summary…"></textarea>
     </section>
 
     <!-- 2. Title -->
     <section class="rde-section">
       <h3 class="rde-section-title">Title</h3>
-      <input v-model="local.title" type="text" class="rde-input" placeholder="e.g. Senior Software Engineer" />
+      <label class="rde-sr-only" for="rde-other-title">Job title</label>
+      <input id="rde-other-title" name="title" v-model="local.title" type="text" class="rde-input" placeholder="e.g. Senior Software Engineer" />
     </section>
 
     <!-- 3. Contact -->
@@ -144,6 +146,7 @@ function removeOtherSection(i) {
 </script>
 
 <style scoped>
+.rde-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .rde-tab-content { padding: 12px 16px; max-height: 60vh; overflow-y: auto; }
 .rde-section { margin-bottom: 20px; }
 .rde-section-title { font-size: 0.8rem; font-weight: 600; color: #fff; margin: 0 0 8px; }

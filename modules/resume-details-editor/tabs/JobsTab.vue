@@ -4,7 +4,10 @@
     <template v-else>
       <section class="rde-section">
         <h3 class="rde-section-title">Job</h3>
+        <label for="rde-jobs-job-select" class="rde-label rde-sr-only">Select job</label>
         <select
+          id="rde-jobs-job-select"
+          name="rde-jobs-job"
           v-model="selectedJobIndex"
           class="rde-select"
           :disabled="jobsList.length === 0"
@@ -22,35 +25,35 @@
       <template v-if="selectedJob != null">
         <section class="rde-section rde-job-fields">
           <div class="rde-field">
-            <label class="rde-label">Employer</label>
-            <input ref="employerInputRef" v-model="local.employer" type="text" class="rde-input" placeholder="Employer name" />
+            <label class="rde-label" for="rde-jobs-employer">Employer</label>
+            <input id="rde-jobs-employer" name="employer" ref="employerInputRef" v-model="local.employer" type="text" class="rde-input" placeholder="Employer name" autocomplete="organization" />
           </div>
           <div class="rde-field">
-            <label class="rde-label">Title</label>
-            <input v-model="local.title" type="text" class="rde-input" placeholder="Job title" />
+            <label class="rde-label" for="rde-jobs-title">Title</label>
+            <input id="rde-jobs-title" name="title" v-model="local.title" type="text" class="rde-input" placeholder="Job title" autocomplete="organization-title" />
           </div>
           <div class="rde-field rde-date-row">
             <div class="rde-date-field">
-              <label class="rde-label">Start (YY/MM)</label>
+              <label class="rde-label" for="rde-jobs-start-year">Start (YY/MM)</label>
               <div class="rde-date-inputs">
-                <select v-model="local.startYear" class="rde-select rde-date-select">
+                <select id="rde-jobs-start-year" name="startYear" v-model="local.startYear" class="rde-select rde-date-select">
                   <option value="">—</option>
                   <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
                 </select>
-                <select v-model="local.startMonth" class="rde-select rde-date-select">
+                <select id="rde-jobs-start-month" name="startMonth" v-model="local.startMonth" class="rde-select rde-date-select">
                   <option value="">—</option>
                   <option v-for="m in 12" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
                 </select>
               </div>
             </div>
             <div class="rde-date-field">
-              <label class="rde-label">End (YY/MM)</label>
+              <label class="rde-label" for="rde-jobs-end-year">End (YY/MM)</label>
               <div class="rde-date-inputs">
-                <select v-model="local.endYear" class="rde-select rde-date-select">
+                <select id="rde-jobs-end-year" name="endYear" v-model="local.endYear" class="rde-select rde-date-select">
                   <option value="">—</option>
                   <option v-for="y in yearOptions" :key="y" :value="y">{{ y }}</option>
                 </select>
-                <select v-model="local.endMonth" class="rde-select rde-date-select">
+                <select id="rde-jobs-end-month" name="endMonth" v-model="local.endMonth" class="rde-select rde-date-select">
                   <option value="">—</option>
                   <option v-for="m in 12" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
                 </select>
@@ -58,8 +61,10 @@
             </div>
           </div>
           <div class="rde-field">
-            <label class="rde-label">Description</label>
+            <label class="rde-label" for="rde-jobs-description">Description</label>
             <textarea
+              id="rde-jobs-description"
+              name="description"
               ref="descriptionInputRef"
               v-model="local.Description"
               class="rde-textarea rde-description"
@@ -197,12 +202,11 @@ watch(() => [props.initialFocusField, selectedJob.value], ([focusField, job]) =>
   focusWatchCount++;
   if (focusWatchCount > 5) console.warn('[RDE] JobsTab focus watch LOOP', focusWatchCount);
   if (!focusField || !job) return;
-  console.log('[RDE] JobsTab focus watch, nextTick focus');
-  nextTick(() => {
+  // Defer focus to a later macrotask to avoid locking UI (browser a11y/autofill in same tick).
+  setTimeout(() => {
     const el = focusField === 'employer' ? employerInputRef.value : focusField === 'description' ? descriptionInputRef.value : null;
     if (el && typeof el.focus === 'function') el.focus();
-    console.log('[RDE] JobsTab focus applied', !!el);
-  });
+  }, 0);
 }, { immediate: true });
 
 function jobOptionLabel(job, i) {
@@ -245,6 +249,7 @@ function openSkillsForCurrentJob() {
 </script>
 
 <style scoped>
+.rde-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .rde-jobs .rde-section-title { font-size: 0.8rem; font-weight: 600; color: #fff; margin: 0 0 8px; }
 .rde-error { color: #e88; padding: 8px 0; }
 .rde-select {

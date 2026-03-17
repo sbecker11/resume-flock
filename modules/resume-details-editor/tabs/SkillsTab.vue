@@ -4,7 +4,10 @@
     <template v-else>
       <section class="rde-section">
         <h3 class="rde-section-title">Job</h3>
+        <label for="rde-skills-job-select" class="rde-sr-only">Select job</label>
         <select
+          id="rde-skills-job-select"
+          name="rde-skills-job"
           v-model="selectedJobIndex"
           class="rde-select"
           :disabled="jobs.length === 0"
@@ -22,7 +25,10 @@
       <template v-if="selectedJob != null">
         <section class="rde-section">
           <div class="rde-skills-add-row">
+            <label for="rde-skills-new-skill" class="rde-sr-only">Add a new skill</label>
             <input
+              id="rde-skills-new-skill"
+              name="newSkill"
               v-model="newSkillName"
               class="rde-input rde-add-skill"
               type="text"
@@ -34,11 +40,13 @@
             </button>
           </div>
           <div v-if="sortedSkills.length >= 2" class="rde-skills-merge-row">
-            <select v-model="mergeFromKey" class="rde-select rde-merge-select" title="Skill to merge away">
+            <label for="rde-skills-merge-from" class="rde-sr-only">Skill to merge away</label>
+            <select id="rde-skills-merge-from" name="mergeFrom" v-model="mergeFromKey" class="rde-select rde-merge-select" title="Skill to merge away">
               <option value="" disabled>Merge link</option>
               <option v-for="s in sortedSkills" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <select v-model="mergeToKey" class="rde-select rde-merge-select" title="Keep this skill (canonical skillID)">
+            <label for="rde-skills-merge-to" class="rde-sr-only">Keep this skill</label>
+            <select id="rde-skills-merge-to" name="mergeTo" v-model="mergeToKey" class="rde-select rde-merge-select" title="Keep this skill (canonical skillID)">
               <option value="" disabled>Into link</option>
               <option v-for="s in sortedSkills" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
@@ -47,7 +55,10 @@
             </button>
           </div>
           <div class="rde-skills-search-row">
+            <label for="rde-skills-search" class="rde-sr-only">Filter skills</label>
             <input
+              id="rde-skills-search"
+              name="search"
               v-model="search"
               class="rde-input rde-search"
               type="text"
@@ -73,7 +84,9 @@
                     ref="editSkillInputRef"
                     v-model="editingSkillName"
                     type="text"
+                    name="editSkillName"
                     class="rde-input rde-skill-edit-input"
+                    :aria-label="`Edit ${skill.name}`"
                     @keydown.enter="saveEditSkill"
                     @keydown.escape="cancelEditSkill"
                   />
@@ -385,6 +398,7 @@ async function saveForCurrentJob() {
 </script>
 
 <style scoped>
+.rde-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .rde-tab-content.rde-skills {
   --rde-skills-gap: 10px;
 }

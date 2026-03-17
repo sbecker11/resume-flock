@@ -1,9 +1,9 @@
 <template>
   <div class="rde-row">
-    <input v-model="local.name" type="text" class="rde-input" placeholder="Name" />
-    <input v-model="local.url" type="url" class="rde-input" placeholder="Link (optional)" />
-    <input v-model="local.description" type="text" class="rde-input" placeholder="Description (optional)" />
-    <button type="button" class="rde-btn-remove" title="Remove" @click="emit('remove')">×</button>
+    <input v-model="local.name" type="text" name="certName" class="rde-input" placeholder="Name" aria-label="Certification name" />
+    <input v-model="local.url" type="url" name="certUrl" class="rde-input" placeholder="Link (optional)" aria-label="Certification link" />
+    <input v-model="local.description" type="text" name="certDescription" class="rde-input" placeholder="Description (optional)" aria-label="Certification description" />
+    <button type="button" class="rde-btn-remove" title="Remove" aria-label="Remove certification" @click="emit('remove')">×</button>
   </div>
 </template>
 

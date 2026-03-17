@@ -1,9 +1,9 @@
 <template>
   <div class="rde-row">
-    <input v-model="local.label" type="text" class="rde-input" placeholder="Label" />
-    <input v-model="local.url" type="url" class="rde-input" placeholder="URL" />
-    <input v-model="local.description" type="text" class="rde-input" placeholder="Description (optional)" />
-    <button type="button" class="rde-btn-remove" title="Remove" @click="emit('remove')">×</button>
+    <input v-model="local.label" type="text" name="websiteLabel" class="rde-input" placeholder="Label" aria-label="Website label" />
+    <input v-model="local.url" type="url" name="websiteUrl" class="rde-input" placeholder="URL" aria-label="Website URL" />
+    <input v-model="local.description" type="text" name="websiteDescription" class="rde-input" placeholder="Description (optional)" aria-label="Website description" />
+    <button type="button" class="rde-btn-remove" title="Remove" aria-label="Remove website" @click="emit('remove')">×</button>
   </div>
 </template>
 

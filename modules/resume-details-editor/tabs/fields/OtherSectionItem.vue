@@ -1,9 +1,9 @@
 <template>
   <div class="rde-row rde-row-col">
-    <input v-model="local.title" type="text" class="rde-input" placeholder="Section title" />
-    <input v-model="local.subtitle" type="text" class="rde-input" placeholder="Subtitle (optional)" />
-    <input v-model="local.description" type="text" class="rde-input" placeholder="Description (optional)" />
-    <button type="button" class="rde-btn-remove" title="Remove" @click="emit('remove')">×</button>
+    <input v-model="local.title" type="text" name="sectionTitle" class="rde-input" placeholder="Section title" aria-label="Section title" />
+    <input v-model="local.subtitle" type="text" name="sectionSubtitle" class="rde-input" placeholder="Subtitle (optional)" aria-label="Section subtitle" />
+    <input v-model="local.description" type="text" name="sectionDescription" class="rde-input" placeholder="Description (optional)" aria-label="Section description" />
+    <button type="button" class="rde-btn-remove" title="Remove" aria-label="Remove section" @click="emit('remove')">×</button>
   </div>
 </template>
 
