@@ -51,6 +51,8 @@ const loadError: Ref<Error | null> = ref(null)
 /** When false, state API is unavailable (e.g. static hosting); save only to localStorage and skip POST to avoid 405 in console. */
 let stateApiAvailable: boolean | null = null
 
+const STATE_API_UNAVAILABLE_KEY = 'resume-flock/state_api_unavailable'
+
 // Single promise to prevent multiple simultaneous loads
 let loadPromise: Promise<AppState> | null = null
 
@@ -383,7 +385,28 @@ function migrateState(state: any): AppState {
 async function loadStateFromServer(): Promise<AppState> {
     const maxRetries = 5;
     const retryDelay = 1000; // 1 second
-    
+
+    // Skip GET when we know state API is unavailable, or when on known static host (e.g. GitHub Pages), to avoid 404 in console
+    const isLikelyStaticHost = typeof window !== 'undefined' && window.location?.origin?.includes('github.io')
+    const skipStateApi = typeof localStorage !== 'undefined' && (
+      localStorage.getItem(STATE_API_UNAVAILABLE_KEY) || isLikelyStaticHost
+    )
+    if (skipStateApi) {
+        stateApiAvailable = false
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(STATE_API_UNAVAILABLE_KEY, '1')
+          } catch (_) {}
+        }
+        try {
+            const raw = localStorage.getItem('resume-flock/app_state')
+            if (raw) return deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+        } catch (e) {
+            reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Using default state')
+        }
+        return getDefaultState()
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`[AppState] Loading state from server (attempt ${attempt}/${maxRetries})...`);
@@ -392,6 +415,9 @@ async function loadStateFromServer(): Promise<AppState> {
             if (!response.ok) {
                 if (response.status === 404) {
                     stateApiAvailable = false
+                    try {
+                        localStorage.setItem(STATE_API_UNAVAILABLE_KEY, '1')
+                    } catch (_) {}
                     console.log("No saved state found on server, using default state.")
                     // GitHub Pages / static hosting: fall back to localStorage if present
                     try {
@@ -466,7 +492,12 @@ async function saveStateToServer(state: AppState): Promise<void> {
             body: JSON.stringify(state),
         })
         if (!response.ok) {
-            if (response.status === 404 || response.status === 405) stateApiAvailable = false
+            if (response.status === 404 || response.status === 405) {
+                stateApiAvailable = false
+                try {
+                    localStorage.setItem(STATE_API_UNAVAILABLE_KEY, '1')
+                } catch (_) {}
+            }
             // GitHub Pages / static hosting: no API (404/405). Persist to localStorage and continue without logging an error.
             const isStaticHosting = response.status === 404 || response.status === 405
             try {

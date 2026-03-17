@@ -23,6 +23,14 @@ function basePathJoin(relPath) {
   return `${b}${p}`
 }
 
+/** Normalize API/static jobs value to an array (accepts array, { jobs: [...] }, or object keyed by id). */
+function toJobsArray(value) {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && Array.isArray(value.jobs)) return value.jobs
+  if (value && typeof value === 'object') return Object.values(value)
+  return []
+}
+
 // Global state for jobs dependency
 const jobsState = ref({
   data: null,
@@ -60,40 +68,57 @@ export function useJobsDependency() {
       return []
     }
 
-    const url = basePathJoin(`api/resumes/${encodeURIComponent(resumeId)}/data`)
-    console.log('[useJobsDependency] 🔄 Loading jobs from resume API:', url)
+    const useStaticFirst = typeof window !== 'undefined' && window.location?.origin?.includes('github.io')
+    const apiUrl = basePathJoin(`api/resumes/${encodeURIComponent(resumeId)}/data`)
+    const staticJobsUrl = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/jobs.json`)
+    const staticSkillsUrl = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/skills.json`)
+    console.log('[useJobsDependency] 🔄 Loading jobs', useStaticFirst ? '(static first)' : 'from API:', useStaticFirst ? staticJobsUrl : apiUrl)
     jobsState.value.isLoading = true
     jobsState.value.error = null
 
     try {
       let payload = null
-      try {
-        const res = await fetch(url)
-        if (!res.ok) {
-          const errBody = await res.text().catch(() => '')
-          throw new Error(res.status === 404 ? `Resume data not found: ${url}` : `Resume API ${res.status}: ${errBody}`)
-        }
-        payload = await res.json()
-      } catch (e) {
-        reportError(e, '[useJobsDependency] Failed to fetch resume data from API', 'Attempting static /parsed_resumes fallback')
-        const staticUrl = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/jobs.json`)
+      if (useStaticFirst) {
         const [jobsRes, skillsRes] = await Promise.all([
-          fetch(staticUrl),
-          fetch(basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/skills.json`)).catch(() => null),
+          fetch(staticJobsUrl),
+          fetch(staticSkillsUrl).catch(() => null),
         ])
         if (!jobsRes.ok) {
           const errBody = await jobsRes.text().catch(() => '')
-          throw new Error(`Static resume jobs not found: ${staticUrl}${errBody ? ` — ${errBody}` : ''}`)
+          throw new Error(`Static resume jobs not found: ${staticJobsUrl}${errBody ? ` — ${errBody}` : ''}`)
         }
         const jobs = await jobsRes.json()
         const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
         payload = { jobs, skills }
+      } else {
+        try {
+          const res = await fetch(apiUrl)
+          if (!res.ok) {
+            const errBody = await res.text().catch(() => '')
+            throw new Error(res.status === 404 ? `Resume data not found: ${apiUrl}` : `Resume API ${res.status}: ${errBody}`)
+          }
+          payload = await res.json()
+        } catch (e) {
+          const is404OrNotFound = e?.message?.includes('404') || e?.message?.includes('Resume data not found')
+          if (!is404OrNotFound) {
+            reportError(e, '[useJobsDependency] Failed to fetch resume data from API', 'Attempting static /parsed_resumes fallback')
+          }
+          const [jobsRes, skillsRes] = await Promise.all([
+            fetch(staticJobsUrl),
+            fetch(staticSkillsUrl).catch(() => null),
+          ])
+          if (!jobsRes.ok) {
+            const errBody = await jobsRes.text().catch(() => '')
+            throw new Error(`Static resume jobs not found: ${staticJobsUrl}${errBody ? ` — ${errBody}` : ''}`)
+          }
+          const jobs = await jobsRes.json()
+          const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
+          payload = { jobs, skills }
+        }
       }
 
-      const { jobs: rawJobs, skills } = payload
-      if (!Array.isArray(rawJobs)) {
-        throw new Error('API returned jobs that are not an array')
-      }
+      const rawJobs = toJobsArray(payload?.jobs ?? payload)
+      const skills = payload?.skills ?? {}
       const jobs = enrichJobsWithSkills(rawJobs, skills || {})
       jobsState.value.data = jobs
       jobsState.value.isInitialized = true

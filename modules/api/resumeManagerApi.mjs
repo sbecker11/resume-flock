@@ -55,13 +55,25 @@ async function fetchStaticResumeData(resumeId) {
  * @returns {Promise<Array>} Array of resume objects with metadata
  */
 export async function listResumes() {
+    const useStaticFirst = typeof window !== 'undefined' && window.location?.origin?.includes('github.io');
+    if (useStaticFirst) {
+        try {
+            const idx = await fetchStaticResumesIndex();
+            return Array.isArray(idx) ? idx : (idx?.resumes || []);
+        } catch (e) {
+            reportError(e, '[ResumeManagerAPI] Static resume index failed');
+            throw e;
+        }
+    }
     try {
         return await fetchJsonOrThrow(basePathJoin('api/resumes'));
     } catch (error) {
-        reportError(error, '[ResumeManagerAPI] Failed to list resumes', 'Falling back to static parsed_resumes index (if available)');
+        const is404 = error?.message?.includes('404');
+        if (!is404) {
+            reportError(error, '[ResumeManagerAPI] Failed to list resumes', 'Falling back to static parsed_resumes index (if available)');
+        }
         try {
             const idx = await fetchStaticResumesIndex();
-            // Support both { resumes: [...] } and [...] formats
             return Array.isArray(idx) ? idx : (idx?.resumes || []);
         } catch (staticError) {
             reportError(staticError, '[ResumeManagerAPI] Static resume index fallback failed');
