@@ -1,5 +1,29 @@
 // modules/api/resumeManagerApi.mjs
 // API client for resume manager operations
+import { reportError } from '@/modules/utils/errorReporting.mjs';
+
+async function fetchJsonOrThrow(url, options = {}) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${response.statusText}${body ? ` — ${body}` : ''}`);
+    }
+    return response.json();
+}
+
+async function fetchStaticResumesIndex() {
+    return fetchJsonOrThrow('/parsed_resumes/index.json');
+}
+
+async function fetchStaticResumeData(resumeId) {
+    const base = `/parsed_resumes/${encodeURIComponent(resumeId)}`;
+    const [jobs, skills, categories] = await Promise.all([
+        fetchJsonOrThrow(`${base}/jobs.json`),
+        fetchJsonOrThrow(`${base}/skills.json`).catch(() => ({})),
+        fetchJsonOrThrow(`${base}/categories.json`).catch(() => ({})),
+    ]);
+    return { jobs, skills, categories };
+}
 
 /**
  * Get list of all parsed resumes with metadata
@@ -7,17 +31,17 @@
  */
 export async function listResumes() {
     try {
-        const response = await fetch('/api/resumes');
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
+        return await fetchJsonOrThrow('/api/resumes');
     } catch (error) {
-        console.error('[ResumeManagerAPI] Failed to list resumes:', error);
-        throw error;
+        reportError(error, '[ResumeManagerAPI] Failed to list resumes', 'Falling back to static parsed_resumes index (if available)');
+        try {
+            const idx = await fetchStaticResumesIndex();
+            // Support both { resumes: [...] } and [...] formats
+            return Array.isArray(idx) ? idx : (idx?.resumes || []);
+        } catch (staticError) {
+            reportError(staticError, '[ResumeManagerAPI] Static resume index fallback failed');
+            throw error;
+        }
     }
 }
 
@@ -188,9 +212,13 @@ export async function mergeSkill(resumeId, fromKey, toKey) {
  * @returns {Promise<Object>}
  */
 export async function getResumeOtherSections(resumeId) {
-    const response = await fetch(`/api/resumes/${encodeURIComponent(resumeId)}/other-sections`);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return response.json();
+    try {
+        return await fetchJsonOrThrow(`/api/resumes/${encodeURIComponent(resumeId)}/other-sections`);
+    } catch (error) {
+        reportError(error, `[ResumeManagerAPI] Failed to get other-sections for ${resumeId}`, 'Falling back to static parsed_resumes other-sections.json (if available)');
+        const base = `/parsed_resumes/${encodeURIComponent(resumeId)}`;
+        return fetchJsonOrThrow(`${base}/other-sections.json`).catch(() => ({}));
+    }
 }
 
 /**
@@ -203,17 +231,10 @@ export async function getResumeData(resumeId) {
         const endpoint = resumeId === 'default'
             ? '/api/resumes/default/data'
             : `/api/resumes/${resumeId}/data`;
-
-        const response = await fetch(endpoint);
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        return await response.json();
+        return await fetchJsonOrThrow(endpoint);
     } catch (error) {
-        console.error(`[ResumeManagerAPI] Failed to get resume data for ${resumeId}:`, error);
-        throw error;
+        reportError(error, `[ResumeManagerAPI] Failed to get resume data for ${resumeId}`, 'Falling back to static parsed_resumes data files (if available)');
+        if (!resumeId || resumeId === 'default') throw error;
+        return fetchStaticResumeData(resumeId);
     }
 }

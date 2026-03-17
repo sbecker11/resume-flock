@@ -3,6 +3,7 @@
  * Self-contained: all fetch calls for meta, other-sections, categories.
  * Base URL empty = relative to current origin; for standalone, set via getApiBase().
  */
+import { reportError } from '@/modules/utils/errorReporting.mjs';
 
 /** @returns {string} Base URL for API (empty = same origin) */
 function getApiBase() {
@@ -11,17 +12,38 @@ function getApiBase() {
         : '';
 }
 
+function downloadJson(filename, data) {
+    try {
+        const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+    } catch (e) {
+        reportError(e, '[resume-details-editor/api] Failed to download JSON remedy');
+    }
+}
+
 async function apiJson(path, options = {}) {
     const url = getApiBase() + path;
-    const res = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...options.headers },
-        ...options
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
+    try {
+        const res = await fetch(url, {
+            headers: { 'Content-Type': 'application/json', ...options.headers },
+            ...options
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+        }
+        return res.json();
+    } catch (e) {
+        reportError(e, `[resume-details-editor/api] Request failed: ${path}`);
+        throw e;
     }
-    return res.json();
 }
 
 /**
@@ -38,10 +60,16 @@ export async function getResumeMeta(resumeId) {
  * @returns {Promise<Object>}
  */
 export async function updateResumeMeta(resumeId, updates) {
-    return apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/meta`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
-    });
+    try {
+        return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/meta`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates)
+        });
+    } catch (e) {
+        reportError(e, '[resume-details-editor/api] Failed to update resume meta', 'Downloading a JSON patch for manual application');
+        downloadJson(`${resumeId}-meta.patch.json`, { resumeId, operation: 'updateResumeMeta', updates });
+        throw e;
+    }
 }
 
 /**
@@ -63,10 +91,16 @@ export async function getResumeOtherSections(resumeId) {
  * @returns {Promise<Object>}
  */
 export async function updateResumeOtherSections(resumeId, payload) {
-    return apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/other-sections`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload)
-    });
+    try {
+        return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/other-sections`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload)
+        });
+    } catch (e) {
+        reportError(e, '[resume-details-editor/api] Failed to update other-sections', 'Downloading a JSON patch for manual application');
+        downloadJson(`${resumeId}-other-sections.patch.json`, { resumeId, operation: 'updateResumeOtherSections', payload });
+        throw e;
+    }
 }
 
 /**
@@ -85,10 +119,16 @@ export async function getResumeData(resumeId) {
  * @returns {Promise<{ ok: boolean, job: object }>}
  */
 export async function updateJob(resumeId, jobIndex, updates) {
-    return apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/jobs/${jobIndex}`, {
-        method: 'PATCH',
-        body: JSON.stringify(updates)
-    });
+    try {
+        return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/jobs/${jobIndex}`, {
+            method: 'PATCH',
+            body: JSON.stringify(updates)
+        });
+    } catch (e) {
+        reportError(e, '[resume-details-editor/api] Failed to update job', 'Downloading a JSON patch for manual application');
+        downloadJson(`${resumeId}-job-${jobIndex}.patch.json`, { resumeId, jobIndex, operation: 'updateJob', updates });
+        throw e;
+    }
 }
 
 /**
@@ -97,8 +137,14 @@ export async function updateJob(resumeId, jobIndex, updates) {
  * @returns {Promise<{ categories: Object }>}
  */
 export async function updateResumeCategories(resumeId, categories) {
-    return apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/categories`, {
-        method: 'PATCH',
-        body: JSON.stringify({ categories })
-    });
+    try {
+        return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/categories`, {
+            method: 'PATCH',
+            body: JSON.stringify({ categories })
+        });
+    } catch (e) {
+        reportError(e, '[resume-details-editor/api] Failed to update categories', 'Downloading a JSON patch for manual application');
+        downloadJson(`${resumeId}-categories.patch.json`, { resumeId, operation: 'updateResumeCategories', categories });
+        throw e;
+    }
 }

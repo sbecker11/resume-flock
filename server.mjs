@@ -18,7 +18,11 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 const PROJECT_ROOT = process.cwd();
 const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
-const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
+// Back-compat note:
+// - Legacy filename: app_state.json
+// - Preferred filename: app_status.json
+const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_status.json');
+const STATE_FILE_PATH_LEGACY = path.resolve(PROJECT_ROOT, 'app_state.json');
 const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_state.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
@@ -113,16 +117,47 @@ async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath =
     return { jobs, skills, categories };
 }
 
-/** If app_state.json is missing, initialize it from app_state.example.json (safe defaults, no user data). */
+/** Choose which state file to use (prefer app_status.json, fall back to app_state.json). */
+async function getStateFilePathToUse() {
+    const hasNew = await fs.access(STATE_FILE_PATH).then(() => true).catch((e) => {
+        if (e?.code === 'ENOENT') return false;
+        throw e;
+    });
+    if (hasNew) return STATE_FILE_PATH;
+
+    const hasLegacy = await fs.access(STATE_FILE_PATH_LEGACY).then(() => true).catch((e) => {
+        if (e?.code === 'ENOENT') return false;
+        throw e;
+    });
+    if (hasLegacy) {
+        // One-time migration: create app_status.json from app_state.json, then prefer the new path.
+        try {
+            const legacy = await fs.readFile(STATE_FILE_PATH_LEGACY, 'utf-8');
+            await fs.writeFile(STATE_FILE_PATH, legacy, 'utf-8');
+            console.log('📄 Migrated app_state.json → app_status.json');
+            return STATE_FILE_PATH;
+        } catch (e) {
+            console.error('[server] Failed to migrate app_state.json → app_status.json:', e);
+            return STATE_FILE_PATH_LEGACY;
+        }
+    }
+
+    // Neither exists yet — create the preferred new one.
+    return STATE_FILE_PATH;
+}
+
+/** If state file is missing, initialize it from app_state.example.json (safe defaults, no user data). */
 async function ensureAppStateFile() {
     try {
-        await fs.access(STATE_FILE_PATH);
+        const statePath = await getStateFilePathToUse();
+        await fs.access(statePath);
     } catch (err) {
         if (err.code === 'ENOENT') {
             try {
                 const example = await fs.readFile(STATE_EXAMPLE_PATH, 'utf-8');
-                await fs.writeFile(STATE_FILE_PATH, example, 'utf-8');
-                console.log('📄 Initialized app_state.json from app_state.example.json');
+                const statePath = await getStateFilePathToUse();
+                await fs.writeFile(statePath, example, 'utf-8');
+                console.log(`📄 Initialized ${path.basename(statePath)} from app_state.example.json`);
             } catch (e) {
                 console.error('[server] Could not initialize app_state.json from example:', e.message);
             }
@@ -138,10 +173,11 @@ async function ensureAppStateFile() {
 app.get('/api/state', async (req, res) => {
     try {
         await ensureAppStateFile();
-        const stateData = await fs.readFile(STATE_FILE_PATH, 'utf-8');
+        const statePath = await getStateFilePathToUse();
+        const stateData = await fs.readFile(statePath, 'utf-8');
         const parsedState = JSON.parse(stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('📖 Loaded app state from disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
+        console.log(`📖 Loaded app state from disk (${path.basename(statePath)}) - size:`, sizeKB, 'KB, at:', new Date().toISOString());
         res.json(parsedState);
     } catch (error) {
         if (error.code === 'ENOENT') {
@@ -157,16 +193,22 @@ app.get('/api/state', async (req, res) => {
 // POST /api/state: Write application state to app_state.json (whenever a persistent attribute is updated)
 app.post('/api/state', async (req, res) => {
     try {
+        const statePath = await getStateFilePathToUse();
         const stateData = JSON.stringify(req.body, null, 2);
-        await atomicWriteWithLock(STATE_FILE_PATH, stateData);
+        await atomicWriteWithLock(statePath, stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log('💾 Saved app state to disk - size:', sizeKB, 'KB, at:', new Date().toISOString());
+        console.log(`💾 Saved app state to disk (${path.basename(statePath)}) - size:`, sizeKB, 'KB, at:', new Date().toISOString());
         res.json({ success: true });
     } catch (error) {
         console.error('Error writing state file:', error);
         res.status(500).json({ error: 'Failed to write state file.' });
     }
 });
+
+// --- Static serving for parsed resumes ---
+// Useful for static hosting / debugging: allows fetching /parsed_resumes/<id>/jobs.json, etc.
+// Note: GitHub Pages cannot write back to these files; writes still require the API.
+app.use('/parsed_resumes', express.static(PARSED_RESUMES_DIR));
 
 // GET /api/resumes/default/data: Jobs and skills from static_content (default resume)
 app.get('/api/resumes/default/data', async (req, res) => {

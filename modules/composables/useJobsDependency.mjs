@@ -3,6 +3,7 @@
 
 import { ref, computed, readonly } from 'vue'
 import { enrichJobsWithSkills } from '../data/enrichedJobs.mjs'
+import { reportError } from '@/modules/utils/errorReporting.mjs'
 
 // Global state for jobs dependency
 const jobsState = ref({
@@ -47,12 +48,31 @@ export function useJobsDependency() {
     jobsState.value.error = null
 
     try {
-      const res = await fetch(url)
-      if (!res.ok) {
-        const errBody = await res.text()
-        throw new Error(res.status === 404 ? `Resume data not found: ${url}` : `Resume API ${res.status}: ${errBody}`)
+      let payload = null
+      try {
+        const res = await fetch(url)
+        if (!res.ok) {
+          const errBody = await res.text().catch(() => '')
+          throw new Error(res.status === 404 ? `Resume data not found: ${url}` : `Resume API ${res.status}: ${errBody}`)
+        }
+        payload = await res.json()
+      } catch (e) {
+        reportError(e, '[useJobsDependency] Failed to fetch resume data from API', 'Attempting static /parsed_resumes fallback')
+        const staticUrl = `/parsed_resumes/${encodeURIComponent(resumeId)}/jobs.json`
+        const [jobsRes, skillsRes] = await Promise.all([
+          fetch(staticUrl),
+          fetch(`/parsed_resumes/${encodeURIComponent(resumeId)}/skills.json`).catch(() => null),
+        ])
+        if (!jobsRes.ok) {
+          const errBody = await jobsRes.text().catch(() => '')
+          throw new Error(`Static resume jobs not found: ${staticUrl}${errBody ? ` — ${errBody}` : ''}`)
+        }
+        const jobs = await jobsRes.json()
+        const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
+        payload = { jobs, skills }
       }
-      const { jobs: rawJobs, skills } = await res.json()
+
+      const { jobs: rawJobs, skills } = payload
       if (!Array.isArray(rawJobs)) {
         throw new Error('API returned jobs that are not an array')
       }
@@ -65,7 +85,7 @@ export function useJobsDependency() {
       await notifyDependentControllers()
       return jobs
     } catch (error) {
-      console.error('[useJobsDependency] ❌ Failed to load jobs:', error)
+      reportError(error, '[useJobsDependency] ❌ Failed to load jobs')
       jobsState.value.error = error
       throw error
     } finally {

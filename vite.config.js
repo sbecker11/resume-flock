@@ -9,9 +9,11 @@ dotenv.config({ path: path.join(process.cwd(), '.env') })
 const viteDevPort = parseInt(process.env.VITE_DEV_PORT, 10) || parseInt(process.env.VITE_PORT, 10) || 5174
 const apiPort = parseInt(process.env.VITE_API_PORT, 10) || parseInt(process.env.EXPRESS_PORT, 10) || 3001
 const proxyTarget = process.env.VITE_PROXY_TARGET || `http://localhost:${apiPort}`
+const base = process.env.VITE_BASE || '/'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base,
   plugins: [vue()],
   resolve: {
     alias: {
