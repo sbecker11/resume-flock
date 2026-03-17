@@ -375,13 +375,18 @@ async function handleEditJobSkills(e) {
 function handleOpenResumeDetails(e) {
   const { tab, jobIndex, focusField } = e.detail || {};
   if (!tab || jobIndex == null) return;
+  console.log('[RDE] handleOpenResumeDetails start', { tab, jobIndex, focusField });
   const current = selectionManager?.getSelectedJobNumber?.() ?? null;
   if (current !== jobIndex) {
+    console.log('[RDE] selectJobNumber before');
     selectionManager?.selectJobNumber(jobIndex, 'ResumeContainer.handleOpenResumeDetails');
+    console.log('[RDE] selectJobNumber after');
   }
-  // Defer opening modal to next tick so selection handlers (scroll, DOM updates) finish first;
-  // avoids same-tick cascade that can freeze the app when opening from pencil icon.
-  nextTick(() => openDetailsModal(tab, jobIndex, focusField));
+  nextTick(() => {
+    console.log('[RDE] nextTick: openDetailsModal before');
+    openDetailsModal(tab, jobIndex, focusField);
+    console.log('[RDE] nextTick: openDetailsModal after');
+  });
 }
 
 async function handleDetailsSaved(payload) {

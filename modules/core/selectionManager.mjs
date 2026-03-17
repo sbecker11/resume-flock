@@ -43,8 +43,10 @@ class SelectionManager {
      */
     selectCard(card, caller = 'unknown') {
         if (!card || !card.type) return;
+        console.log('[RDE] SelectionManager selectCard start', caller, card?.type);
         const previousCard = this.selectedCard;
         this._unselectAllSelectedCards(previousCard);
+        console.log('[RDE] SelectionManager _unselectAllSelectedCards done');
 
         this.selectedCard = card;
         this.selectedJobNumber = card.type === 'biz' ? card.jobNumber : null;
@@ -53,9 +55,13 @@ class SelectionManager {
 
         if (card.type === 'biz') {
             const previousJobNumber = previousCard?.type === 'biz' ? previousCard.jobNumber : null;
+            console.log('[RDE] SelectionManager commandControllers before');
             this.commandControllers(card.jobNumber, previousJobNumber, caller);
+            console.log('[RDE] SelectionManager commandControllers after');
             this.dispatchCardSelected(this.selectedCard, previousCard, caller);
+            console.log('[RDE] SelectionManager dispatchCardSelected after');
             this.dispatchSelectionEvents(card.jobNumber, previousJobNumber, caller);
+            console.log('[RDE] SelectionManager dispatchSelectionEvents after');
             const dataJobObject = this.getJobDataByNumber(card.jobNumber);
             console.debug('[SelectionManager] Biz card selected', dataJobObject?.employer);
         } else {

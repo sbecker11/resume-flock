@@ -265,6 +265,7 @@ function onResizeEnd() {
 
 watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
   if (!open || !id || id === 'default') return;
+  console.log('[RDE] editor watch start', { open, id });
   const tab = props.initialTab && tabs.some(t => t.id === props.initialTab) ? props.initialTab : 'meta';
   activeTab.value = tab;
   skillsPreselectJobIndex.value = null;
@@ -275,8 +276,9 @@ watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
   clampDragOffset();
   pendingMeta.value = null;
   pendingOtherSections.value = null;
-  // Defer async load to next tick so modal is painted first; avoids same-tick cascade/freeze.
+  console.log('[RDE] editor watch sync done, scheduling nextTick load');
   nextTick(async () => {
+    console.log('[RDE] editor nextTick load start');
     try {
       const [metaRes, otherRes] = await Promise.all([
         api.getResumeMeta(id).catch(() => ({})),
@@ -284,6 +286,7 @@ watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
       ]);
       meta.value = metaRes;
       otherSections.value = otherRes;
+      console.log('[RDE] editor nextTick load done');
     } catch (err) {
       console.error('[ResumeDetailsEditor] load failed:', err);
     }

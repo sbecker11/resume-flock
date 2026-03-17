@@ -120,12 +120,13 @@ const yearOptions = computed(() => {
 });
 
 watch(() => props.resumeId, (id) => {
+  console.log('[RDE] JobsTab resumeId watch', { id });
   loadError.value = '';
   jobs.value = [];
   selectedJobIndex.value = null;
   if (!id || id === 'default') return;
-  // Defer fetch to next tick so we don't run in same flush as modal open (avoids freeze).
   nextTick(async () => {
+    console.log('[RDE] JobsTab nextTick getResumeData start', id);
     try {
       const data = await api.getResumeData(id);
       jobs.value = jobsArray(data.jobs);
@@ -133,6 +134,7 @@ watch(() => props.resumeId, (id) => {
         ? Number(props.initialJobIndex)
         : (jobs.value.length ? 0 : null);
       selectedJobIndex.value = idx;
+      console.log('[RDE] JobsTab getResumeData done', { jobsCount: jobs.value.length, selectedIndex: idx });
     } catch (err) {
       console.error('[JobsTab] load failed:', err);
       loadError.value = 'Failed to load jobs: ' + err.message;
@@ -167,6 +169,7 @@ function toStartEnd(l) {
 
 watch(selectedJob, (job) => {
   if (!job) return;
+  console.log('[RDE] JobsTab selectedJob watch, setting local');
   const start = parseYearMonth(job.start);
   const end = parseYearMonth(job.end);
   local.value = {
@@ -182,9 +185,11 @@ watch(selectedJob, (job) => {
 
 watch(() => [props.initialFocusField, selectedJob.value], ([focusField, job]) => {
   if (!focusField || !job) return;
+  console.log('[RDE] JobsTab focus watch, nextTick focus');
   nextTick(() => {
     const el = focusField === 'employer' ? employerInputRef.value : focusField === 'description' ? descriptionInputRef.value : null;
     if (el && typeof el.focus === 'function') el.focus();
+    console.log('[RDE] JobsTab focus applied', !!el);
   });
 }, { immediate: true });
 
