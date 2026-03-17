@@ -360,10 +360,19 @@ async function loadStateFromServer(): Promise<AppState> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`[AppState] Loading state from server (attempt ${attempt}/${maxRetries})...`);
-            const response = await fetch('/api/state')
+            const base = (import.meta as any)?.env?.BASE_URL || '/'
+            const apiUrl = (base.endsWith('/') ? base : `${base}/`) + 'api/state'
+            const response = await fetch(apiUrl)
             if (!response.ok) {
                 if (response.status === 404) {
                     console.log("No saved state found on server, using default state.")
+                    // GitHub Pages / static hosting: fall back to localStorage if present
+                    try {
+                        const raw = localStorage.getItem('resume-flock/app_state')
+                        if (raw) return deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+                    } catch (e) {
+                        reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Using default state')
+                    }
                     return getDefaultState()
                 } else {
                     throw new Error(`Server responded with status: ${response.status}`)
@@ -416,7 +425,9 @@ async function saveStateToServer(state: AppState): Promise<void> {
     try {
         state.lastUpdated = new Date().toISOString()
         console.log('[AppState] 💾 Saving state to server - currentResumeId:', state['user-settings']?.currentResumeId)
-        const response = await fetch('/api/state', {
+        const base = (import.meta as any)?.env?.BASE_URL || '/'
+        const apiUrl = (base.endsWith('/') ? base : `${base}/`) + 'api/state'
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -424,12 +435,21 @@ async function saveStateToServer(state: AppState): Promise<void> {
             body: JSON.stringify(state),
         })
         if (!response.ok) {
+            // GitHub Pages / static hosting can't accept POST. Remedy: persist to localStorage and continue.
+            try {
+                localStorage.setItem('resume-flock/app_state', JSON.stringify(state))
+                reportError(new Error(`Server returned ${response.status}: ${response.statusText}`), '[AppState] Failed to save state to server', 'Remedy: Saved AppState to localStorage instead (static hosting)')
+                return
+            } catch (e) {
+                reportError(e, '[AppState] Failed to save AppState to localStorage', 'Remedy: Disabling auto-save to avoid spam')
+            }
             throw new Error(`Server returned ${response.status}: ${response.statusText}`)
         }
         console.log('[AppState] ✅ State saved to server successfully')
     } catch (error) {
-        reportError(error, '[AppState] Failed to save state to server', '')
-        throw error
+        reportError(error, '[AppState] Failed to save state to server', 'Remedy: Auto-save will be disabled for this session')
+        // For static hosting, do not rethrow here; callers (auto-save) should not crash the app.
+        return
     }
 }
 
@@ -512,8 +532,8 @@ export function useAppState(): UseAppStateReturn {
                     await saveAppState()
                     hasPendingUpdates = false
                 } catch (error) {
-                    reportError(error, '[AppState] Auto-save failed', '')
-                    throw error
+                    reportError(error, '[AppState] Auto-save failed', 'Remedy: Stopping auto-save to avoid repeated errors')
+                    stopAutoSave()
                 }
             }
         }, AUTO_SAVE_INTERVAL)

@@ -43,6 +43,12 @@ jobs:
           mkdir -p dist/parsed_resumes
           rsync -av --exclude="**/*.docx" --exclude="**/*.pdf" --exclude="**/*.html" parsed_resumes/ dist/parsed_resumes/
 
+      - name: Copy static_content (palettes/icons/media)
+        run: |
+          node scripts/generate-color-palette-manifest.mjs
+          mkdir -p dist/static_content
+          rsync -av static_content/ dist/static_content/
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

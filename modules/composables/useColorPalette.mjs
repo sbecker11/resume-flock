@@ -4,10 +4,18 @@ import { parsePaletteJson, normalizePaletteColors, getHighContrastForBackground,
 import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 
-const PALETTE_DIR = './static_content/colorPalettes/';
-const MANIFEST_ENDPOINT = '/api/palette-manifest';
+function basePathJoin(relPath) {
+    const base = (import.meta?.env?.BASE_URL || '/');
+    const b = base.endsWith('/') ? base : `${base}/`;
+    const p = relPath.startsWith('/') ? relPath.slice(1) : relPath;
+    return `${b}${p}`;
+}
+
+const PALETTE_DIR = basePathJoin('static_content/colorPalettes/');
+const STATIC_MANIFEST_URL = basePathJoin('static_content/colorPalettes/manifest.json');
+const API_MANIFEST_URL = basePathJoin('api/palette-manifest');
 /** Base path for contrast icons (url/back/img); must contain icons8-{url,back,img}-16-black.png. */
-const ICON_BASE = '/static_content/icons';
+const ICON_BASE = basePathJoin('static_content/icons');
 
 // --- Reactive State ---
 // This state is shared across all components that use this composable
@@ -87,9 +95,20 @@ export function useColorPalette() {
             currentPaletteFilename.value = appState.value["user-settings"].theme.colorPalette;
             // console.log(`[ColorPalette] Initialized currentPaletteFilename from appState.colorPalette: ${appState.value.theme.colorPalette}`);
 
-            const response = await fetch(MANIFEST_ENDPOINT);
-            if (!response.ok) throw new Error('Failed to fetch palette manifest');
-            const manifestData = await response.json();
+            let manifestData = null;
+            try {
+                const staticRes = await fetch(STATIC_MANIFEST_URL);
+                if (staticRes.ok) {
+                    manifestData = await staticRes.json();
+                } else {
+                    throw new Error(`Static manifest ${staticRes.status}`);
+                }
+            } catch (e) {
+                // Local dev: fall back to API endpoint served by node.
+                const apiRes = await fetch(API_MANIFEST_URL);
+                if (!apiRes.ok) throw new Error('Failed to fetch palette manifest');
+                manifestData = await apiRes.json();
+            }
             // console.log(`[ColorPalette] Loaded manifest with ${manifestData.length} palette files`);
 
             const tempLoadedColorPalettes = {};
