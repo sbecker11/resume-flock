@@ -53,6 +53,10 @@ function downloadJson(filename, data) {
     }
 }
 
+function isStaticHost() {
+    return typeof window !== 'undefined' && window.location?.origin?.includes('github.io');
+}
+
 async function apiJson(path, options = {}) {
     const base = getApiBase();
     const url = base ? (base + path) : basePathJoin(path);
@@ -67,7 +71,8 @@ async function apiJson(path, options = {}) {
         }
         return res.json();
     } catch (e) {
-        reportError(e, `[resume-details-editor/api] Request failed: ${path}`);
+        const is404 = e?.message?.includes('404') || e?.message?.includes('not found');
+        if (!is404) reportError(e, `[resume-details-editor/api] Request failed: ${path}`);
         throw e;
     }
 }
@@ -77,7 +82,27 @@ async function apiJson(path, options = {}) {
  * @returns {Promise<{ id: string, displayName: string, createdAt?: string, fileName?: string, jobCount?: number, skillCount?: number }>}
  */
 export async function getResumeMeta(resumeId) {
-    return apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/meta`);
+    if (resumeId !== 'default' && isStaticHost()) {
+        try {
+            const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/meta.json`);
+            const res = await fetch(url);
+            if (res.ok) return res.json();
+        } catch (_) {}
+        return { id: resumeId, displayName: resumeId };
+    }
+    try {
+        return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/meta`);
+    } catch (e) {
+        if (e?.message?.includes('404') || e?.message?.includes('not found')) {
+            try {
+                const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/meta.json`);
+                const res = await fetch(url);
+                if (res.ok) return res.json();
+            } catch (_) {}
+            return { id: resumeId, displayName: resumeId };
+        }
+        throw e;
+    }
 }
 
 /**
@@ -103,10 +128,25 @@ export async function updateResumeMeta(resumeId, updates) {
  * @returns {Promise<Object>} otherSections (summary, title, contact, certifications, websites, custom_sections)
  */
 export async function getResumeOtherSections(resumeId) {
+    if (resumeId !== 'default' && isStaticHost()) {
+        try {
+            const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/other-sections.json`);
+            const res = await fetch(url);
+            if (res.ok) return res.json();
+        } catch (_) {}
+        return {};
+    }
     try {
         return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/other-sections`);
     } catch (e) {
-        if (e.message.includes('404') || e.message.includes('not found')) return {};
+        if (e?.message?.includes('404') || e?.message?.includes('not found')) {
+            try {
+                const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/other-sections.json`);
+                const res = await fetch(url);
+                if (res.ok) return res.json();
+            } catch (_) {}
+            return {};
+        }
         throw e;
     }
 }
