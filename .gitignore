@@ -9,12 +9,20 @@ palette-utils-ts/coverage/
 
 # Persisted UI state (per-user; app writes when a persistent attribute is updated)
 app_state.json
+app_status.json
 
 # Local-only Cursor command (do not push)
 .cursor/commands/env.md
 
 # Generated parsed resumes (runtime output)
-parsed_resumes
+parsed_resumes/
+
+# Allow committing a curated, public resume dataset for GitHub Pages.
+# Keep ALL parsed resumes ignored by default, then opt-in only the one folder we want public.
+parsed_resumes/**
+!parsed_resumes/
+!parsed_resumes/shawn-becker-full-stack-developer-ai-ml-engineer/
+!parsed_resumes/shawn-becker-full-stack-developer-ai-ml-engineer/*.json
 
 # Schema validator test venv
 .venv-schema/.venv-schema/
