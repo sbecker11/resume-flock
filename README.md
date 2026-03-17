@@ -1,6 +1,7 @@
 # resume-flock
 
 <img src="static_content/movie.gif" width=400 height=300>
+<img src="static_content/resume.png">
 
 # Dark, chaotic, and deep
 
