@@ -373,6 +373,27 @@ const detailsEditorInitialTab = ref('meta');
 const detailsEditorInitialJobIndex = ref(null);
 const detailsEditorInitialFocusField = ref(null);
 
+// --- About modal (hero phrase) ---
+const isAboutModalOpen = ref(false);
+const aboutHtml = `
+<strong>resume-flock</strong> is an interactive resume explorer. The name comes from the original concept "flock-of-postcards" (later "flock-of-cards"): your resume is explored like a <em>flock of birds</em> - business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as <strong>business cards</strong> (one per job) and <strong>skill cards</strong> (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
+`.trim();
+
+function openAboutModal() {
+  // Avoid stacking modals; keep UX simple.
+  isDetailsEditorOpen.value = false;
+  isAboutModalOpen.value = true;
+}
+
+function closeAboutModal() {
+  isAboutModalOpen.value = false;
+}
+
+function handleGlobalKeyDown(e) {
+  if (!isAboutModalOpen.value) return;
+  if (e?.key === 'Escape') closeAboutModal();
+}
+
 function openDetailsModal(tab = 'meta', jobIndex = null, focusField = null) {
   detailsEditorInitialTab.value = tab;
   detailsEditorInitialJobIndex.value = jobIndex;
@@ -704,11 +725,13 @@ onMounted(() => {
   window.addEventListener('app-state-loaded', onAppStateLoadedForSort);
   window.addEventListener('edit-job-skills', handleEditJobSkills);
   window.addEventListener('open-resume-details', handleOpenResumeDetails);
+  document.addEventListener('keydown', handleGlobalKeyDown);
   nextTick(() => { setTimeout(syncSortRuleKeyFromController, 100); });
   window.__resumeAppendSkillCardCopy = appendSkillCardCopyToResumeListing;
 });
 onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick);
+  document.removeEventListener('keydown', handleGlobalKeyDown);
   selectionManager?.eventTarget?.removeEventListener('card-selected', updateSelectedCardSnapshot);
   selectionManager?.eventTarget?.removeEventListener('selection-cleared', updateSelectedCardSnapshot);
   selectionManager?.eventTarget?.removeEventListener('skill-resume-div-scrollIntoView', onResumeSkillCardScrollIntoView);
@@ -737,7 +760,17 @@ function onResumeSkillCardClick(event) {
 <template>
     <div id="resume-content">
         <div id="resume-content-header">
-            <p class="intro">Welcome to your resume-flock!</p>
+            <p
+              class="intro about-trigger"
+              role="button"
+              tabindex="0"
+              aria-label="About resume-flock"
+              @click="openAboutModal"
+              @keydown.enter.prevent="openAboutModal"
+              @keydown.space.prevent="openAboutModal"
+            >
+              Welcome to your resume-flock!
+            </p>
             <!-- Resume Selector + Print Button Row -->
             <div class="resume-selector-row">
                 <div class="resume-selector" ref="resumeSelectorRef">
@@ -858,6 +891,32 @@ function onResumeSkillCardClick(event) {
                 <button @click="clearAllResumeDivs" class="resume-divs-control-button">Clear</button>
             </div>
         </div>
+
+        <teleport to="body">
+          <div
+            v-if="isAboutModalOpen"
+            class="about-modal-overlay"
+            @click.self="closeAboutModal"
+          >
+            <div
+              class="about-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="About resume-flock"
+            >
+              <button
+                type="button"
+                class="about-modal-close"
+                aria-label="Close about modal"
+                @click="closeAboutModal"
+              >
+                ×
+              </button>
+              <div class="about-modal-body" v-html="aboutHtml"></div>
+            </div>
+          </div>
+        </teleport>
+
         <!-- Resume Details Editor Modal (Meta, Other sections, Skills tabs) -->
         <ResumeDetailsEditor
             :resume-id="currentResumeId"
@@ -923,6 +982,76 @@ function onResumeSkillCardClick(event) {
 #resume-content-header > p {
     margin-block-start: 0.5em;
     margin-block-end: 0.5em;
+}
+
+#resume-content-header .intro.about-trigger {
+    cursor: pointer;
+    user-select: none;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+#resume-content-header .intro.about-trigger:hover {
+    opacity: 0.95;
+}
+#resume-content-header .intro.about-trigger:focus {
+    outline: 2px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 2px;
+}
+
+.about-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    /* Must exceed ResizeHandle (z-index: 10000) so modal stays on top */
+    z-index: 25000;
+}
+
+.about-modal {
+    width: min(720px, 95vw);
+    max-height: 80vh;
+    overflow: auto;
+    background-color: var(--grey-darkest);
+    color: white;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+    padding: 22px 18px 18px;
+    position: relative;
+}
+
+.about-modal-close {
+    position: absolute;
+    top: 11px;
+    right: 11px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    color: #c00;
+    background: #fff;
+    border: 1px solid #c00;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    cursor: pointer;
+}
+.about-modal-close:hover {
+    color: #f00;
+    border-color: #f00;
+    background: rgba(255, 255, 255, 0.9);
+}
+
+.about-modal-body {
+    font-family: sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
 }
 
 #resume-content-listing {

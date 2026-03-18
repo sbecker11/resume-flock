@@ -6,7 +6,7 @@
 
 # Dark, chaotic, and deep
 
-**resume-flock** is an interactive resume explorer. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
+**resume-flock** is an interactive resume explorer. The name comes from the original concept “flock-of-postcards” (later “flock-of-cards”): your resume is explored like a *flock of birds*—business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
 
 ### High-level functionality
 
