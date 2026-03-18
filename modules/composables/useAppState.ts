@@ -16,7 +16,7 @@ import { reportError } from '../utils/errorReporting.mjs'
 // @ts-ignore - Legacy module imports with type declarations
 import type { AppState, UseAppStateReturn } from '../types/index'
 // @ts-ignore - Legacy module
-import { setFromAppState as setRenderingFromAppState, DEFAULT_RENDERING_LIMITS } from '../core/renderingConfig.mjs'
+import { setFromAppState as setRenderingFromAppState } from '../core/renderingConfig.mjs'
 import { hasServer } from '../core/hasServer.mjs'
 
 function getRuntimeBase(): string {
@@ -53,21 +53,56 @@ const loadError: Ref<Error | null> = ref(null)
 let stateApiAvailable: boolean | null = null
 
 const STATE_API_UNAVAILABLE_KEY = 'resume-flock/state_api_unavailable'
-const EXAMPLE_STATE_PATH = 'app_state.example.json'
+const DEFAULT_STATE_PATH = 'app_state.default.json'
+
+const REQUIRED_RENDERING_LIMITS_KEYS = ['blurAtMaxZ', 'saturationAtMaxZ', 'brightnessAtMaxZ', 'parallaxScaleAtMinZ', 'parallaxScaleAtMaxZ'] as const
+
+function hasMinMaxStep(obj: unknown): obj is { min: number; max: number; step: number } {
+    return (
+        typeof obj === 'object' &&
+        obj !== null &&
+        typeof (obj as any).min === 'number' &&
+        typeof (obj as any).max === 'number' &&
+        typeof (obj as any).step === 'number'
+    )
+}
 
 /**
- * Load state from static app_state.example.json (e.g. on GitHub Pages when no server).
- * Returns null if fetch or parse fails.
+ * Fast-fail if required state is missing. Required: system-constants.renderingLimits with each key having { min, max, step }.
+ * Call before accepting state from app_state.json / app_state.default.json.
  */
-async function loadStateFromExampleFile(): Promise<AppState | null> {
+function validateRequiredState(state: AppState): void {
+    const limits = state?.['system-constants']?.renderingLimits
+    if (!limits || typeof limits !== 'object') {
+        const err = new Error('[AppState] Missing required system-constants.renderingLimits. Ensure public/app_state.default.json (and app_state.json when using server) includes renderingLimits with blurAtMaxZ, saturationAtMaxZ, brightnessAtMaxZ, parallaxScaleAtMinZ, parallaxScaleAtMaxZ (each with min, max, step).')
+        reportError(err, '[AppState] Invalid or incomplete state', 'Remedy: Fix app_state.default.json and reload.')
+        throw err
+    }
+    for (const key of REQUIRED_RENDERING_LIMITS_KEYS) {
+        if (!hasMinMaxStep(limits[key])) {
+            const err = new Error(`[AppState] Missing or invalid system-constants.renderingLimits.${key} (expected { min, max, step }). Ensure public/app_state.default.json is complete.`)
+            reportError(err, '[AppState] Invalid or incomplete state', 'Remedy: Fix app_state.default.json and reload.')
+            throw err
+        }
+    }
+}
+
+/**
+ * Load state from static app_state.default.json (e.g. on GitHub Pages when no server).
+ * Returns null if fetch or parse fails. Throws if file is loaded but missing required settings (fast-fail).
+ */
+async function loadStateFromDefaultFile(): Promise<AppState | null> {
     try {
-        const url = basePathJoin(EXAMPLE_STATE_PATH)
+        const url = basePathJoin(DEFAULT_STATE_PATH)
         const response = await fetch(url)
         if (!response.ok) return null
         const raw = await response.json()
         const migrated = migrateState(raw)
-        return deepMerge(getDefaultState(), migrated)
-    } catch {
+        const state = deepMerge(getDefaultState(), migrated)
+        validateRequiredState(state)
+        return state
+    } catch (e) {
+        if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
         return null
     }
 }
@@ -86,7 +121,8 @@ const AUTO_SAVE_INTERVAL = 5000 // 5 seconds
 const DEBOUNCE_TIMEOUT = 1000   // 1 second for immediate debouncing
 
 /**
- * Gets the default state - preserving existing user/system separation
+ * Gets the default state - preserving existing user/system separation.
+ * renderingLimits come only from app_state.json / app_state.default.json (not from code).
  */
 function getDefaultState(): AppState {
     return {
@@ -230,15 +266,8 @@ function getDefaultState(): AppState {
                 saturationAtMaxZ: 100,
                 brightnessAtMaxZ: 100,
                 blurAtMaxZ: 0
-            },
-            /** Min/max/step for 3D Settings sliders; single place to edit is app_state.json */
-            renderingLimits: {
-                blurAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.blurAtMaxZ },
-                saturationAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.saturationAtMaxZ },
-                brightnessAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.brightnessAtMaxZ },
-                parallaxScaleAtMinZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMinZ },
-                parallaxScaleAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMaxZ }
             }
+            // renderingLimits: only from app_state.json / app_state.default.json (never from code)
         }
     };
 }
@@ -391,16 +420,7 @@ function migrateState(state: any): AppState {
             if (r.displacementAtMinZ !== undefined) delete r.displacementAtMinZ
         }
         if (state['user-settings']?.rendering) delete state['user-settings'].rendering
-        if (!sc.renderingLimits) {
-            sc.renderingLimits = {
-                blurAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.blurAtMaxZ },
-                saturationAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.saturationAtMaxZ },
-                brightnessAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.brightnessAtMaxZ },
-                parallaxScaleAtMinZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMinZ },
-                parallaxScaleAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMaxZ }
-            }
-            console.log('[AppState] Added missing system-constants.renderingLimits')
-        }
+        // renderingLimits: only from app_state.json / app_state.default.json (do not inject from code)
         // Single system for depth: only system-constants.rendering (max Z). Strip removed depthEffects.
         if (sc.visualEffects?.depthEffects !== undefined) {
             delete sc.visualEffects.depthEffects
@@ -442,16 +462,23 @@ async function loadStateFromServer(): Promise<AppState> {
                     try {
                         localStorage.setItem(STATE_API_UNAVAILABLE_KEY, '1')
                     } catch (_) {}
-                    console.log('[AppState] No saved state on server; using app_state.example.json or localStorage or defaults.')
-                    const fromExample = await loadStateFromExampleFile()
-                    if (fromExample) return fromExample
+                    console.log('[AppState] No saved state on server; using app_state.default.json or localStorage.')
+                    const fromDefault = await loadStateFromDefaultFile()
+                    if (fromDefault) return fromDefault
                     try {
                         const raw = localStorage.getItem('resume-flock/app_state')
-                        if (raw) return deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+                        if (raw) {
+                            const state = deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+                            validateRequiredState(state)
+                            return state
+                        }
                     } catch (e) {
-                        reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Using default state')
+                        if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
+                        reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Ensure app_state.default.json is valid')
                     }
-                    return getDefaultState()
+                    const err = new Error('[AppState] No valid state: server 404, app_state.default.json missing/failed/invalid, and no localStorage state. Ensure public/app_state.default.json exists with system-constants.renderingLimits.')
+                    reportError(err, '[AppState] Cannot load state', 'Remedy: Add or fix public/app_state.default.json and reload.')
+                    throw err
                 } else {
                     throw new Error(`Server responded with status: ${response.status}`)
                 }
@@ -466,7 +493,8 @@ async function loadStateFromServer(): Promise<AppState> {
             
             // Merge with defaults to ensure all keys exist
             const finalState = deepMerge(getDefaultState(), migratedState)
-            
+            validateRequiredState(finalState)
+
             // If saved state was missing system-constants.rendering or renderingLimits, persist merged state so app_state.json gets the new keys
             const scRaw = rawState['system-constants']
             const r = scRaw?.rendering
@@ -505,13 +533,20 @@ async function loadStateFromServer(): Promise<AppState> {
         }
         try {
             const raw = localStorage.getItem('resume-flock/app_state')
-            if (raw) return deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+            if (raw) {
+                const state = deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
+                validateRequiredState(state)
+                return state
+            }
         } catch (e) {
-            reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Using default state')
+            if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
+            reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Ensure app_state.default.json is valid')
         }
-        const fromExample = await loadStateFromExampleFile()
-        if (fromExample) return fromExample
-        return getDefaultState()
+        const fromDefault = await loadStateFromDefaultFile()
+        if (fromDefault) return fromDefault
+        const err = new Error('[AppState] No valid state: no server, app_state.default.json missing/failed/invalid, and no localStorage state. Ensure public/app_state.default.json exists with system-constants.renderingLimits.')
+        reportError(err, '[AppState] Cannot load state', 'Remedy: Add or fix public/app_state.default.json and reload.')
+        throw err
     }
 }
 

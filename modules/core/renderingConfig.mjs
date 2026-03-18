@@ -1,34 +1,27 @@
 // modules/core/renderingConfig.mjs
 // Parallax/depth rendering constants from app_state.json system-constants.rendering.
 // Synced when app state loads; used by filters.mjs and useParallaxVue3Enhanced.mjs.
-// Min/max/step for 3D sliders live in app_state.json system-constants.renderingLimits (single place to edit).
+// Min/max/step for 3D sliders: ONLY from app_state.json (local) or app_state.default.json (GitHub Pages).
+// renderingConfig does not define limits; callers pass system-constants.renderingLimits from state.
 
 const DEFAULTS = {
   parallaxScaleAtMinZ: 1.0,  // at min scene Z (1 = near; scene Z is distance-from-viewer, not z-index)
   parallaxScaleAtMaxZ: 1.0,   // at max scene Z (14 = far)
   saturationAtMaxZ: 100,      // percentage 0–100; 100 = no change
-  brightnessAtMaxZ: 100,     // percentage 75–100; 100 = no z-based darkness
+  brightnessAtMaxZ: 100,     // percentage 0–100; 100 = no z-based darkness
   blurAtMaxZ: 0
 }
 
-/** Default min/max/step for 3D Settings inputs. Override in app_state.json system-constants.renderingLimits. */
-export const DEFAULT_RENDERING_LIMITS = {
-  blurAtMaxZ: { min: 0, max: 5, step: 0.5 },
-  saturationAtMaxZ: { min: 0, max: 100, step: 5 },
-  brightnessAtMaxZ: { min: 75, max: 100, step: 5 },
-  parallaxScaleAtMinZ: { min: 0, max: 1.5, step: 0.05 },
-  parallaxScaleAtMaxZ: { min: 0, max: 1.5, step: 0.05 }
-}
-
 /**
- * Clamp a value using rendering limits (from app state or DEFAULT_RENDERING_LIMITS).
- * @param {object} limits - system-constants.renderingLimits
+ * Clamp a value using rendering limits from app state (app_state.json or app_state.default.json).
+ * If limits or limits[field] is missing, returns value unchanged (no hardcoded fallback).
+ * @param {object} limits - system-constants.renderingLimits from state
  * @param {string} field - key e.g. 'brightnessAtMaxZ'
  * @param {number} value
  * @returns {number}
  */
 export function clampRenderingValue(limits, field, value) {
-  const lim = (limits && limits[field]) || DEFAULT_RENDERING_LIMITS[field]
+  const lim = limits && limits[field]
   if (!lim) return value
   const n = Number(value)
   if (Number.isNaN(n)) return lim.min
@@ -41,7 +34,7 @@ let current = { ...DEFAULTS }
  * Update config from app state (system-constants.rendering). Call after loadAppState().
  * If limits provided, values are clamped to renderingLimits (e.g. from app_state.json).
  * @param {object} [rendering] - state['system-constants'].rendering
- * @param {object} [limits] - state['system-constants'].renderingLimits (optional)
+ * @param {object} [limits] - state['system-constants'].renderingLimits (optional; when omitted, no clamping)
  */
 export function setFromAppState(rendering, limits) {
   if (!rendering || typeof rendering !== 'object') return

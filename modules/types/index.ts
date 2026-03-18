@@ -160,7 +160,7 @@ export interface AppState {
       parallaxScaleAtMinZ: number;   // at min scene Z (near); scene Z = distance-from-viewer, not z-index; 0–1.5 (default 1.0)
       parallaxScaleAtMaxZ: number;   // at max scene Z (far), 0–1.5 (default 1.0)
       saturationAtMaxZ: number;      // 0–100%; 100 = no change (default 100)
-      brightnessAtMaxZ: number;      // 75–100%; 100 = no z-based darkness (default 100)
+      brightnessAtMaxZ: number;      // 0–100%; 100 = no z-based darkness (default 100)
       blurAtMaxZ: number;            // 0–5 px at max Z; 0 = no z-based blur (default 0)
     };
     /** Min/max/step for 3D Settings sliders; edit in app_state.json for single source of truth */

@@ -42,7 +42,7 @@
             <input v-model.number="form3D.saturationAtMaxZ" type="number" :min="renderingLimits.saturationAtMaxZ.min" :max="renderingLimits.saturationAtMaxZ.max" :step="renderingLimits.saturationAtMaxZ.step" />
           </label>
           <label class="modal-row">
-            <span>Brightness at max Z (75–100%; 100% = no z-based darkness)</span>
+            <span>Brightness at max Z ({{ renderingLimits.brightnessAtMaxZ.min }}–{{ renderingLimits.brightnessAtMaxZ.max }}%; 100% = no z-based darkness)</span>
             <input v-model.number="form3D.brightnessAtMaxZ" type="number" :min="renderingLimits.brightnessAtMaxZ.min" :max="renderingLimits.brightnessAtMaxZ.max" :step="renderingLimits.brightnessAtMaxZ.step" />
           </label>
           <label class="modal-row">
@@ -67,7 +67,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useColorPalette } from '../composables/useColorPalette.mjs'
 import { useAppState } from '../composables/useAppState.ts'
-import { setFromAppState as setRenderingFromAppState, getRendering, DEFAULT_RENDERING_LIMITS, clampRenderingValue } from '../core/renderingConfig.mjs'
+import { setFromAppState as setRenderingFromAppState, getRendering, clampRenderingValue } from '../core/renderingConfig.mjs'
 
 // Use color palette composable
 const {
@@ -79,7 +79,9 @@ const {
 } = useColorPalette()
 
 const { appState, updateAppState } = useAppState()
-const renderingLimits = computed(() => appState.value?.['system-constants']?.renderingLimits ?? DEFAULT_RENDERING_LIMITS)
+
+/** Only from app_state.json / app_state.default.json (no default in code). */
+const renderingLimits = computed(() => appState.value?.['system-constants']?.renderingLimits)
 
 // Local state
 const isDropdownOpen = ref(false)

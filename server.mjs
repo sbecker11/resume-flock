@@ -20,7 +20,7 @@ const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPale
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
 /** Persisted app state (layout, theme, currentResumeId, system-constants, etc.). */
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
-const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'public', 'app_state.example.json');
+const STATE_DEFAULT_PATH = path.resolve(PROJECT_ROOT, 'public', 'app_state.default.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
 const STATIC_CATEGORIES_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'categories.mjs');
@@ -114,18 +114,18 @@ async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath =
     return { jobs, skills, categories };
 }
 
-/** If state file is missing, create it from app_state.example.json (safe defaults). */
+/** If state file is missing, create it from app_state.default.json (safe defaults). */
 async function ensureAppStateFile() {
     try {
         await fs.access(STATE_FILE_PATH);
     } catch (err) {
         if (err.code === 'ENOENT') {
             try {
-                const example = await fs.readFile(STATE_EXAMPLE_PATH, 'utf-8');
-                await fs.writeFile(STATE_FILE_PATH, example, 'utf-8');
-                console.log('📄 Initialized app_state.json from app_state.example.json');
+                const defaultState = await fs.readFile(STATE_DEFAULT_PATH, 'utf-8');
+                await fs.writeFile(STATE_FILE_PATH, defaultState, 'utf-8');
+                console.log('📄 Initialized app_state.json from app_state.default.json');
             } catch (e) {
-                console.error('[server] Could not initialize app_state.json from example:', e.message);
+                console.error('[server] Could not initialize app_state.json from default:', e.message);
             }
         }
     }
