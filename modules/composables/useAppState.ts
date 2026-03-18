@@ -464,7 +464,23 @@ async function loadStateFromServer(): Promise<AppState> {
                     } catch (_) {}
                     console.log('[AppState] No saved state on server; using app_state.default.json or localStorage.')
                     const fromDefault = await loadStateFromDefaultFile()
-                    if (fromDefault) return fromDefault
+                    if (fromDefault) {
+                        try {
+                            const raw = localStorage.getItem('resume-flock/app_state')
+                            if (raw) {
+                                const saved = migrateState(JSON.parse(raw))
+                                const merged = deepMerge(fromDefault, {
+                                    ...saved,
+                                    'system-constants': fromDefault['system-constants']
+                                })
+                                validateRequiredState(merged)
+                                return merged
+                            }
+                        } catch (e) {
+                            if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
+                        }
+                        return fromDefault
+                    }
                     try {
                         const raw = localStorage.getItem('resume-flock/app_state')
                         if (raw) {
@@ -531,6 +547,26 @@ async function loadStateFromServer(): Promise<AppState> {
             localStorage.setItem(STATE_API_UNAVAILABLE_KEY, '1')
           } catch (_) {}
         }
+        // Fetch deployed default first so system-constants (e.g. renderingLimits) always match the build
+        const fromDefault = await loadStateFromDefaultFile()
+        if (fromDefault) {
+            try {
+                const raw = localStorage.getItem('resume-flock/app_state')
+                if (raw) {
+                    const saved = migrateState(JSON.parse(raw))
+                    // Merge saved user state on top of default; default wins for system-constants (e.g. renderingLimits)
+                    const merged = deepMerge(fromDefault, {
+                        ...saved,
+                        'system-constants': fromDefault['system-constants']
+                    })
+                    validateRequiredState(merged)
+                    return merged
+                }
+            } catch (e) {
+                if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
+            }
+            return fromDefault
+        }
         try {
             const raw = localStorage.getItem('resume-flock/app_state')
             if (raw) {
@@ -542,8 +578,6 @@ async function loadStateFromServer(): Promise<AppState> {
             if (e instanceof Error && e.message.startsWith('[AppState]')) throw e
             reportError(e, '[AppState] Failed to load localStorage state', 'Remedy: Ensure app_state.default.json is valid')
         }
-        const fromDefault = await loadStateFromDefaultFile()
-        if (fromDefault) return fromDefault
         const err = new Error('[AppState] No valid state: no server, app_state.default.json missing/failed/invalid, and no localStorage state. Ensure public/app_state.default.json exists with system-constants.renderingLimits.')
         reportError(err, '[AppState] Cannot load state', 'Remedy: Add or fix public/app_state.default.json and reload.')
         throw err
