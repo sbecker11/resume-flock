@@ -11,7 +11,6 @@ import { listResumes, getResumeOtherSections, getResumeData } from '@/modules/ap
 import { buildPrintHtml } from '@/modules/utils/buildPrintHtml.mjs';
 import ResumeManager from './ResumeManager.vue';
 import ResumeManagerDelete from './ResumeManagerDelete.vue';
-import Scene3DSettings from './Scene3DSettings.vue';
 import { ResumeDetailsEditor } from '@/modules/resume-details-editor';
 
 // Define props
@@ -809,7 +808,7 @@ function onResumeSkillCardClick(event) {
                 @selected="handleResumeSelectedFromManage"
                 @open-upload="handleOpenUploadFromManage"
             />
-            <!-- Color Palette Row + 3D Settings -->
+            <!-- Color Palette Row -->
             <div class="header-controls-row">
                 <div id="color-palette-container" tabindex="-1">
                     <select
@@ -822,7 +821,6 @@ function onResumeSkillCardClick(event) {
                         </option>
                     </select>
                 </div>
-                <Scene3DSettings />
             </div>
             <div id="resume-divs-sorting-container" tabindex="-1">
                 <select id="resume-divs-sorting-selector" v-model="sortRuleKey" tabindex="0">

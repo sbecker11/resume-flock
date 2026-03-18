@@ -3,8 +3,9 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-vi.mock('@/modules/core/hasServer.mjs', () => ({ hasServer: () => true }));
+vi.mock('@/modules/core/hasServer.mjs', () => ({ hasServer: vi.fn(() => true) }));
 
+import { hasServer } from '@/modules/core/hasServer.mjs';
 import {
     getResumeMeta,
     updateResumeMeta,
@@ -65,6 +66,15 @@ describe('resume-details-editor api', () => {
             const result = await getResumeMeta('missing');
             expect(result).toMatchObject({ id: 'missing', displayName: 'missing' });
         });
+
+        it('falls back to static meta when API returns 404', async () => {
+            const meta = { id: 'r1', displayName: 'Static', createdAt: '2025-01-01' };
+            fetchMock
+                .mockResolvedValueOnce(errJson(404, 'not found'))
+                .mockResolvedValueOnce(okJson(meta));
+            const result = await getResumeMeta('r1');
+            expect(result).toEqual(meta);
+        });
     });
 
     describe('updateResumeMeta', () => {
@@ -101,6 +111,15 @@ describe('resume-details-editor api', () => {
             fetchMock.mockResolvedValue(errJson(404, 'File not found for this resume'));
             const result = await getResumeOtherSections('r1');
             expect(result).toEqual({});
+        });
+
+        it('falls back to static other-sections when API returns 404', async () => {
+            const data = { summary: 'S', contact: {} };
+            fetchMock
+                .mockResolvedValueOnce(errJson(404, 'not found'))
+                .mockResolvedValueOnce(okJson(data));
+            const result = await getResumeOtherSections('r1');
+            expect(result).toEqual(data);
         });
 
         it('throws on non-404 error', async () => {
@@ -141,6 +160,19 @@ describe('resume-details-editor api', () => {
                 expect.any(Object)
             );
         });
+
+        it('falls back to static when API returns 404 for non-default resume', async () => {
+            const jobs = [{ index: 0, Description: '' }];
+            const skills = {};
+            const categories = {};
+            fetchMock
+                .mockResolvedValueOnce(errJson(404, 'not found'))
+                .mockResolvedValueOnce(okJson(jobs))
+                .mockResolvedValueOnce(okJson(skills))
+                .mockResolvedValueOnce(okJson(categories));
+            const result = await getResumeData('resume-1');
+            expect(result).toEqual({ jobs, skills, categories });
+        });
     });
 
     describe('updateResumeCategories', () => {
@@ -156,6 +188,11 @@ describe('resume-details-editor api', () => {
                     body: JSON.stringify({ categories })
                 })
             );
+        });
+
+        it('downloads patch and rethrows when API fails', async () => {
+            fetchMock.mockResolvedValue(errJson(500, 'Server error'));
+            await expect(updateResumeCategories('r1', { c1: { name: 'C', skillIDs: [] } })).rejects.toThrow('Server error');
         });
     });
 
@@ -188,6 +225,11 @@ describe('resume-details-editor api', () => {
             fetchMock.mockResolvedValue(errJson(404, 'Job index 99 not found'));
             await expect(updateJob('r1', 99, { role: 'X' })).rejects.toThrow('Job index 99 not found');
         });
+
+        it('downloads patch and rethrows when API fails', async () => {
+            fetchMock.mockResolvedValue(errJson(500, 'Server error'));
+            await expect(updateJob('r1', 0, { role: 'X' })).rejects.toThrow('Server error');
+        });
     });
 
     describe('base URL', () => {
@@ -201,13 +243,80 @@ describe('resume-details-editor api', () => {
         });
 
         it('uses custom base when window.__RESUME_DETAILS_EDITOR_API_BASE__ is set', async () => {
-            global.window = { __RESUME_DETAILS_EDITOR_API_BASE__: 'https://api.example.com' };
+            global.window.__RESUME_DETAILS_EDITOR_API_BASE__ = 'https://api.example.com';
             fetchMock.mockResolvedValue(okJson({}));
             await getResumeMeta('r1');
             expect(fetchMock).toHaveBeenCalledWith(
                 'https://api.example.com/api/resumes/r1/meta',
                 expect.any(Object)
             );
+        });
+    });
+
+    describe('when hasServer() is false (static host)', () => {
+        beforeEach(() => {
+            vi.mocked(hasServer).mockReturnValue(false);
+            if (global.window && !global.window.location) {
+                global.window.location = { origin: 'http://localhost', pathname: '/' };
+            }
+        });
+
+        it('getResumeMeta returns default when static fetch fails', async () => {
+            fetchMock.mockResolvedValue(errJson(404, 'not found'));
+            const result = await getResumeMeta('missing');
+            expect(result).toMatchObject({ id: 'missing', displayName: 'missing' });
+        });
+
+        it('getResumeMeta returns static meta when available', async () => {
+            const meta = { id: 'r1', displayName: 'Static', createdAt: '2025-01-01' };
+            fetchMock.mockResolvedValue(okJson(meta));
+            const result = await getResumeMeta('r1');
+            expect(result).toEqual(meta);
+        });
+
+        it('getResumeOtherSections returns static data', async () => {
+            const data = { summary: 'S', contact: {} };
+            fetchMock.mockResolvedValue(okJson(data));
+            const result = await getResumeOtherSections('r1');
+            expect(result).toEqual(data);
+        });
+
+        it('getResumeOtherSections returns empty object when static fails', async () => {
+            fetchMock.mockResolvedValue(errJson(404, 'not found'));
+            const result = await getResumeOtherSections('r1');
+            expect(result).toEqual({});
+        });
+
+        it('getResumeData returns static data for non-default resume', async () => {
+            const jobs = [{ index: 0, Description: '' }];
+            const skills = {};
+            const categories = {};
+            fetchMock
+                .mockResolvedValueOnce(okJson(jobs))
+                .mockResolvedValueOnce(okJson(skills))
+                .mockResolvedValueOnce(okJson(categories));
+            const result = await getResumeData('resume-1');
+            expect(result).toEqual({ jobs, skills, categories });
+        });
+
+        it('getResumeData throws for default on static host', async () => {
+            await expect(getResumeData('default')).rejects.toThrow('not available on static hosting');
+        });
+
+        it('updateResumeMeta throws and downloads patch', async () => {
+            await expect(updateResumeMeta('r1', { displayName: 'X' })).rejects.toThrow('not available on static hosting');
+        });
+
+        it('updateResumeOtherSections throws and downloads patch', async () => {
+            await expect(updateResumeOtherSections('r1', { summary: 'S' })).rejects.toThrow('not available on static hosting');
+        });
+
+        it('updateJob throws and downloads patch', async () => {
+            await expect(updateJob('r1', 0, { role: 'X' })).rejects.toThrow('not available on static hosting');
+        });
+
+        it('updateResumeCategories throws and downloads patch', async () => {
+            await expect(updateResumeCategories('r1', { cat1: { name: 'C', skillIDs: [] } })).rejects.toThrow('not available on static hosting');
         });
     });
 });

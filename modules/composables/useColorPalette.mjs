@@ -44,6 +44,16 @@ const backgroundSwatchIndexByPalette = ref({});
 const orderedPaletteNames = ref([]);
 const filenameToNameMap = ref({});
 const isLoading = ref(false);
+
+/** Resolve palette name from stored filename; use map, then fallback to name derived from filename (e.g. "55 Emerald.json" -> "55 Emerald"). */
+function resolvePaletteNameFromFilename(filename) {
+    if (!filename) return null;
+    const fromMap = filenameToNameMap.value[filename];
+    if (fromMap) return fromMap;
+    const nameFromFilename = filename.replace(/\.json$/i, '').trim();
+    if (nameFromFilename && colorPalettes.value[nameFromFilename]) return nameFromFilename;
+    return null;
+}
 let resolveReady;
 export const readyPromise = new Promise((resolve) => { resolveReady = resolve; });
 // Initialize from the global state, but allow it to be updated locally
@@ -56,7 +66,7 @@ const currentPaletteFilename = ref(null);
 function applySceneBackgroundFromCurrentPalette() {
     const filename = currentPaletteFilename.value;
     if (!filename || typeof document === 'undefined') return;
-    const paletteName = filenameToNameMap.value[filename];
+    const paletteName = resolvePaletteNameFromFilename(filename);
     const colorPalette = colorPalettes.value[paletteName];
     if (!paletteName || !colorPalette || colorPalette.length === 0) return;
     const root = document.documentElement;
@@ -140,7 +150,13 @@ export function useColorPalette() {
             const tempFilenameToNameMap = {};
             const tempOrderedNames = [];
 
-            for (const filename of manifestData) {
+            const paletteFilenames = Array.isArray(manifestData)
+                ? manifestData.filter((f) => typeof f === 'string' && f.endsWith('.json') && f.toLowerCase() !== 'manifest.json')
+                : [];
+            if (paletteFilenames.length === 0) {
+                throw new Error('No palette files in manifest (expected array of .json filenames, excluding manifest.json)');
+            }
+            for (const filename of paletteFilenames) {
                 const filePath = PALETTE_DIR + filename;
                 const paletteResponse = await fetch(filePath);
                 if (!paletteResponse.ok) {
@@ -300,7 +316,7 @@ export function useColorPalette() {
     }
 
     const currentPaletteName = computed(() => {
-        return filenameToNameMap.value[currentPaletteFilename.value] || null;
+        return resolvePaletteNameFromFilename(currentPaletteFilename.value) || null;
     });
 
     const currentPalette = computed(() => {
@@ -391,8 +407,8 @@ export function useColorPalette() {
     // Color palette filename watcher - handles document-level theming
     watch(currentPaletteFilename, async (newFilename) => {
         if (!newFilename) return;
-        
-        const paletteName = filenameToNameMap.value[newFilename];
+
+        const paletteName = resolvePaletteNameFromFilename(newFilename);
         const colorPalette = colorPalettes.value[paletteName];
 
         // Wait for both filename mapping and palette data to be loaded
@@ -502,7 +518,7 @@ export async function applyCurrentPaletteToAllElements(registry = null) {
         }
     }
     const filename = currentPaletteFilename.value;
-    const paletteName = filenameToNameMap.value[filename];
+    const paletteName = resolvePaletteNameFromFilename(filename);
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('color-palette-changed', {
             detail: { filename, paletteName, previousFilename: null }
@@ -529,6 +545,9 @@ async function applyCurrentPaletteToAllElementsImpl() {
  */
 export async function applyPaletteToElement(element) {
     if (!element) throw new Error('applyPaletteToElement: element is required');
+
+    // Ensure palettes are loaded (e.g. when switching resume before palette UI has been shown)
+    await readyPromise;
 
     // Access the centralized app state
     const { appState } = useAppState();
@@ -563,8 +582,8 @@ export async function applyPaletteToElement(element) {
     if (!currentPaletteFilename.value) {
         throw new Error('No palette filename set; cannot apply palette');
     }
-    
-    const paletteName = filenameToNameMap.value[currentPaletteFilename.value];
+
+    let paletteName = resolvePaletteNameFromFilename(currentPaletteFilename.value);
     if (!paletteName) {
         throw new Error(`Palette name not found for filename: ${currentPaletteFilename.value}`);
     }

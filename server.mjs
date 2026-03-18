@@ -18,11 +18,8 @@ dotenv.config({ path: path.join(process.cwd(), '.env') });
 const PROJECT_ROOT = process.cwd();
 const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
-// Back-compat note:
-// - Legacy filename: app_state.json
-// - Preferred filename: app_status.json
-const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_status.json');
-const STATE_FILE_PATH_LEGACY = path.resolve(PROJECT_ROOT, 'app_state.json');
+/** Persisted app state (layout, theme, currentResumeId, system-constants, etc.). */
+const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
 const STATE_EXAMPLE_PATH = path.resolve(PROJECT_ROOT, 'app_state.example.json');
 const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
 const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
@@ -117,47 +114,16 @@ async function readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath =
     return { jobs, skills, categories };
 }
 
-/** Choose which state file to use (prefer app_status.json, fall back to app_state.json). */
-async function getStateFilePathToUse() {
-    const hasNew = await fs.access(STATE_FILE_PATH).then(() => true).catch((e) => {
-        if (e?.code === 'ENOENT') return false;
-        throw e;
-    });
-    if (hasNew) return STATE_FILE_PATH;
-
-    const hasLegacy = await fs.access(STATE_FILE_PATH_LEGACY).then(() => true).catch((e) => {
-        if (e?.code === 'ENOENT') return false;
-        throw e;
-    });
-    if (hasLegacy) {
-        // One-time migration: create app_status.json from app_state.json, then prefer the new path.
-        try {
-            const legacy = await fs.readFile(STATE_FILE_PATH_LEGACY, 'utf-8');
-            await fs.writeFile(STATE_FILE_PATH, legacy, 'utf-8');
-            console.log('📄 Migrated app_state.json → app_status.json');
-            return STATE_FILE_PATH;
-        } catch (e) {
-            console.error('[server] Failed to migrate app_state.json → app_status.json:', e);
-            return STATE_FILE_PATH_LEGACY;
-        }
-    }
-
-    // Neither exists yet — create the preferred new one.
-    return STATE_FILE_PATH;
-}
-
-/** If state file is missing, initialize it from app_state.example.json (safe defaults, no user data). */
+/** If state file is missing, create it from app_state.example.json (safe defaults). */
 async function ensureAppStateFile() {
     try {
-        const statePath = await getStateFilePathToUse();
-        await fs.access(statePath);
+        await fs.access(STATE_FILE_PATH);
     } catch (err) {
         if (err.code === 'ENOENT') {
             try {
                 const example = await fs.readFile(STATE_EXAMPLE_PATH, 'utf-8');
-                const statePath = await getStateFilePathToUse();
-                await fs.writeFile(statePath, example, 'utf-8');
-                console.log(`📄 Initialized ${path.basename(statePath)} from app_state.example.json`);
+                await fs.writeFile(STATE_FILE_PATH, example, 'utf-8');
+                console.log('📄 Initialized app_state.json from app_state.example.json');
             } catch (e) {
                 console.error('[server] Could not initialize app_state.json from example:', e.message);
             }
@@ -168,20 +134,17 @@ async function ensureAppStateFile() {
 // --- API Endpoints ---
 // These must be defined *before* the static file server.
 
-// GET /api/state: Read application state from app_state.json (used at startup / hard-refresh)
-// If app_state.json is missing, initialize it from app_state.example.json (committed; safe defaults, no user data) then return it.
+// GET /api/state: Read application state from app_state.json
 app.get('/api/state', async (req, res) => {
     try {
         await ensureAppStateFile();
-        const statePath = await getStateFilePathToUse();
-        const stateData = await fs.readFile(statePath, 'utf-8');
+        const stateData = await fs.readFile(STATE_FILE_PATH, 'utf-8');
         const parsedState = JSON.parse(stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log(`📖 Loaded app state from disk (${path.basename(statePath)}) - size:`, sizeKB, 'KB, at:', new Date().toISOString());
+        console.log('📖 Loaded app state from app_state.json - size:', sizeKB, 'KB');
         res.json(parsedState);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            console.log('📖 State file not found and app_state.example.json missing; client will use defaults');
             res.status(404).json({ error: 'State file not found.' });
         } else {
             console.error('Error reading state file:', error);
@@ -190,14 +153,13 @@ app.get('/api/state', async (req, res) => {
     }
 });
 
-// POST /api/state: Write application state to app_state.json (whenever a persistent attribute is updated)
+// POST /api/state: Write application state to app_state.json
 app.post('/api/state', async (req, res) => {
     try {
-        const statePath = await getStateFilePathToUse();
         const stateData = JSON.stringify(req.body, null, 2);
-        await atomicWriteWithLock(statePath, stateData);
+        await atomicWriteWithLock(STATE_FILE_PATH, stateData);
         const sizeKB = (Buffer.byteLength(stateData, 'utf8') / 1024).toFixed(1);
-        console.log(`💾 Saved app state to disk (${path.basename(statePath)}) - size:`, sizeKB, 'KB, at:', new Date().toISOString());
+        console.log('💾 Saved app state to app_state.json - size:', sizeKB, 'KB');
         res.json({ success: true });
     } catch (error) {
         console.error('Error writing state file:', error);

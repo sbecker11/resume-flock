@@ -16,23 +16,23 @@
         <div class="modal-body">
           <label class="modal-row">
             <span>Blur at max Z (0–5; 0 = no z-based blur)</span>
-            <input v-model.number="form.blurAtMaxZ" type="number" min="0" max="5" step="0.5" />
+            <input v-model.number="form.blurAtMaxZ" type="number" :min="renderingLimits.blurAtMaxZ.min" :max="renderingLimits.blurAtMaxZ.max" :step="renderingLimits.blurAtMaxZ.step" />
           </label>
           <label class="modal-row">
             <span>Saturation at max Z (0–100%; 100% = no change)</span>
-            <input v-model.number="form.saturationAtMaxZ" type="number" min="0" max="100" step="5" />
+            <input v-model.number="form.saturationAtMaxZ" type="number" :min="renderingLimits.saturationAtMaxZ.min" :max="renderingLimits.saturationAtMaxZ.max" :step="renderingLimits.saturationAtMaxZ.step" />
           </label>
           <label class="modal-row">
             <span>Brightness at max Z (75–100%; 100% = no z-based darkness)</span>
-            <input v-model.number="form.brightnessAtMaxZ" type="number" min="75" max="100" step="5" />
+            <input v-model.number="form.brightnessAtMaxZ" type="number" :min="renderingLimits.brightnessAtMaxZ.min" :max="renderingLimits.brightnessAtMaxZ.max" :step="renderingLimits.brightnessAtMaxZ.step" />
           </label>
           <label class="modal-row">
             <span>Parallax scale at min scene Z / near (0–1.5)</span>
-            <input v-model.number="form.parallaxScaleAtMinZ" type="number" min="0" max="1.5" step="0.05" />
+            <input v-model.number="form.parallaxScaleAtMinZ" type="number" :min="renderingLimits.parallaxScaleAtMinZ.min" :max="renderingLimits.parallaxScaleAtMinZ.max" :step="renderingLimits.parallaxScaleAtMinZ.step" />
           </label>
           <label class="modal-row">
             <span>Parallax scale at max scene Z / far (0–1.5)</span>
-            <input v-model.number="form.parallaxScaleAtMaxZ" type="number" min="0" max="1.5" step="0.05" />
+            <input v-model.number="form.parallaxScaleAtMaxZ" type="number" :min="renderingLimits.parallaxScaleAtMaxZ.min" :max="renderingLimits.parallaxScaleAtMaxZ.max" :step="renderingLimits.parallaxScaleAtMaxZ.step" />
           </label>
         </div>
         <div class="modal-footer">
@@ -45,11 +45,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useAppState } from '../composables/useAppState.ts'
-import { setFromAppState as setRenderingFromAppState, getRendering } from '../core/renderingConfig.mjs'
+import { setFromAppState as setRenderingFromAppState, getRendering, DEFAULT_RENDERING_LIMITS, clampRenderingValue } from '../core/renderingConfig.mjs'
 
 const { appState, updateAppState } = useAppState()
+
+const renderingLimits = computed(() => appState.value?.['system-constants']?.renderingLimits ?? DEFAULT_RENDERING_LIMITS)
 
 const showModal = ref(false)
 const form = ref({
@@ -60,24 +62,19 @@ const form = ref({
   parallaxScaleAtMaxZ: 1.0
 })
 
-function clamp(val, min, max) {
-  const n = Number(val)
-  if (Number.isNaN(n)) return min
-  return Math.max(min, Math.min(max, n))
-}
-
 function openModal() {
+  const limits = renderingLimits.value
   const r = appState.value?.['system-constants']?.rendering || getRendering()
   const saturationRaw = r.saturationAtMaxZ ?? 100
   const saturationPct = (typeof saturationRaw === 'number' && saturationRaw <= 1 && saturationRaw >= 0) ? Math.round(saturationRaw * 100) : saturationRaw
   const brightnessRaw = r.brightnessAtMaxZ
   const brightnessPct = (typeof brightnessRaw === 'number' && brightnessRaw <= 1 && brightnessRaw > 0) ? Math.round(brightnessRaw * 100) : brightnessRaw
   form.value = {
-    blurAtMaxZ: clamp(r.blurAtMaxZ, 0, 5),
-    saturationAtMaxZ: clamp(saturationPct, 0, 100),
-    brightnessAtMaxZ: clamp(brightnessPct, 75, 100),
-    parallaxScaleAtMinZ: clamp(r.parallaxScaleAtMinZ, 0, 1.5),
-    parallaxScaleAtMaxZ: clamp(r.parallaxScaleAtMaxZ, 0, 1.5)
+    blurAtMaxZ: clampRenderingValue(limits, 'blurAtMaxZ', r.blurAtMaxZ),
+    saturationAtMaxZ: clampRenderingValue(limits, 'saturationAtMaxZ', saturationPct),
+    brightnessAtMaxZ: clampRenderingValue(limits, 'brightnessAtMaxZ', brightnessPct),
+    parallaxScaleAtMinZ: clampRenderingValue(limits, 'parallaxScaleAtMinZ', r.parallaxScaleAtMinZ),
+    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', r.parallaxScaleAtMaxZ)
   }
   showModal.value = true
 }
@@ -87,14 +84,15 @@ function closeModal() {
 }
 
 async function save() {
+  const limits = renderingLimits.value
   const r = appState.value?.['system-constants']?.rendering || {}
   const updated = {
     ...r,
-    blurAtMaxZ: clamp(form.value.blurAtMaxZ, 0, 5),
-    saturationAtMaxZ: clamp(form.value.saturationAtMaxZ, 0, 100),
-    brightnessAtMaxZ: clamp(form.value.brightnessAtMaxZ, 75, 100),
-    parallaxScaleAtMinZ: clamp(form.value.parallaxScaleAtMinZ, 0, 1.5),
-    parallaxScaleAtMaxZ: clamp(form.value.parallaxScaleAtMaxZ, 0, 1.5)
+    blurAtMaxZ: clampRenderingValue(limits, 'blurAtMaxZ', form.value.blurAtMaxZ),
+    saturationAtMaxZ: clampRenderingValue(limits, 'saturationAtMaxZ', form.value.saturationAtMaxZ),
+    brightnessAtMaxZ: clampRenderingValue(limits, 'brightnessAtMaxZ', form.value.brightnessAtMaxZ),
+    parallaxScaleAtMinZ: clampRenderingValue(limits, 'parallaxScaleAtMinZ', form.value.parallaxScaleAtMinZ),
+    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', form.value.parallaxScaleAtMaxZ)
   }
   try {
     await updateAppState({
@@ -154,6 +152,7 @@ async function save() {
 }
 
 .modal-3d {
+  font-family: var(--scene-font-family, 'Inter', sans-serif);
   background: rgba(30, 30, 30, 0.98);
   border: 1px solid #555;
   border-radius: 8px;

@@ -116,17 +116,25 @@ describe('core/renderingConfig', () => {
       expect(r.parallaxScaleAtMinZ).toBe(1.0);
     });
 
-    it('keeps 0 for saturationAtMaxZ and brightnessAtMaxZ', () => {
+    it('keeps 0 for saturationAtMaxZ; clamps brightnessAtMaxZ to default min 75', () => {
       setFromAppState({ saturationAtMaxZ: 0, brightnessAtMaxZ: 0 });
       const r = getRendering();
       expect(r.saturationAtMaxZ).toBe(0);
-      expect(r.brightnessAtMaxZ).toBe(0);
+      expect(r.brightnessAtMaxZ).toBe(75); // default renderingLimits.brightnessAtMaxZ.min is 75
     });
 
     it('converts legacy saturation 0.6 to 60%', () => {
       setFromAppState({ saturationAtMaxZ: 0.6 });
       const r = getRendering();
       expect(r.saturationAtMaxZ).toBe(60);
+    });
+
+    it('uses custom limits when provided (e.g. brightness 0 allowed)', () => {
+      const limits = { brightnessAtMaxZ: { min: 0, max: 100, step: 5 } };
+      setFromAppState({ saturationAtMaxZ: 0, brightnessAtMaxZ: 0 }, limits);
+      const r = getRendering();
+      expect(r.saturationAtMaxZ).toBe(0);
+      expect(r.brightnessAtMaxZ).toBe(0);
     });
   });
 });

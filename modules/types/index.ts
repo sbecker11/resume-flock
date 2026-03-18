@@ -173,6 +173,14 @@ export interface AppState {
       brightnessAtMaxZ: number;      // 75–100%; 100 = no z-based darkness (default 100)
       blurAtMaxZ: number;            // 0–5 px at max Z; 0 = no z-based blur (default 0)
     };
+    /** Min/max/step for 3D Settings sliders; edit in app_state.json for single source of truth */
+    renderingLimits?: {
+      blurAtMaxZ: { min: number; max: number; step: number };
+      saturationAtMaxZ: { min: number; max: number; step: number };
+      brightnessAtMaxZ: { min: number; max: number; step: number };
+      parallaxScaleAtMinZ: { min: number; max: number; step: number };
+      parallaxScaleAtMaxZ: { min: number; max: number; step: number };
+    };
   };
 }
 

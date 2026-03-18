@@ -16,7 +16,7 @@ import { reportError } from '../utils/errorReporting.mjs'
 // @ts-ignore - Legacy module imports with type declarations
 import type { AppState, UseAppStateReturn } from '../types/index'
 // @ts-ignore - Legacy module
-import { setFromAppState as setRenderingFromAppState } from '../core/renderingConfig.mjs'
+import { setFromAppState as setRenderingFromAppState, DEFAULT_RENDERING_LIMITS } from '../core/renderingConfig.mjs'
 import { hasServer } from '../core/hasServer.mjs'
 
 function getRuntimeBase(): string {
@@ -222,6 +222,14 @@ function getDefaultState(): AppState {
                 saturationAtMaxZ: 100,
                 brightnessAtMaxZ: 100,
                 blurAtMaxZ: 0
+            },
+            /** Min/max/step for 3D Settings sliders; single place to edit is app_state.json */
+            renderingLimits: {
+                blurAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.blurAtMaxZ },
+                saturationAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.saturationAtMaxZ },
+                brightnessAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.brightnessAtMaxZ },
+                parallaxScaleAtMinZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMinZ },
+                parallaxScaleAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMaxZ }
             }
         }
     };
@@ -375,6 +383,16 @@ function migrateState(state: any): AppState {
             if (r.displacementAtMinZ !== undefined) delete r.displacementAtMinZ
         }
         if (state['user-settings']?.rendering) delete state['user-settings'].rendering
+        if (!sc.renderingLimits) {
+            sc.renderingLimits = {
+                blurAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.blurAtMaxZ },
+                saturationAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.saturationAtMaxZ },
+                brightnessAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.brightnessAtMaxZ },
+                parallaxScaleAtMinZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMinZ },
+                parallaxScaleAtMaxZ: { ...DEFAULT_RENDERING_LIMITS.parallaxScaleAtMaxZ }
+            }
+            console.log('[AppState] Added missing system-constants.renderingLimits')
+        }
     }
 
     return state
@@ -424,14 +442,16 @@ async function loadStateFromServer(): Promise<AppState> {
             // Merge with defaults to ensure all keys exist
             const finalState = deepMerge(getDefaultState(), migratedState)
             
-            // If saved state was missing system-constants.rendering, persist merged state so app_state.json gets the new keys
-            const r = rawState['system-constants']?.rendering
+            // If saved state was missing system-constants.rendering or renderingLimits, persist merged state so app_state.json gets the new keys
+            const scRaw = rawState['system-constants']
+            const r = scRaw?.rendering
             const renderingKeys = ['parallaxScaleAtMinZ', 'parallaxScaleAtMaxZ', 'saturationAtMaxZ', 'brightnessAtMaxZ', 'blurAtMaxZ'] as const
             const hadMissingRendering = !r || renderingKeys.some(k => r[k] === undefined)
-            if (hadMissingRendering) {
+            const hadMissingRenderingLimits = !scRaw?.renderingLimits
+            if (hadMissingRendering || hadMissingRenderingLimits) {
                 try {
                     await saveStateToServer(finalState)
-                    console.log('[AppState] Persisted state so app_state.json includes system-constants.rendering')
+                    console.log('[AppState] Persisted state so app_state.json includes system-constants.rendering / renderingLimits')
                 } catch (e) {
                     reportError(e, '[AppState] Failed to persist state after adding rendering defaults', 'app_state.json will update on next normal save')
                 }
@@ -550,7 +570,7 @@ export function useAppState(): UseAppStateReturn {
                 appState.value = state
                 isLoaded.value = true
                 isLoading.value = false
-                setRenderingFromAppState(state['system-constants']?.rendering)
+                setRenderingFromAppState(state['system-constants']?.rendering, state['system-constants']?.renderingLimits)
                 
                 // Dispatch event for backward compatibility
                 window.dispatchEvent(new CustomEvent('app-state-loaded', {
