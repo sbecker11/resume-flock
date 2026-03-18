@@ -275,7 +275,7 @@ watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
   clampDragOffset();
   pendingMeta.value = null;
   pendingOtherSections.value = null;
-  nextTick(async () => {
+  setTimeout(async () => {
     try {
       const [metaRes, otherRes] = await Promise.all([
         api.getResumeMeta(id).catch(() => ({})),
@@ -286,7 +286,7 @@ watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
     } catch (err) {
       console.error('[ResumeDetailsEditor] load failed:', err);
     }
-  });
+  }, 0);
 }, { immediate: true });
 
 function onMetaUpdate(updates) {

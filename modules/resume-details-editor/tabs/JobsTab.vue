@@ -136,7 +136,8 @@ watch(() => props.resumeId, (id) => {
   jobs.value = [];
   selectedJobIndex.value = null;
   if (!id || id === 'default') return;
-  nextTick(async () => {
+  // Defer fetch to macrotask; then assign selection in a second macrotask to avoid one big reactive burst.
+  setTimeout(async () => {
     try {
       const data = await api.getResumeData(id);
       const arr = jobsArray(data.jobs);
@@ -145,14 +146,16 @@ watch(() => props.resumeId, (id) => {
       const idx = props.initialJobIndex != null && props.initialJobIndex >= 0 && props.initialJobIndex < arr.length
         ? Number(props.initialJobIndex)
         : (arr.length ? 0 : null);
-      selectedJobIndex.value = idx;
       jobsLoaded.value = true;
+      setTimeout(() => {
+        selectedJobIndex.value = idx;
+      }, 0);
     } catch (err) {
       console.error('[JobsTab] load failed:', err);
       loadError.value = 'Failed to load jobs: ' + err.message;
       jobsLoaded.value = true;
     }
-  });
+  }, 0);
 }, { immediate: true });
 
 // Keep selection in sync when jobs are empty (e.g. select can emit "" with no options).
