@@ -760,8 +760,9 @@ export function useCardsController() {
         skillCard.style.pointerEvents = 'auto'
         skillCard.style.cursor = 'pointer'
         skillCard.style.display = 'flex'
-        skillCard.style.alignItems = 'center'
-        skillCard.style.justifyContent = 'center'
+        // Top-align text content (avoid vertical centering)
+        skillCard.style.alignItems = 'stretch'
+        skillCard.style.justifyContent = 'flex-start'
         skillCard.style.textAlign = 'left'
         skillCard.style.wordBreak = 'break-word'
         skillCard.style.filter = filters.get_filterStr_from_z(sceneZ)
