@@ -81,6 +81,8 @@ import { useLayoutToggle } from '../composables/useLayoutToggle.mjs'
 import { useResizeHandle } from '../composables/useResizeHandle.mjs'
 import { useAppState } from '../composables/useAppState.ts'
 import { get_filterStr_from_z } from '../core/filters.mjs'
+import { reportError } from '../utils/errorReporting.mjs'
+import { listResumes } from '../api/resumeManagerApi.mjs'
 
 // Resume system initialization (to be migrated)
 import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
@@ -503,6 +505,31 @@ async function handleResumeSelected(resumeId) {
   }
 }
 
+async function resolveStartupResumeId(persistedResumeId) {
+  if (!persistedResumeId || persistedResumeId === 'default') return null
+  try {
+    const resumes = await listResumes()
+    if (!Array.isArray(resumes) || resumes.length === 0) return null
+
+    const exact = resumes.find(r => r?.id === persistedResumeId)
+    if (exact?.id) return exact.id
+
+    const fallback = resumes[0]?.id ?? null
+    const err = new Error(`[AppContent] Persisted resume "${persistedResumeId}" is unavailable in this environment`)
+    reportError(
+      err,
+      '[AppContent] Startup resume validation failed',
+      fallback
+        ? `Using first available resume "${fallback}" and updating user-settings.currentResumeId`
+        : 'Clearing currentResumeId to default because no resumes are available'
+    )
+    return fallback
+  } catch (e) {
+    reportError(e, '[AppContent] Failed to validate startup resume id', 'Proceeding with persisted value and relying on startup fallback handling')
+    return persistedResumeId
+  }
+}
+
 // Re-apply depth filters to scene cards when 3D Settings change (rendering-changed)
 function handleRenderingChanged() {
   const plane = document.getElementById('scene-plane')
@@ -563,7 +590,14 @@ onMounted(async () => {
     
     // PHASE 5: Resume system — load persisted resume, or show upload modal if none
     const persistedResumeId = appState.value?.['user-settings']?.currentResumeId
-    const startupResumeId = persistedResumeId && persistedResumeId !== 'default' ? persistedResumeId : null
+    const startupResumeId = await resolveStartupResumeId(persistedResumeId)
+    if ((startupResumeId || 'default') !== (persistedResumeId || 'default')) {
+      try {
+        await updateAppState({ 'user-settings': { currentResumeId: startupResumeId || 'default' } }, true)
+      } catch (e) {
+        reportError(e, '[AppContent] Failed to persist startup resume fallback', 'Continuing with in-memory fallback selection')
+      }
+    }
     if (!startupResumeId) {
       console.log('[AppContent] 📋 No persisted resume — showing upload modal')
       noJobsLoaded.value = true
