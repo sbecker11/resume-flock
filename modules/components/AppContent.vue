@@ -85,6 +85,9 @@ import { updateContrastForBrightness } from '../composables/useColorPalette.mjs'
 import { reportError } from '../utils/errorReporting.mjs'
 import { listResumes } from '../api/resumeManagerApi.mjs'
 
+/** Dev / ?debugSkillContrast=1 — teardown in onUnmounted */
+let skillCardContrastGuardTeardown = null
+
 // Resume system initialization (to be migrated)
 import { initializeResumeSystem, testResumeSystem, checkResumeDivs, testScrolling } from '../resume/resumeSystemInitializer.mjs'
 import { registerResumeListReinit, reinitializeResumeSystem } from '../resume/resumeReinitializer.mjs'
@@ -688,6 +691,16 @@ onMounted(async () => {
 
     window.addEventListener('rendering-changed', handleRenderingChanged)
 
+    if (import.meta.env.DEV || new URLSearchParams(window.location.search).get('debugSkillContrast') === '1') {
+      try {
+        const { installSkillCardContrastGuard } = await import('../debug/skillCardContrastGuard.mjs')
+        skillCardContrastGuardTeardown = installSkillCardContrastGuard()
+        console.log('[AppContent] 🎯 Skill card contrast guard active (DEV or ?debugSkillContrast=1)')
+      } catch (e) {
+        reportError(e, '[AppContent] Skill card contrast guard failed to install', null)
+      }
+    }
+
     console.log('[AppContent] ✅ Vue 3 app initialization complete!')
     
   } catch (error) {
@@ -700,6 +713,10 @@ onMounted(async () => {
 onUnmounted(() => {
   console.log('[AppContent] 🧹 Cleaning up...')
   window.removeEventListener('rendering-changed', handleRenderingChanged)
+  if (typeof skillCardContrastGuardTeardown === 'function') {
+    skillCardContrastGuardTeardown()
+    skillCardContrastGuardTeardown = null
+  }
   console.log('[AppContent] ✅ Cleanup complete')
 })
 

@@ -143,9 +143,11 @@ body .biz-resume-div.selected a,
     background-color: transparent !important;
 }
 /* Contrast icons in card descriptions: white on dark, black on light (normal state). */
-.biz-card-div[data-icon-set-variant="white"] .url-icon,
-.biz-card-div[data-icon-set-variant="white"] .back-icon,
-.biz-card-div[data-icon-set-variant="white"] .img-icon {
+/* :not(.clone) — selected clones use data-icon-set-selected-variant only. */
+/* :not(.hovered) — hover must use data-icon-set-hovered-variant only (normal attr often stays white). */
+.biz-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+.biz-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+.biz-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
 
@@ -244,16 +246,18 @@ body .biz-resume-div.selected a,
     z-index: 99;
 }
 /* Resume div contrast icons: same variant rules as biz/skill (white on dark → invert) */
-.biz-resume-div[data-icon-set-variant="white"] .url-icon,
-.biz-resume-div[data-icon-set-variant="white"] .back-icon,
-.biz-resume-div[data-icon-set-variant="white"] .img-icon {
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
 
 /* Skill card contrast icons: same variant rules as biz (white on dark → invert) */
-.skill-card-div[data-icon-set-variant="white"] .url-icon,
-.skill-card-div[data-icon-set-variant="white"] .back-icon,
-.skill-card-div[data-icon-set-variant="white"] .img-icon {
+/* :not(.clone) — scene clones are always “selected”; icon invert must follow data-icon-set-selected-variant only. */
+/* :not(.hovered) — hover must use data-icon-set-hovered-variant only (normal attr often stays white). */
+.skill-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+.skill-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+.skill-card-div:not(.clone):not(.hovered)[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
 .skill-card-div:not(.clone).hovered[data-icon-set-hovered-variant="white"] .url-icon,
@@ -322,12 +326,15 @@ body .biz-resume-div.selected a,
     border-radius: calc(var(--data-normal-border-radius, 25px) / 2) !important;
 }
 /* Skill resume div contrast icons (match text color per state) */
-.skill-resume-div[data-icon-set-variant="white"] .url-icon,
-.skill-resume-div[data-icon-set-variant="white"] .back-icon,
-.skill-resume-div[data-icon-set-variant="white"] .img-icon,
-#resume-container .skill-resume-div[data-icon-set-variant="white"] .url-icon,
-#resume-container .skill-resume-div[data-icon-set-variant="white"] .back-icon,
-#resume-container .skill-resume-div[data-icon-set-variant="white"] .img-icon {
+/* :not(.selected) — when selected, only data-icon-set-selected-variant may invert; otherwise normal
+   variant=white still matches on .selected and overrides black selected icons (black text + white icons bug). */
+/* :not(.hovered) — hover uses data-icon-set-hovered-variant only. */
+.skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+.skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+.skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon,
+#resume-container .skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+#resume-container .skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+#resume-container .skill-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
 .skill-resume-div.hovered[data-icon-set-hovered-variant="white"] .url-icon,
@@ -349,15 +356,17 @@ body .biz-resume-div.selected a,
 
 /* bizCardLineItem (rDiv): border styling must match .biz-card-div above (normal, hovered, selected). */
 /* Contrast icons in resume card descriptions (normal). */
-.biz-resume-div[data-icon-set-variant="white"] .url-icon,
-.biz-resume-div[data-icon-set-variant="white"] .back-icon,
-.biz-resume-div[data-icon-set-variant="white"] .img-icon,
-body .biz-resume-div[data-icon-set-variant="white"] .url-icon,
-body .biz-resume-div[data-icon-set-variant="white"] .back-icon,
-body .biz-resume-div[data-icon-set-variant="white"] .img-icon,
-#resume-container .biz-resume-div[data-icon-set-variant="white"] .url-icon,
-#resume-container .biz-resume-div[data-icon-set-variant="white"] .back-icon,
-#resume-container .biz-resume-div[data-icon-set-variant="white"] .img-icon {
+/* :not(.selected) — selected rows must use data-icon-set-selected-variant only (same as skill-resume-div). */
+/* :not(.hovered) — hover uses data-icon-set-hovered-variant only. */
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+.biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon,
+body .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+body .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+body .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon,
+#resume-container .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .url-icon,
+#resume-container .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .back-icon,
+#resume-container .biz-resume-div:not(.selected):not(.hovered)[data-icon-set-variant="white"] .img-icon {
     filter: invert(1);
 }
 /* rDiv layout: full width; close button is in header, does not affect description */

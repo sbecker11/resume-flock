@@ -1112,7 +1112,7 @@ export function useCardsController() {
     }
 
     /** One selected card at a time; show its clone (biz or skill) */
-    function handleCardSelected(event) {
+    async function handleCardSelected(event) {
         const { card, previousCard } = event.detail || {}
         if (!card) return
 
@@ -1138,7 +1138,7 @@ export function useCardsController() {
             hideSkillCardOriginal(card.skillCardId)
             const cloneId = `${card.skillCardId}-clone`
             if (!document.getElementById(cloneId)) {
-                createSkillCardClone(card.skillCardId)
+                await createSkillCardClone(card.skillCardId)
             }
             const cloneEl = document.getElementById(cloneId)
             if (cloneEl) {
@@ -1788,7 +1788,7 @@ export function useCardsController() {
         el.style.removeProperty('display')
     }
 
-    function createSkillCardClone(skillCardId) {
+    async function createSkillCardClone(skillCardId) {
         const scenePlaneEl = scenePlaneElement || elementRegistry.getScenePlane()
         if (!scenePlaneEl) return
         const original = document.getElementById(skillCardId)
@@ -1841,6 +1841,19 @@ export function useCardsController() {
         // Append as last child of container so clone displays over everything else
         scenePlaneEl.appendChild(clone)
         elementRegistry.clearAllCache()
+
+        // Match biz-card clone: cloneNode copies stale palette/contrast from the hidden original;
+        // re-apply palette + brightness-aware contrast so label + icons use one resolver for selected state.
+        try {
+            await applyPaletteToElement(clone)
+            updateContrastForBrightness(clone)
+        } catch (error) {
+            reportError(error, '[useCardsController] applyPaletteToElement/updateContrastForBrightness for skill card clone', null)
+            throw error
+        }
+        clone.style.setProperty('display', 'block', 'important')
+        clone.style.setProperty('visibility', 'visible', 'important')
+        clone.style.setProperty('opacity', '1', 'important')
     }
 
     function removeSkillCardClone(skillCardId) {

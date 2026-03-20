@@ -281,6 +281,8 @@ The app is built with **Vite** and uses ES modules. Use **Cursor** (or another e
 
 This runs the Vite dev server (frontend) and the backend API. Open the URL shown in the terminal (e.g. `http://localhost:5174`) in your browser. Upload a DOCX or PDF resume to explore your career as business cards and skill cards.
 
+- **Skill card contrast guard (diagnostics):** In dev (`import.meta.env.DEV`), or add `?debugSkillContrast=1` to the URL, the app installs `modules/debug/skillCardContrastGuard.mjs`, which watches scene + resume skill rows and `console.warn`s when `data-icon-set-*-variant` disagrees with **inline** `--data-foreground-color*` (not `getComputedStyle().color`, which can interpolate during `transition: color`) or with icon `filter: invert()`. Re-checks on `rendering-changed` (Z / 3D filter updates); it does **not** observe `style` for every parallax `transform` tick.
+
 # Behold your flock of skill cards and business cards
 
 ## Naming Conventions
