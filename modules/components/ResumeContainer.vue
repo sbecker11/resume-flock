@@ -375,7 +375,7 @@ const detailsEditorInitialFocusField = ref(null);
 
 // --- About modal (hero phrase) ---
 const isAboutModalOpen = ref(false);
-const README_PREVIEW_URL = 'https://github.com/sbecker11/resume-flock/blob/main/README.md';
+const README_PREVIEW_URL = 'https://raw.githubusercontent.com/sbecker11/resume-flock/master/README.md';
 const aboutHtml = `
 <strong>resume-flock</strong> is an interactive resume explorer. The name comes from the original concept "flock-of-postcards" (later "flock-of-cards"): your resume is explored like a <em>flock of birds</em> - business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as <strong>business cards</strong> (one per job) and <strong>skill cards</strong> (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
 `.trim();
@@ -1026,6 +1026,7 @@ function onResumeSkillCardClick(event) {
     overflow: auto;
     background-color: var(--grey-darkest);
     color: white;
+    font-family: sans-serif;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.18);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
@@ -1051,6 +1052,7 @@ function onResumeSkillCardClick(event) {
     justify-content: center;
     z-index: 1;
     cursor: pointer;
+    font-family: inherit;
 }
 .about-modal-close:hover {
     color: #f00;
@@ -1071,6 +1073,7 @@ function onResumeSkillCardClick(event) {
     text-decoration: underline;
     text-underline-offset: 2px;
     font-size: 13px;
+    font-family: inherit;
 }
 .about-readme-link:hover {
     color: #c5e4ff;
