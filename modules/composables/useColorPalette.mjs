@@ -36,6 +36,20 @@ const API_MANIFEST_URL = basePathJoin('api/palette-manifest');
 /** Base path for contrast icons (url/back/img); must contain icons8-{url,back,img}-16-black.png. */
 const ICON_BASE = basePathJoin('static_content/icons');
 
+/**
+ * Single source of truth for text/icon contrast against a background color.
+ * Returns both text style and icon asset/variant for consistent rendering.
+ */
+function resolveTextAndIconStyle(backgroundHex) {
+    const contrast = getHighContrastForBackground(backgroundHex, { iconBase: ICON_BASE });
+    return {
+        textColor: contrast.textColor,
+        linkColor: contrast.textColor,
+        iconSet: contrast.iconSet,
+        iconFilter: contrast.iconSet.variant === 'white' ? 'invert(1)' : 'none'
+    };
+}
+
 // --- Reactive State ---
 // This state is shared across all components that use this composable
 const colorPalettes = ref({});
@@ -599,9 +613,9 @@ export async function applyPaletteToElement(element) {
 
     // Calculate base colors (palette-utils-ts: LCH-based highlight, high-contrast text + icons from single call)
     const backgroundColor = formatHexDisplay(colorPalette[paletteColorIndex % colorPalette.length]) || colorPalette[paletteColorIndex % colorPalette.length];
-    const normalContrast = getHighContrastForBackground(backgroundColor, { iconBase: ICON_BASE });
-    const foregroundColor = normalContrast.textColor;
-    const normalIconSet = normalContrast.iconSet;
+    const normalStyle = resolveTextAndIconStyle(backgroundColor);
+    const foregroundColor = normalStyle.textColor;
+    const normalIconSet = normalStyle.iconSet;
 
     const systemConstants = appState.value["system-constants"];
     // Selected: single knob 135 → L >= floor(100/1.35) darken (L'=L/1.35), else brighten (L'=L*1.35).
@@ -613,9 +627,9 @@ export async function applyPaletteToElement(element) {
         highlightPercent: selectedHighlightPercent,
         nearlyWhiteL: highLuminosityThreshold
     });
-    const highlightedContrast = getHighContrastForBackground(selectedBackgroundColor, { iconBase: ICON_BASE });
-    const highlightedTextColor = highlightedContrast.textColor;
-    const highlightedIconSet = highlightedContrast.iconSet;
+    const selectedStyle = resolveTextAndIconStyle(selectedBackgroundColor);
+    const highlightedTextColor = selectedStyle.textColor;
+    const highlightedIconSet = selectedStyle.iconSet;
 
     // Hover = (unselected + selected) / 2 in RGB. Palette colors are validated at startup.
     const rgbNorm = hexToRgb(backgroundColor);
@@ -628,9 +642,9 @@ export async function applyPaletteToElement(element) {
         Math.round((rgbNorm.g + rgbSel.g) / 2),
         Math.round((rgbNorm.b + rgbSel.b) / 2)
     );
-    const hoveredContrast = getHighContrastForBackground(hoveredBackgroundColor, { iconBase: ICON_BASE });
-    const hoveredForegroundColor = hoveredContrast.textColor;
-    const hoveredIconSet = hoveredContrast.iconSet;
+    const hoveredStyle = resolveTextAndIconStyle(hoveredBackgroundColor);
+    const hoveredForegroundColor = hoveredStyle.textColor;
+    const hoveredIconSet = hoveredStyle.iconSet;
 
     const borderRadius = appState.value.theme?.borderRadius || '25px';
 
@@ -751,7 +765,7 @@ export async function applyPaletteToElement(element) {
     // Set as HTML attribute so CSS attribute selectors fire for all element types
     element.setAttribute('data-icon-set-variant', normalIconSet.variant);
     // Directly set filter on icon children — same decision as textColor/variant, computed once, applied to both
-    const normalIconFilter = normalIconSet.variant === 'white' ? 'invert(1)' : 'none';
+    const normalIconFilter = normalStyle.iconFilter;
     element.querySelectorAll('.back-icon, .url-icon, .img-icon').forEach(icon => {
         icon.style.filter = normalIconFilter;
     });
@@ -836,23 +850,48 @@ export function updateContrastForBrightness(element) {
         b: Math.min(255, Math.round(rgb.b * brightness)),
     }
     const effectiveHex = rgbToHex(effectiveRgb.r, effectiveRgb.g, effectiveRgb.b)
-    const contrast = getHighContrastForBackground(effectiveHex, { iconBase: ICON_BASE })
+    const hoveredBg = element.getAttribute('data-background-color-hovered') || rawBg
+    const selectedBg = element.getAttribute('data-background-color-selected') || rawBg
+    const hoveredRgb = hexToRgb(hoveredBg) || rgb
+    const selectedRgb = hexToRgb(selectedBg) || rgb
 
-    // Update normal-state icon variant, text color, and link color from effective background
-    element.setAttribute('data-icon-set-variant', contrast.iconSet.variant)
-    element.style.setProperty('--data-icon-set-variant', contrast.iconSet.variant)
-    element.style.setProperty('--data-foreground-color', contrast.textColor)
-    element.style.setProperty('--data-link-color', contrast.textColor)
+    const effectiveHoveredHex = rgbToHex(
+        Math.min(255, Math.round(hoveredRgb.r * brightness)),
+        Math.min(255, Math.round(hoveredRgb.g * brightness)),
+        Math.min(255, Math.round(hoveredRgb.b * brightness))
+    )
+    const effectiveSelectedHex = rgbToHex(
+        Math.min(255, Math.round(selectedRgb.r * brightness)),
+        Math.min(255, Math.round(selectedRgb.g * brightness)),
+        Math.min(255, Math.round(selectedRgb.b * brightness))
+    )
 
-    // Directly set filter on icon elements — CSS attribute selector approach is unreliable
-    const iconFilter = contrast.iconSet.variant === 'white' ? 'invert(1)' : 'none'
+    const normalStyle = resolveTextAndIconStyle(effectiveHex)
+    const hoveredStyle = resolveTextAndIconStyle(effectiveHoveredHex)
+    const selectedStyle = resolveTextAndIconStyle(effectiveSelectedHex)
+
+    // Keep text/icon decisions in lock-step for all interaction states.
+    element.setAttribute('data-icon-set-variant', normalStyle.iconSet.variant)
+    element.setAttribute('data-icon-set-hovered-variant', hoveredStyle.iconSet.variant)
+    element.setAttribute('data-icon-set-selected-variant', selectedStyle.iconSet.variant)
+    element.style.setProperty('--data-icon-set-variant', normalStyle.iconSet.variant)
+    element.style.setProperty('--data-icon-set-hovered-variant', hoveredStyle.iconSet.variant)
+    element.style.setProperty('--data-icon-set-selected-variant', selectedStyle.iconSet.variant)
+    element.style.setProperty('--data-foreground-color', normalStyle.textColor)
+    element.style.setProperty('--data-foreground-color-hovered', hoveredStyle.textColor)
+    element.style.setProperty('--data-foreground-color-selected', selectedStyle.textColor)
+    element.style.setProperty('--data-link-color', normalStyle.linkColor)
+    element.style.setProperty('--data-link-color-hovered', hoveredStyle.linkColor)
+    element.style.setProperty('--data-link-color-selected', selectedStyle.linkColor)
+
+    // Base state icon filter for <img> icons; hovered/selected are handled by CSS selectors.
     element.querySelectorAll('.back-icon, .url-icon, .img-icon').forEach(icon => {
-        icon.style.filter = iconFilter
+        icon.style.filter = normalStyle.iconFilter
     })
 
     const isBizOrRDiv = element.classList.contains('biz-card-div') || element.classList.contains('biz-resume-div')
     if (!isBizOrRDiv) {
-        element.style.color = contrast.textColor
+        element.style.color = normalStyle.textColor
     }
 }
 
