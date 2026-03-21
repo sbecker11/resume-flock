@@ -216,8 +216,14 @@ const {
   orderedPaletteNames,
   filenameToNameMap,
   currentPaletteFilename,
-  setCurrentPalette
+  setCurrentPalette,
+  imagePublicUrlByPaletteName
 } = useColorPalette();
+
+const currentPaletteImageUrl = computed(
+  () => (currentPaletteFilename.value && imagePublicUrlByPaletteName.value?.[currentPaletteFilename.value]) || null
+);
+const showPaletteImageModal = ref(false);
 
 // Debug palette loading
 watch(orderedPaletteNames, () => {}, { immediate: true });
@@ -879,6 +885,15 @@ function onResumeSkillCardClick(event) {
                             {{ name }}
                         </option>
                     </select>
+                    <button
+                        type="button"
+                        class="palette-image-btn"
+                        :disabled="!currentPaletteImageUrl"
+                        :title="currentPaletteImageUrl ? 'View palette source image' : 'No image for this palette'"
+                        @click="showPaletteImageModal = true"
+                    >
+                        🖼️
+                    </button>
                 </div>
             </div>
             <div id="resume-divs-sorting-container" tabindex="-1">
@@ -926,6 +941,36 @@ function onResumeSkillCardClick(event) {
               >
                 Open README preview
               </a>
+            </div>
+          </div>
+        </teleport>
+
+        <!-- Palette source image modal -->
+        <teleport to="body">
+          <div
+            v-if="showPaletteImageModal && currentPaletteImageUrl"
+            class="palette-image-modal-overlay"
+            @click.self="showPaletteImageModal = false"
+          >
+            <div
+              class="palette-image-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Palette source image"
+            >
+              <button
+                type="button"
+                class="palette-image-modal-close"
+                aria-label="Close"
+                @click="showPaletteImageModal = false"
+              >
+                ×
+              </button>
+              <img
+                :src="currentPaletteImageUrl"
+                :alt="'Source image for ' + (currentPaletteFilename || 'palette')"
+                class="palette-image-modal-img"
+              />
             </div>
           </div>
         </teleport>
@@ -1195,6 +1240,86 @@ function onResumeSkillCardClick(event) {
     position: relative;
     display: flex;
     flex: 1 1 auto;
+    gap: 6px;
+    align-items: center;
+}
+
+.palette-image-btn {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: var(--grey-dark-6);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.palette-image-btn:hover:not(:disabled) {
+    background: var(--grey-dark-7);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+.palette-image-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.palette-image-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Above ResizeHandle (z-index: 10000); align with about-modal-overlay */
+    z-index: 25000;
+}
+.palette-image-modal {
+    position: relative;
+    background: rgba(30, 30, 30, 0.98);
+    border: 1px solid #555;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+/* Same as .skill-resume-div-close (circular, white bg, red border) */
+.palette-image-modal-close {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    left: auto;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    color: #c00;
+    background: #fff;
+    border: 1px solid #c00;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    font-family: inherit;
+}
+.palette-image-modal-close:hover {
+    color: #f00;
+    border-color: #f00;
+    background: rgba(255, 255, 255, 0.9);
+}
+.palette-image-modal-img {
+    display: block;
+    max-width: 300px;
+    max-height: 300px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
 }
 
 #resume-divs-sorting-container {
