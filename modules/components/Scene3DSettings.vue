@@ -4,7 +4,7 @@
       id="scene-3d-button"
       type="button"
       class="toggle-circle"
-      title="3D Settings (parallax, blur, brightness)"
+      title="3D Settings (parallax, blur, focal &amp; bulls-eye visibility)"
       @click.stop="openModal"
     >
       3D
@@ -15,25 +15,53 @@
         <h3 id="modal-3d-title" class="modal-title">3D Settings</h3>
         <div class="modal-body" v-if="renderingLimits">
           <label class="modal-row">
-            <span>Blur at max Z (0–5; 0 = no z-based blur)</span>
-            <input v-model.number="form.blurAtMaxZ" type="number" :min="renderingLimits.blurAtMaxZ.min" :max="renderingLimits.blurAtMaxZ.max" :step="renderingLimits.blurAtMaxZ.step" />
+            <span class="modal-row-label">Blur at max Z (0–5; 0 = no z-based blur)</span>
+            <span class="modal-row-input-wrap">
+              <input v-model.number="form.blurAtMaxZ" type="number" :min="renderingLimits.blurAtMaxZ.min" :max="renderingLimits.blurAtMaxZ.max" :step="renderingLimits.blurAtMaxZ.step" />
+            </span>
           </label>
           <label class="modal-row">
-            <span>Saturation at max Z (0–100%; 100% = no change)</span>
-            <input v-model.number="form.saturationAtMaxZ" type="number" :min="renderingLimits.saturationAtMaxZ.min" :max="renderingLimits.saturationAtMaxZ.max" :step="renderingLimits.saturationAtMaxZ.step" />
+            <span class="modal-row-label">Saturation at max Z (0–100%; 100% = no change)</span>
+            <span class="modal-row-input-wrap">
+              <input v-model.number="form.saturationAtMaxZ" type="number" :min="renderingLimits.saturationAtMaxZ.min" :max="renderingLimits.saturationAtMaxZ.max" :step="renderingLimits.saturationAtMaxZ.step" />
+            </span>
           </label>
           <label class="modal-row">
-            <span>Brightness at max Z ({{ renderingLimits.brightnessAtMaxZ.min }}–{{ renderingLimits.brightnessAtMaxZ.max }}%; 100% = no z-based darkness)</span>
-            <input v-model.number="form.brightnessAtMaxZ" type="number" :min="renderingLimits.brightnessAtMaxZ.min" :max="renderingLimits.brightnessAtMaxZ.max" :step="renderingLimits.brightnessAtMaxZ.step" />
+            <span class="modal-row-label">Brightness at max Z ({{ renderingLimits.brightnessAtMaxZ.min }}–{{ renderingLimits.brightnessAtMaxZ.max }}%; 100% = no z-based darkness)</span>
+            <span class="modal-row-input-wrap">
+              <input v-model.number="form.brightnessAtMaxZ" type="number" :min="renderingLimits.brightnessAtMaxZ.min" :max="renderingLimits.brightnessAtMaxZ.max" :step="renderingLimits.brightnessAtMaxZ.step" />
+            </span>
           </label>
           <label class="modal-row">
-            <span>Parallax scale at min scene Z / near (0–1.5)</span>
-            <input v-model.number="form.parallaxScaleAtMinZ" type="number" :min="renderingLimits.parallaxScaleAtMinZ.min" :max="renderingLimits.parallaxScaleAtMinZ.max" :step="renderingLimits.parallaxScaleAtMinZ.step" />
+            <span class="modal-row-label">Parallax scale at min scene Z / near (0–1.5)</span>
+            <span class="modal-row-input-wrap">
+              <input v-model.number="form.parallaxScaleAtMinZ" type="number" :min="renderingLimits.parallaxScaleAtMinZ.min" :max="renderingLimits.parallaxScaleAtMinZ.max" :step="renderingLimits.parallaxScaleAtMinZ.step" />
+            </span>
           </label>
           <label class="modal-row">
-            <span>Parallax scale at max scene Z / far (0–1.5)</span>
-            <input v-model.number="form.parallaxScaleAtMaxZ" type="number" :min="renderingLimits.parallaxScaleAtMaxZ.min" :max="renderingLimits.parallaxScaleAtMaxZ.max" :step="renderingLimits.parallaxScaleAtMaxZ.step" />
+            <span class="modal-row-label">Parallax scale at max scene Z / far (0–1.5)</span>
+            <span class="modal-row-input-wrap">
+              <input v-model.number="form.parallaxScaleAtMaxZ" type="number" :min="renderingLimits.parallaxScaleAtMaxZ.min" :max="renderingLimits.parallaxScaleAtMaxZ.max" :step="renderingLimits.parallaxScaleAtMaxZ.step" />
+            </span>
           </label>
+          <div class="modal-row modal-row-toggle">
+            <span class="modal-row-label">Show focal point</span>
+            <span class="modal-row-input-wrap modal-row-input-wrap--toggle">
+              <label class="switch">
+                <input v-model="form.focalPointUiVisible" type="checkbox" role="switch" />
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </span>
+          </div>
+          <div class="modal-row modal-row-toggle">
+            <span class="modal-row-label">Show viewport center (bulls-eye)</span>
+            <span class="modal-row-input-wrap modal-row-input-wrap--toggle">
+              <label class="switch">
+                <input v-model="form.bullsEyeUiVisible" type="checkbox" role="switch" />
+                <span class="switch-slider" aria-hidden="true"></span>
+              </label>
+            </span>
+          </div>
         </div>
         <p v-else class="modal-body">Loading state…</p>
         <div class="modal-footer">
@@ -49,6 +77,7 @@
 import { ref, computed } from 'vue'
 import { useAppState } from '../composables/useAppState.ts'
 import { setFromAppState as setRenderingFromAppState, getRendering, clampRenderingValue } from '../core/renderingConfig.mjs'
+import { reportError } from '../utils/errorReporting.mjs'
 
 const { appState, updateAppState } = useAppState()
 
@@ -61,7 +90,9 @@ const form = ref({
   saturationAtMaxZ: 100,
   brightnessAtMaxZ: 100,
   parallaxScaleAtMinZ: 1.0,
-  parallaxScaleAtMaxZ: 1.0
+  parallaxScaleAtMaxZ: 1.0,
+  focalPointUiVisible: true,
+  bullsEyeUiVisible: true
 })
 
 function openModal() {
@@ -76,7 +107,9 @@ function openModal() {
     saturationAtMaxZ: clampRenderingValue(limits, 'saturationAtMaxZ', saturationPct),
     brightnessAtMaxZ: clampRenderingValue(limits, 'brightnessAtMaxZ', brightnessPct),
     parallaxScaleAtMinZ: clampRenderingValue(limits, 'parallaxScaleAtMinZ', r.parallaxScaleAtMinZ),
-    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', r.parallaxScaleAtMaxZ)
+    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', r.parallaxScaleAtMaxZ),
+    focalPointUiVisible: r.focalPointUiVisible !== false,
+    bullsEyeUiVisible: r.bullsEyeUiVisible !== false
   }
   showModal.value = true
 }
@@ -94,7 +127,9 @@ async function save() {
     saturationAtMaxZ: clampRenderingValue(limits, 'saturationAtMaxZ', form.value.saturationAtMaxZ),
     brightnessAtMaxZ: clampRenderingValue(limits, 'brightnessAtMaxZ', form.value.brightnessAtMaxZ),
     parallaxScaleAtMinZ: clampRenderingValue(limits, 'parallaxScaleAtMinZ', form.value.parallaxScaleAtMinZ),
-    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', form.value.parallaxScaleAtMaxZ)
+    parallaxScaleAtMaxZ: clampRenderingValue(limits, 'parallaxScaleAtMaxZ', form.value.parallaxScaleAtMaxZ),
+    focalPointUiVisible: !!form.value.focalPointUiVisible,
+    bullsEyeUiVisible: !!form.value.bullsEyeUiVisible
   }
   try {
     await updateAppState({
@@ -107,7 +142,8 @@ async function save() {
     window.dispatchEvent(new CustomEvent('rendering-changed'))
     closeModal()
   } catch (e) {
-    console.error('[Scene3DSettings] Failed to save 3D settings:', e)
+    reportError(e, '[Scene3DSettings] Failed to save 3D settings')
+    throw e
   }
 }
 </script>
@@ -185,13 +221,87 @@ async function save() {
   font-size: 13px;
 }
 
-.modal-row input {
-  width: 72px;
-  padding: 4px 8px;
+.modal-row-label {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+/* Fixed column so every number input (and stepper) is the same width */
+.modal-row-input-wrap {
+  flex: 0 0 88px;
+  width: 88px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.modal-row-input-wrap input[type='number'] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 4px 6px;
   border-radius: 4px;
   border: 1px solid #555;
   background: #222;
   color: white;
+}
+
+.modal-row-input-wrap--toggle {
+  justify-content: flex-end;
+}
+
+/* Toggle switch (checkbox + slider) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #555;
+  border-radius: 12px;
+  border: 1px solid #666;
+  transition: background 0.2s ease;
+}
+
+.switch-slider::before {
+  position: absolute;
+  content: '';
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+.switch input:checked + .switch-slider {
+  background: #0066aa;
+  border-color: #0088cc;
+}
+
+.switch input:checked + .switch-slider::before {
+  transform: translate(20px, -50%);
+}
+
+.switch input:focus-visible + .switch-slider {
+  outline: 2px solid #88c8ff;
+  outline-offset: 2px;
 }
 
 .modal-footer {

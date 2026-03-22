@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, type Ref, type ComputedRef } from 'vue';
 // useAimPoint removed during Vue 3 migration cleanup
-import { useFocalPoint } from '@/modules/composables/useFocalPointVue3.mjs';
+import { FOCALPOINT_MODES } from '@/modules/composables/useFocalPointVue3.mjs';
+import { useAppStore } from '@/modules/stores/appStore.mjs';
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useLayoutToggle } from '@/modules/composables/useLayoutToggle.mjs';
 import { useAppState } from '@/modules/composables/useAppState';
@@ -39,6 +40,7 @@ const stepCount: Ref<number> = ref(1);
 
 const { orientation } = useLayoutToggle();
 const { updateAppState, appState } = useAppState();
+const { store, actions: appStoreActions } = useAppStore();
 
 // Use Vue 3 provide/inject instead of window.bullsEye
 const bullsEye = useBullsEyeService();
@@ -175,16 +177,22 @@ const stepRightButton: ComputedRef<StepButton> = computed(() => {
   }
 });
 
-// Get focal point mode from useFocalPoint - restored tri-state functionality
-const { 
-  mode: focalPointMode,
-  cycleMode: cycleFocalPointMode
-} = useFocalPoint();
+// Focal tri-state: use shared app store only (avoid a second useFocalPoint() instance in this component).
+const focalPointMode = computed(() => store.focalPoint.mode);
 
-// Debug watcher to see mode changes
-watch(focalPointMode, (newMode, oldMode) => {
-  console.log(`ResizeHandle: focalPointMode changed from ${oldMode} to ${newMode}`);
-}, { immediate: true });
+const FOCAL_CYCLE_ORDER = [
+  FOCALPOINT_MODES.LOCKED,
+  FOCALPOINT_MODES.FOLLOWING,
+  FOCALPOINT_MODES.DRAGGING,
+] as const;
+
+function cycleFocalPointMode(): void {
+  const modes = FOCAL_CYCLE_ORDER;
+  const i = modes.indexOf(store.focalPoint.mode as (typeof modes)[number]);
+  const currentIndex = i >= 0 ? i : 0;
+  const next = modes[(currentIndex + 1) % modes.length];
+  appStoreActions.setFocalPointMode(next);
+}
 
 const {
   toggleOrientation,
@@ -193,17 +201,45 @@ const {
 } = useLayoutToggle();
 
 const isHovering = ref(false);
+/** Keyboard focus: show same custom tooltip as hover (native title can't be positioned). */
+const focalTriStateFocused = ref(false);
 const isSteppingHovering = ref(false);
 const isLayoutHovering = ref(false);
 const hasJustClicked = ref(false); // Track if we just clicked (to maintain hover state)
 
+const showFocalTriStateTooltip = computed(
+  () => isHovering.value || focalTriStateFocused.value
+);
+
+/** Store uses uppercase LOCKED / FOLLOWING / DRAGGING */
 const nextMode = computed(() => {
   switch (focalPointMode.value) {
-    case 'locked': return 'following';
-    case 'following': return 'dragging';
-    case 'dragging': return 'locked';
-    default: return 'locked';
+    case FOCALPOINT_MODES.LOCKED:
+      return FOCALPOINT_MODES.FOLLOWING;
+    case FOCALPOINT_MODES.FOLLOWING:
+      return FOCALPOINT_MODES.DRAGGING;
+    case FOCALPOINT_MODES.DRAGGING:
+      return FOCALPOINT_MODES.LOCKED;
+    default:
+      return FOCALPOINT_MODES.LOCKED;
   }
+});
+
+const FOCAL_MODE_TITLE: Record<string, string> = {
+  [FOCALPOINT_MODES.LOCKED]: 'Locked — focal fixed to viewport center (bulls-eye)',
+  [FOCALPOINT_MODES.FOLLOWING]: 'Following — focal eases toward mouse',
+  [FOCALPOINT_MODES.DRAGGING]: 'Dragging — focal tracks mouse; crosshair cursor',
+};
+
+/** Tooltip: current mode only (icon already previews next mode on hover). */
+const triStateFocalButtonTitle = computed(() => {
+  const currentLabel = FOCAL_MODE_TITLE[focalPointMode.value] ?? `Mode: ${focalPointMode.value}`;
+  return `${currentLabel}. Click to cycle focal point mode.`;
+});
+
+const triStateFocalAriaLabel = computed(() => {
+  const currentLabel = FOCAL_MODE_TITLE[focalPointMode.value] ?? String(focalPointMode.value);
+  return `Focal point mode. ${currentLabel}. Click to cycle modes.`;
 });
 
 // Get layout button text - shows opposite direction on hover
@@ -217,27 +253,25 @@ const layoutButtonText = computed(() => {
   }
 });
 
-// The mode whose icon we're currently displaying (for CSS class styling)
+// CSS classes use lowercase (.locked, .following, .dragging)
 const displayedIconMode = computed(() => {
-    return isHovering.value ? nextMode.value : focalPointMode.value;
+  const raw = isHovering.value ? nextMode.value : focalPointMode.value;
+  return String(raw).toLowerCase();
 });
 
-// The actual icon to show
-const displayIcon = computed(() => {
-    const modeToShow = isHovering.value ? nextMode.value : focalPointMode.value;
-    // console.log('displayIcon computed:', {
-    //     isHovering: isHovering.value,
-    //     currentMode: focalPointMode.value,
-    //     nextMode: nextMode.value,
-    //     modeToShow,
-    //     hasJustClicked: hasJustClicked.value
-    // });
-    switch (modeToShow) {
-        case 'locked': return '⦻';
-        case 'following': return '›';
-        case 'dragging': return '⤮';
-        default: return '⦻';
-    }
+/** Which focal glyph to render (matches on-screen focal: reticle vs crosshair). */
+const focalTriStateVisualMode = computed(() => {
+  const modeToShow = isHovering.value ? nextMode.value : focalPointMode.value;
+  switch (modeToShow) {
+    case FOCALPOINT_MODES.LOCKED:
+      return 'locked';
+    case FOCALPOINT_MODES.FOLLOWING:
+      return 'following';
+    case FOCALPOINT_MODES.DRAGGING:
+      return 'dragging';
+    default:
+      return 'locked';
+  }
 });
 
 // CSS classes for the button
@@ -323,15 +357,52 @@ function handleResizeHandleClick(event: MouseEvent): void {
     <div id="resize-handle" class="resize-handle" @mousedown="startDrag" @click="handleResizeHandleClick">
         <div class="button-container" @click.stop @mousedown.stop>
             <button :id="stepLeftButton.id" class="toggle-circle" @click.stop="stepLeftButton.action" :disabled="stepLeftButton.disabled" :title="stepLeftButton.title">{{ stepLeftButton.icon }}</button>
-            <button id="tri-state-toggle" 
-                    class="toggle-circle" 
-                    :class="buttonClasses"
-                    @click.stop="toggleFocalLock" 
-                    @mouseenter="isHovering = true; hasJustClicked = false"
-                    @mouseleave="isHovering = false; hasJustClicked = false"
-                    :title="isHovering ? 'Next: ' + nextMode + ' (click to switch)' : 'Current: ' + focalPointMode + ' (hover to preview next)'">
-                <span>{{ displayIcon }}</span>
-            </button>
+            <div class="tri-state-wrap">
+              <button id="tri-state-toggle" 
+                      type="button"
+                      class="toggle-circle" 
+                      :class="buttonClasses"
+                      @click.stop="toggleFocalLock" 
+                      @mouseenter="isHovering = true; hasJustClicked = false"
+                      @mouseleave="isHovering = false; hasJustClicked = false"
+                      @focus="focalTriStateFocused = true"
+                      @blur="focalTriStateFocused = false"
+                      :aria-label="triStateFocalAriaLabel">
+                <span class="tri-state-icon" aria-hidden="true">
+                  <!-- LOCKED / FOLLOWING: same geometry as #focal-point .focal-point-reticle (not ‹ › step glyphs) -->
+                  <svg
+                    v-if="focalTriStateVisualMode === 'locked' || focalTriStateVisualMode === 'following'"
+                    class="tri-state-reticle"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5" />
+                    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1" />
+                    <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1" />
+                    <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1" />
+                    <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="1" />
+                    <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1" />
+                  </svg>
+                  <!-- DRAGGING: crosshair-style like focal-point-crosshair image -->
+                  <svg
+                    v-else
+                    class="tri-state-crosshair"
+                    viewBox="0 0 24 24"
+                  >
+                    <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.2" />
+                  </svg>
+                </span>
+              </button>
+              <div
+                v-show="showFocalTriStateTooltip"
+                id="tri-state-tooltip-text"
+                class="tri-state-tooltip"
+                role="tooltip"
+              >
+                {{ triStateFocalButtonTitle }}
+              </div>
+            </div>
             <button id="layout-toggle" 
                     class="toggle-circle" 
                     :class="{ 'hovering': isLayoutHovering }"
@@ -371,6 +442,7 @@ function handleResizeHandleClick(event: MouseEvent): void {
     padding-bottom: 20px;
     box-sizing: border-box;
     flex-shrink: 0;
+    overflow: visible;
 }
 
 /* Add drop shadow on the scene-facing edge */
@@ -396,6 +468,7 @@ function handleResizeHandleClick(event: MouseEvent): void {
     align-items: center;
     gap: 10px;
     pointer-events: auto; /* Ensure buttons can receive clicks */
+    overflow: visible; /* tooltip must not shrink to ~24px strip width */
 }
 
 .toggle-circle {
@@ -416,6 +489,58 @@ function handleResizeHandleClick(event: MouseEvent): void {
     transition: all 0.2s ease;
 }
 
+.tri-state-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+/*
+ * Focal-mode tooltip: parent column is only ~24px wide; without explicit width,
+ * shrink-to-fit can crush the box (serif fallback + “chimney” wrapping).
+ */
+.tri-state-tooltip {
+    position: absolute;
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    margin: 0;
+    box-sizing: border-box;
+    width: clamp(200px, min(268px, calc(100vw - 32px)), 268px);
+    padding: 10px 12px;
+    background: rgba(32, 32, 32, 0.98);
+    color: #f2f2f2;
+    border: 1px solid #777;
+    border-radius: 6px;
+    font-family: var(
+        --scene-font-family,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        'Segoe UI',
+        Roboto,
+        'Helvetica Neue',
+        Arial,
+        sans-serif
+    );
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: 0.01em;
+    -webkit-font-smoothing: antialiased;
+    z-index: 10002;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    text-align: left;
+    white-space: normal;
+    hyphens: none;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
 #tri-state-toggle {
     width: 24px;
     height: 24px;
@@ -432,9 +557,32 @@ function handleResizeHandleClick(event: MouseEvent): void {
 }
 
 /* Default state: current mode with white icon on black background */
-#tri-state-toggle span {
+#tri-state-toggle .tri-state-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
     color: white;
-    transition: color 0.2s ease;
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+/* Mirror #focal-point.locked: same reticle, muted */
+#tri-state-toggle.locked .tri-state-icon {
+    color: #a8a8a8;
+}
+
+#tri-state-toggle .tri-state-reticle,
+#tri-state-toggle .tri-state-crosshair {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    display: block;
+}
+
+#tri-state-toggle.dragging .tri-state-crosshair {
+    width: 17px;
+    height: 17px;
 }
 
 /* Hover state: next mode with black icon on white background */
@@ -444,19 +592,12 @@ function handleResizeHandleClick(event: MouseEvent): void {
     border-color: black;
 }
 
-#tri-state-toggle.hovering span {
+#tri-state-toggle.hovering .tri-state-icon {
     color: black;
 }
 
-/* Mode-specific font sizing adjustments */
-#tri-state-toggle.following span,
-#tri-state-toggle.dragging span {
-    font-size: 20px;
-}
-
-#tri-state-toggle.following span {
-    position: relative;
-    top: -1px;
+#tri-state-toggle.hovering.locked .tri-state-icon {
+    color: #555;
 }
 
 #stepping-indicator {

@@ -816,6 +816,7 @@ watch(orientation, (newOrientation) => {
   visibility: visible !important;
   z-index: 10000;
   pointer-events: auto;
+  overflow: visible !important; /* focal-mode tooltip extends past 20px strip */
 }
 
 .resume-content {
