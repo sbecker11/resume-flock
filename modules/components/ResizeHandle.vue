@@ -211,35 +211,19 @@ const showFocalTriStateTooltip = computed(
   () => isHovering.value || focalTriStateFocused.value
 );
 
-/** Store uses uppercase LOCKED / FOLLOWING / DRAGGING */
-const nextMode = computed(() => {
-  switch (focalPointMode.value) {
-    case FOCALPOINT_MODES.LOCKED:
-      return FOCALPOINT_MODES.FOLLOWING;
-    case FOCALPOINT_MODES.FOLLOWING:
-      return FOCALPOINT_MODES.DRAGGING;
-    case FOCALPOINT_MODES.DRAGGING:
-      return FOCALPOINT_MODES.LOCKED;
-    default:
-      return FOCALPOINT_MODES.LOCKED;
-  }
-});
-
 const FOCAL_MODE_TITLE: Record<string, string> = {
-  [FOCALPOINT_MODES.LOCKED]: 'Locked — focal fixed to viewport center (bulls-eye)',
-  [FOCALPOINT_MODES.FOLLOWING]: 'Following — focal eases toward mouse',
-  [FOCALPOINT_MODES.DRAGGING]: 'Dragging — focal tracks mouse; crosshair cursor',
+  [FOCALPOINT_MODES.LOCKED]: 'focal point locked at viewport center (bulls eye)',
+  [FOCALPOINT_MODES.FOLLOWING]: 'focal point eases to mouse',
+  [FOCALPOINT_MODES.DRAGGING]: 'mouse drags focal point',
 };
 
-/** Tooltip: current mode only (icon already previews next mode on hover). */
+/** Tooltip and aria: current mode only, no "click to cycle". */
 const triStateFocalButtonTitle = computed(() => {
-  const currentLabel = FOCAL_MODE_TITLE[focalPointMode.value] ?? `Mode: ${focalPointMode.value}`;
-  return `${currentLabel}. Click to cycle focal point mode.`;
+  return FOCAL_MODE_TITLE[focalPointMode.value] ?? `Mode: ${focalPointMode.value}`;
 });
 
 const triStateFocalAriaLabel = computed(() => {
-  const currentLabel = FOCAL_MODE_TITLE[focalPointMode.value] ?? String(focalPointMode.value);
-  return `Focal point mode. ${currentLabel}. Click to cycle modes.`;
+  return FOCAL_MODE_TITLE[focalPointMode.value] ?? String(focalPointMode.value);
 });
 
 // Get layout button text - shows opposite direction on hover
@@ -253,25 +237,15 @@ const layoutButtonText = computed(() => {
   }
 });
 
-// CSS classes use lowercase (.locked, .following, .dragging)
-const displayedIconMode = computed(() => {
-  const raw = isHovering.value ? nextMode.value : focalPointMode.value;
-  return String(raw).toLowerCase();
-});
+/** Current mode only (no next-mode preview on hover). */
+const displayedIconMode = computed(() => String(focalPointMode.value).toLowerCase());
 
-/** Which focal glyph to render (matches on-screen focal: reticle vs crosshair). */
-const focalTriStateVisualMode = computed(() => {
-  const modeToShow = isHovering.value ? nextMode.value : focalPointMode.value;
-  switch (modeToShow) {
-    case FOCALPOINT_MODES.LOCKED:
-      return 'locked';
-    case FOCALPOINT_MODES.FOLLOWING:
-      return 'following';
-    case FOCALPOINT_MODES.DRAGGING:
-      return 'dragging';
-    default:
-      return 'locked';
-  }
+/** 15x15 PNG path: current mode, inverted (black) on hover. Following uses locked icon (same reticle). */
+const focalTriStateIconSrc = computed(() => {
+  const mode = focalPointMode.value;
+  const variant = isHovering.value ? 'black' : 'white';
+  const iconMode = mode === FOCALPOINT_MODES.FOLLOWING ? 'locked' : String(mode).toLowerCase();
+  return `/static_content/icons/x-hairs/15/${iconMode}-15-${variant}.png`;
 });
 
 // CSS classes for the button
@@ -301,8 +275,6 @@ function toggleFocalLock(event: MouseEvent): void {
   // Mark that we just clicked (don't reset hover state yet)
   hasJustClicked.value = true;
   
-  // Force a small delay to ensure the mode change has been processed
-  // This allows the nextMode computed to recalculate with the new current mode
   setTimeout(() => {
     // This setTimeout ensures the DOM and computeds have updated
     // The isHovering state remains true, so we'll show the next mode of the NEW current mode
@@ -368,31 +340,14 @@ function handleResizeHandleClick(event: MouseEvent): void {
                       @focus="focalTriStateFocused = true"
                       @blur="focalTriStateFocused = false"
                       :aria-label="triStateFocalAriaLabel">
-                <span class="tri-state-icon" aria-hidden="true">
-                  <!-- LOCKED / FOLLOWING: same geometry as #focal-point .focal-point-reticle (not ‹ › step glyphs) -->
-                  <svg
-                    v-if="focalTriStateVisualMode === 'locked' || focalTriStateVisualMode === 'following'"
-                    class="tri-state-reticle"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.5" />
-                    <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1" />
-                    <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1" />
-                    <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1" />
-                    <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="1" />
-                    <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1" />
-                  </svg>
-                  <!-- DRAGGING: crosshair-style like focal-point-crosshair image -->
-                  <svg
-                    v-else
-                    class="tri-state-crosshair"
-                    viewBox="0 0 24 24"
-                  >
-                    <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-                    <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
-                    <circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.2" />
-                  </svg>
-                </span>
+                <img
+                  :src="focalTriStateIconSrc"
+                  class="tri-state-icon-img"
+                  width="15"
+                  height="15"
+                  alt=""
+                  aria-hidden="true"
+                />
               </button>
               <div
                 v-show="showFocalTriStateTooltip"
@@ -541,63 +496,36 @@ function handleResizeHandleClick(event: MouseEvent): void {
     word-break: normal;
 }
 
+/* 15x15 PNG dead center; on-hover shows inverted (black) variant */
 #tri-state-toggle {
     width: 24px;
     height: 24px;
+    min-width: 24px;
+    min-height: 24px;
     border-radius: 50%;
     border: 2px solid white;
     background-color: rgba(0,0,0,0.5);
     background-image: none;
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 16px;
-    line-height: 1;
-    text-align: center;
-    position: relative;
-}
-
-/* Default state: current mode with white icon on black background */
-#tri-state-toggle .tri-state-icon {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    height: 100%;
-    color: white;
-    transition: color 0.2s ease, opacity 0.2s ease;
+    position: relative;
 }
 
-/* Mirror #focal-point.locked: same reticle, muted */
-#tri-state-toggle.locked .tri-state-icon {
-    color: #a8a8a8;
-}
-
-#tri-state-toggle .tri-state-reticle,
-#tri-state-toggle .tri-state-crosshair {
+#tri-state-toggle .tri-state-icon-img {
+    display: block;
     width: 15px;
     height: 15px;
+    object-fit: contain;
     flex-shrink: 0;
-    display: block;
 }
 
-#tri-state-toggle.dragging .tri-state-crosshair {
-    width: 17px;
-    height: 17px;
-}
-
-/* Hover state: next mode with black icon on white background */
+/* Hover: inverted icon (black on white) via PNG variant */
 #tri-state-toggle.hovering {
     background-color: white;
-    color: black;
     border-color: black;
-}
-
-#tri-state-toggle.hovering .tri-state-icon {
-    color: black;
-}
-
-#tri-state-toggle.hovering.locked .tri-state-icon {
-    color: #555;
 }
 
 #stepping-indicator {

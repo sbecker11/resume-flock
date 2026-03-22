@@ -19,7 +19,7 @@ export const FOCALPOINT_MODES = {
 }
 
 // Larger focal display: cursor file used only in DRAGGING mode (smaller display = circles/lines in LOCKED/FOLLOWING)
-const CROSSHAIR_CURSOR = 'url(\'/static_content/icons/x-hairs/icons8-accuracy-32-whiter.png\') 16 16, crosshair'
+const CROSSHAIR_CURSOR = 'url(\'/static_content/icons/x-hairs/32/dragging-32-white.png\') 16 16, crosshair'
 
 export function useFocalPoint() {
   const { store, actions } = useAppStore()

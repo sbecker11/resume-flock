@@ -50,7 +50,7 @@
       <img
         v-show="focalPointIsDragging"
         class="focal-point-crosshair"
-        src="/static_content/icons/x-hairs/icons8-accuracy-32-whiter.png"
+        src="/static_content/icons/x-hairs/32/dragging-32-white.png"
         width="32"
         height="32"
         alt=""
