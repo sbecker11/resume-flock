@@ -249,103 +249,66 @@ export function useColorPalette() {
             currentPaletteFilename.value = appState.value["user-settings"].theme.colorPalette;
             // console.log(`[ColorPalette] Initialized currentPaletteFilename from appState.colorPalette: ${appState.value.theme.colorPalette}`);
 
-            /** @type {{ version?: number, palettes?: Array<{ name: string, colors: string[], backgroundSwatchIndex?: number, imagePublicUrl?: string }> } | null} */
-            let bundle = null;
-            /** @type {string | null} Human-readable catalog origin (DEV log + support). */
-            let catalogLoadOrigin = null;
+            /** @type {{ version: number, palettes: Array<{ name: string, colors: string[], backgroundSwatchIndex?: number, imagePublicUrl?: string }> }} */
+            let bundle;
 
-            // Permanent S3 catalog (startup + hard refresh): S3_COLOR_PALETTES_JSON_URL or S3_BUCKET + S3_REGION + S3_COLOR_PALETTES_OBJECT_KEY (see color-palette-utils-ts README / test URL decomposition).
-            const s3Url = resolvePaletteCatalogS3Url();
-            if (s3Url) {
+            if (hasServer()) {
+                const apiUrl = basePathJoin('api/palette-catalog');
+                const headers = {};
+                if (isDocumentReloadNavigation()) {
+                    headers['X-Palette-Catalog-Refresh'] = '1';
+                }
+                const res = await fetch(apiUrl, { method: 'GET', cache: 'no-store', headers });
+                if (!res.ok) {
+                    const body = await res.text();
+                    const err = new Error(
+                        `[ColorPalette] API palette catalog ${res.status} ${res.statusText} (${apiUrl}) ${body.slice(0, 500)}`
+                    );
+                    reportError(err, '[ColorPalette] Server palette catalog request failed (S3 is loaded on the server)');
+                    throw err;
+                }
+                bundle = await res.json();
+                assertValidPaletteCatalogBundle(bundle);
+                if (import.meta.env?.DEV && typeof console !== 'undefined') {
+                    console.log(
+                        `[ColorPalette] Catalog from server /api/palette-catalog (${bundle.palettes.length} palette(s)); S3 refetched: ${Boolean(headers['X-Palette-Catalog-Refresh'])}`
+                    );
+                }
+            } else {
+                // GitHub Pages / static host: browser fetches S3 directly (no Node server).
+                const s3Url = resolvePaletteCatalogS3Url();
+                if (!s3Url) {
+                    const err = new Error(
+                        '[ColorPalette] S3 catalog URL not configured. For static deploy, bake S3_COLOR_PALETTES_JSON_URL or S3_IMAGES_BUCKET+AWS_REGION+S3_PALETTES_JSONL_KEY at build time (GitHub Actions secrets). See .env.example.'
+                    );
+                    reportError(err, '[ColorPalette] Missing S3 catalog configuration');
+                    throw err;
+                }
+
+                const res = await fetch(s3Url, { method: 'GET', cache: 'no-store' });
+                if (!res.ok) {
+                    const err = new Error(
+                        `[ColorPalette] S3 palette catalog HTTP ${res.status} ${res.statusText} (${s3Url})`
+                    );
+                    reportError(err, '[ColorPalette] S3 catalog request failed');
+                    throw err;
+                }
+
+                const raw = await res.text();
                 try {
-                    const res = await fetch(s3Url, { method: 'GET', cache: 'no-store' });
-                    if (!res.ok) {
-                        throw new Error(`S3 palette catalog ${res.status} ${res.statusText} (${s3Url})`);
-                    }
-                    const raw = await res.text();
-                    writeCachedPaletteCatalogNdjson(s3Url, raw);
                     bundle = parsePaletteBundleFromImageMetadataJsonl(raw);
-                    catalogLoadOrigin = `S3 live (${s3Url})`;
-                } catch (e) {
-                    const cached = readCachedPaletteCatalogNdjson(s3Url);
-                    if (cached) {
-                        try {
-                            bundle = parsePaletteBundleFromImageMetadataJsonl(cached);
-                            catalogLoadOrigin = `S3 localStorage cache (fetch failed; url ${s3Url})`;
-                            reportError(
-                                e,
-                                '[ColorPalette] S3 catalog fetch failed',
-                                'Remedy: Using readonly localStorage snapshot of last successful catalog'
-                            );
-                        } catch (parseErr) {
-                            reportError(
-                                parseErr,
-                                '[ColorPalette] Cached S3 catalog parse failed',
-                                'Remedy: Clearing invalid cache entry'
-                            );
-                            clearCachedPaletteCatalog(s3Url);
-                            reportError(
-                                e,
-                                '[ColorPalette] S3 palette catalog unavailable after cache discard',
-                                'Falling back to API/static'
-                            );
-                        }
-                    } else {
-                        reportError(
-                            e,
-                            '[ColorPalette] S3 palette catalog fetch failed (no local cache)',
-                            'Falling back to API/static'
-                        );
-                    }
+                } catch (parseErr) {
+                    reportError(parseErr, '[ColorPalette] S3 catalog NDJSON parse failed');
+                    throw parseErr;
                 }
-            }
 
-            if (!bundle && hasServer()) {
-                try {
-                    const apiRes = await fetch(API_MANIFEST_URL);
-                    if (apiRes.ok) {
-                        bundle = await apiRes.json();
-                        catalogLoadOrigin = `API ${API_MANIFEST_URL}`;
-                    } else {
-                        throw new Error(`API palette bundle ${apiRes.status}`);
-                    }
-                } catch (e) {
-                    reportError(e, '[ColorPalette] API palette-manifest fetch failed', 'Falling back to static color_palettes.jsonl');
-                    const staticRes = await fetch(COLOR_PALETTES_JSONL_URL);
-                    if (!staticRes.ok) {
-                        throw new Error(`Failed to fetch color_palettes.jsonl (${staticRes.status})`);
-                    }
-                    const rawJsonl = await staticRes.text();
-                    bundle = parsePaletteBundleFromImageMetadataJsonl(rawJsonl);
-                    catalogLoadOrigin = `static ${COLOR_PALETTES_JSONL_URL} (after API failure)`;
+                assertValidPaletteCatalogBundle(bundle);
+
+                if (import.meta.env?.DEV && typeof console !== 'undefined') {
+                    console.log(
+                        `[ColorPalette] Catalog fetched from S3 (${bundle.palettes.length} palette(s)): ${s3Url}`
+                    );
                 }
-            }
-
-            if (!bundle) {
-                const staticRes = await fetch(COLOR_PALETTES_JSONL_URL);
-                if (!staticRes.ok) {
-                    throw new Error(`Static color_palettes.jsonl ${staticRes.status}`);
-                }
-                const rawJsonl = await staticRes.text();
-                bundle = parsePaletteBundleFromImageMetadataJsonl(rawJsonl);
-                catalogLoadOrigin = catalogLoadOrigin || `static ${COLOR_PALETTES_JSONL_URL}`;
-            }
-
-            if (import.meta.env?.DEV && catalogLoadOrigin && typeof console !== 'undefined') {
-                console.log(
-                    `[ColorPalette] Catalog loaded (${bundle?.palettes?.length ?? 0} palettes): ${catalogLoadOrigin}`
-                );
-            }
-            if (!s3Url && import.meta.env?.DEV && typeof console !== 'undefined') {
-                console.log(
-                    '[ColorPalette] S3 catalog disabled: set S3_COLOR_PALETTES_JSON_URL or S3_BUCKET+S3_REGION+S3_COLOR_PALETTES_OBJECT_KEY in .env (see .env.example)'
-                );
-            }
-
-            if (!bundle || bundle.version !== 2 || !Array.isArray(bundle.palettes) || bundle.palettes.length === 0) {
-                throw new Error(
-                    'Invalid palette bundle (expected { version: 2, palettes: [...] } from server or parsed jsonl)'
-                );
             }
 
             const tempLoadedColorPalettes = {};
@@ -355,10 +318,6 @@ export function useColorPalette() {
             const tempOrderedNames = [];
 
             for (const p of bundle.palettes) {
-                if (!p || typeof p.name !== 'string' || !Array.isArray(p.colors)) {
-                    throw new Error('Invalid palette entry in bundle');
-                }
-                normalizePaletteColors(p.colors);
                 tempLoadedColorPalettes[p.name] = p.colors;
                 if (p.backgroundSwatchIndex != null) {
                     tempBackgroundSwatchIndexByPalette[p.name] =
@@ -368,15 +327,6 @@ export function useColorPalette() {
                 tempOrderedNames.push(p.name);
                 if (p.imagePublicUrl) {
                     tempImageUrls[p.name] = p.imagePublicUrl;
-                }
-            }
-
-            // Fast-fail: validate every palette color at startup; invalid hex fails entire startup.
-            for (const [paletteName, colors] of Object.entries(tempLoadedColorPalettes)) {
-                for (let i = 0; i < colors.length; i++) {
-                    if (!hexToRgb(colors[i])) {
-                        throw new Error(`Invalid hex in palette "${paletteName}" at index ${i}: "${colors[i]}"`);
-                    }
                 }
             }
 
