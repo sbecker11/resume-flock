@@ -1,0 +1,3 @@
+# Copy to github-pages-palette-catalog.url (one line, no # prefix on the URL line).
+# Used by GitHub Actions when no S3_* secrets/variables are set (public GET catalog).
+# https://your-bucket.s3.region.amazonaws.com/path/to/color_palettes.jsonl

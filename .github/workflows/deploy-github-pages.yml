@@ -42,6 +42,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # If Actions secrets/variables are empty, use committed public catalog URL (see config/).
+      - name: Optional committed palette catalog URL
+        run: node scripts/apply-committed-palette-catalog-env.mjs
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

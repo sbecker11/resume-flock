@@ -30,6 +30,7 @@ console.error('No palette catalog URL from env. Need one of these bundles:');
 console.error('  • S3_COLOR_PALETTES_JSON_URL');
 console.error('  • S3_IMAGES_BUCKET + AWS_REGION + S3_PALETTES_JSONL_KEY');
 console.error('  • S3_BUCKET + S3_REGION + S3_COLOR_PALETTES_OBJECT_KEY');
+console.error('  • OR commit a single-line HTTPS URL in config/github-pages-palette-catalog.url (public catalog; no GitHub secrets).');
 console.error('');
 console.error('Diagnostics (names only, never values):');
 for (const k of KEYS) {
