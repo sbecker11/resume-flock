@@ -18,6 +18,20 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Single source of truth: every step (verify + vite build) sees the same S3_* / AWS_* values.
+    # GitHub repo → Settings → Secrets and variables → Actions → New repository secret.
+    # You need ONE of these bundles (see modules/utils/paletteCatalogS3Url.mjs + .env.example):
+    #   • S3_COLOR_PALETTES_JSON_URL  (full HTTPS URL to the .jsonl catalog)
+    #   • OR S3_IMAGES_BUCKET + AWS_REGION + S3_PALETTES_JSONL_KEY
+    #   • OR S3_BUCKET + S3_REGION + S3_COLOR_PALETTES_OBJECT_KEY  (legacy)
+    env:
+      S3_COLOR_PALETTES_JSON_URL: ${{ secrets.S3_COLOR_PALETTES_JSON_URL }}
+      S3_IMAGES_BUCKET: ${{ secrets.S3_IMAGES_BUCKET }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      S3_PALETTES_JSONL_KEY: ${{ secrets.S3_PALETTES_JSONL_KEY }}
+      S3_BUCKET: ${{ secrets.S3_BUCKET }}
+      S3_REGION: ${{ secrets.S3_REGION }}
+      S3_COLOR_PALETTES_OBJECT_KEY: ${{ secrets.S3_COLOR_PALETTES_OBJECT_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,17 +45,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # S3 catalog: S3_COLOR_PALETTES_JSON_URL or CPM-aligned S3_IMAGES_BUCKET + AWS_REGION + S3_PALETTES_JSONL_KEY (see color-palette-utils-ts/DEVELOPMENT.md). Legacy secrets still supported.
+      # Fail fast if secrets above don’t resolve to a catalog URL (empty build = broken palettes on Pages).
+      - name: Verify S3 palette catalog secrets
+        run: |
+          node --input-type=module -e "
+            import { resolvePaletteCatalogS3UrlFromRecord } from './modules/utils/paletteCatalogS3Url.mjs';
+            const u = resolvePaletteCatalogS3UrlFromRecord(process.env);
+            if (!u) {
+              console.error('No palette catalog URL from secrets. Add at least one of:');
+              console.error('  S3_COLOR_PALETTES_JSON_URL');
+              console.error('  or S3_IMAGES_BUCKET + AWS_REGION + S3_PALETTES_JSONL_KEY');
+              console.error('  or legacy S3_BUCKET + S3_REGION + S3_COLOR_PALETTES_OBJECT_KEY');
+              console.error('See .env.example and Settings → Secrets → Actions.');
+              process.exit(1);
+            }
+            console.log('Palette catalog URL OK for build (length', u.length, ')');
+          "
+
       - name: Build (Vite)
         env:
           VITE_BASE: /resume-flock/
-          S3_COLOR_PALETTES_JSON_URL: ${{ secrets.S3_COLOR_PALETTES_JSON_URL }}
-          S3_IMAGES_BUCKET: ${{ secrets.S3_IMAGES_BUCKET }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-          S3_PALETTES_JSONL_KEY: ${{ secrets.S3_PALETTES_JSONL_KEY }}
-          S3_BUCKET: ${{ secrets.S3_BUCKET }}
-          S3_REGION: ${{ secrets.S3_REGION }}
-          S3_COLOR_PALETTES_OBJECT_KEY: ${{ secrets.S3_COLOR_PALETTES_OBJECT_KEY }}
         run: npm run build
 
       - name: Copy parsed resumes (static)
