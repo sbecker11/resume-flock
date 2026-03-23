@@ -1126,8 +1126,10 @@ export function useCardsController() {
         }
 
         if (card.type === 'biz') {
-            hideJobOriginal(card.jobNumber)
-            createSelectedClone(card.jobNumber)
+            // Do not call hideJobOriginal here — createSelectedClone must read geometry from a
+            // visible original without hasClone (parallax skips hasClone cards; hiding first
+            // freezes wrong transform until the next focal change).
+            await createSelectedClone(card.jobNumber)
             scrollCDivHeaderIntoViewAfterCloneVisible(card.jobNumber)
         } else {
             // Skill selected: show as selected in both scene (clone) and resume (paired skill-resume-div)
@@ -1627,13 +1629,24 @@ export function useCardsController() {
     }
 
     /** Biz-card clone: same flow as createSkillCardClone — hide original, clone, show clone. */
-    function createSelectedClone(jobNumber) {
+    async function createSelectedClone(jobNumber) {
         const scenePlaneEl = scenePlaneElement || elementRegistry.getScenePlane()
         if (!scenePlaneEl) return
         
         let originalCard = cardRegistry.getCardElement(jobNumber) || document.getElementById(createBizCardDivId(jobNumber))
         if (!originalCard) return
         const cloneId = `${originalCard.id}-clone`
+        if (document.getElementById(cloneId)) return
+
+        // Parallax writes style.transform in the same turn as this event; getComputedStyle is still
+        // stale until the next frame(s). Wait two rAFs so First-button / auto-select reads the same
+        // transform as after a later rDiv click (when layout has settled).
+        window.dispatchEvent(new CustomEvent('focal-point-changed', { detail: {} }))
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+
+        originalCard = cardRegistry.getCardElement(jobNumber) || document.getElementById(createBizCardDivId(jobNumber))
+        if (!originalCard || originalCard.classList.contains('hasClone')) return
         if (document.getElementById(cloneId)) return
 
         // Capture geometry from original BEFORE hiding (so computed/rect are correct)
@@ -1645,8 +1658,11 @@ export function useCardsController() {
         const height = origStyle.height || (origComputed && origComputed.height) || '180px'
         const transform = origStyle.transform || (origComputed && origComputed.transform) || 'none'
 
-        originalCard.classList.add('hasClone')
+        originalCard.classList.add('hasClone', 'force-hidden-for-clone')
         originalCard.style.setProperty('display', 'none', 'important')
+        originalCard.style.setProperty('visibility', 'hidden', 'important')
+        originalCard.style.setProperty('opacity', '0', 'important')
+        originalCard.style.setProperty('pointer-events', 'none', 'important')
 
         const clone = originalCard.cloneNode(true)
         clone.id = cloneId
