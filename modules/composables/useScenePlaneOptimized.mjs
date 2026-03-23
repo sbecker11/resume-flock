@@ -136,23 +136,22 @@ export function useScenePlaneOptimized() {
   }
   
   /**
-   * Optimized recalculation with debouncing
+   * Defer geometry reads to the next animation frame so they run after the browser
+   * finishes layout (reduces Chrome “forced reflow” violations from ResizeObserver + getBoundingClientRect).
    */
-  let recalculationTimeout = null
+  let recalculationRaf = null
   const scheduleRecalculation = () => {
     needsRecalculation.value = true
-    
-    if (recalculationTimeout) {
-      clearTimeout(recalculationTimeout)
+    if (recalculationRaf != null) {
+      cancelAnimationFrame(recalculationRaf)
     }
-    
-    recalculationTimeout = setTimeout(() => {
-      if (needsRecalculation.value) {
-        updateDimensions()
-        updateElementCounts()
-        needsRecalculation.value = false
-      }
-    }, 16) // ~60fps
+    recalculationRaf = requestAnimationFrame(() => {
+      recalculationRaf = null
+      if (!needsRecalculation.value) return
+      updateDimensions()
+      updateElementCounts()
+      needsRecalculation.value = false
+    })
   }
   
   // ==========================================
@@ -255,9 +254,9 @@ export function useScenePlaneOptimized() {
       resizeObserver = null
     }
     
-    if (recalculationTimeout) {
-      clearTimeout(recalculationTimeout)
-      recalculationTimeout = null
+    if (recalculationRaf != null) {
+      cancelAnimationFrame(recalculationRaf)
+      recalculationRaf = null
     }
     
     isInitialized.value = false

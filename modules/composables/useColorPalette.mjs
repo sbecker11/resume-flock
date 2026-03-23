@@ -13,6 +13,8 @@ import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 import { reportError } from '@/modules/utils/errorReporting.mjs';
 import { complainLoudlyPaletteS3Failure } from '@/modules/utils/paletteS3LoudError.mjs';
+import { resolvePaletteCatalogS3Url } from '@/modules/utils/paletteCatalogS3Url.mjs';
+import { parsePaletteBundleFromImageMetadataJsonl } from '@/modules/utils/paletteBundleFromImageMetadata.mjs';
 
 /** True when the error is from catalog/manifest/fetch (show S3/catalog loud banner). */
 function isPaletteCatalogOrS3Failure(error) {
@@ -47,9 +49,36 @@ function basePathJoin(relPath) {
     return `${b}${p}`;
 }
 
-const PALETTE_DIR = './static_content/colorPalettes/';
-const CATALOG_ENDPOINT = '/api/palette-catalog';
-const MANIFEST_ENDPOINT = '/api/palette-manifest';
+/** Same as server NDJSON post-process — theme.colorPalette needs filename keys on static hosts. */
+function ensureSyntheticPaletteFilenamesForClient(bundle) {
+    if (!bundle?.palettes) return;
+    for (const p of bundle.palettes) {
+        if (p.filename || p.key) continue;
+        if (typeof p.name !== 'string' || !p.name.trim()) continue;
+        const s = p.name
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'palette';
+        const fn = `${s}.json`;
+        p.filename = fn;
+        p.key = fn;
+    }
+}
+
+function getPaletteCatalogApiUrl() {
+    return basePathJoin('api/palette-catalog');
+}
+
+function getPaletteManifestApiUrl() {
+    return basePathJoin('api/palette-manifest');
+}
+
+function paletteStaticFileUrl(filename) {
+    const base = basePathJoin('static_content/colorPalettes').replace(/\/$/, '');
+    return `${base}/${filename}`;
+}
+
 /** Base path for contrast icons (url/back/img); must contain icons8-{url,back,img}-16-black.png. */
 const ICON_BASE = basePathJoin('static_content/icons');
 
@@ -246,8 +275,39 @@ export function useColorPalette() {
             const tempImageUrls = {};
             const tempOrderedNames = [];
 
-            const catalogResponse = await fetch(CATALOG_ENDPOINT);
-            const catalogJson = catalogResponse.ok ? await catalogResponse.json() : null;
+            /** @type {{ version: number, palettes: unknown[] } | null} */
+            let catalogJson = null;
+            const apiCatalogRes = await fetch(getPaletteCatalogApiUrl());
+            if (apiCatalogRes.ok) {
+                const ct = (apiCatalogRes.headers.get('content-type') || '').toLowerCase();
+                if (ct.includes('json')) {
+                    try {
+                        catalogJson = await apiCatalogRes.json();
+                    } catch {
+                        catalogJson = null;
+                    }
+                }
+            }
+            const apiLooksLikeV2 =
+                catalogJson &&
+                catalogJson.version === 2 &&
+                Array.isArray(catalogJson.palettes) &&
+                catalogJson.palettes.length > 0;
+            if (!apiLooksLikeV2) {
+                const s3Url = resolvePaletteCatalogS3Url();
+                if (s3Url) {
+                    const s3Res = await fetch(s3Url, { method: 'GET', cache: 'no-store', mode: 'cors' });
+                    if (!s3Res.ok) {
+                        throw new Error(`Palette catalog HTTP ${s3Res.status} (${s3Url})`);
+                    }
+                    const raw = await s3Res.text();
+                    catalogJson = parsePaletteBundleFromImageMetadataJsonl(raw);
+                    ensureSyntheticPaletteFilenamesForClient(catalogJson);
+                }
+            } else {
+                ensureSyntheticPaletteFilenamesForClient(catalogJson);
+            }
+
             const useV2Catalog =
                 catalogJson &&
                 catalogJson.version === 2 &&
@@ -274,7 +334,7 @@ export function useColorPalette() {
             }
 
             if (!loadedFromV2) {
-                const response = await fetch(MANIFEST_ENDPOINT);
+                const response = await fetch(getPaletteManifestApiUrl());
                 if (!response.ok) throw new Error('Failed to fetch palette manifest');
                 const manifestData = await response.json();
                 if (!Array.isArray(manifestData)) {
@@ -285,7 +345,7 @@ export function useColorPalette() {
                 Object.keys(tempFilenameToNameMap).forEach((k) => delete tempFilenameToNameMap[k]);
                 tempOrderedNames.length = 0;
                 for (const filename of manifestData) {
-                    const filePath = PALETTE_DIR + filename;
+                    const filePath = paletteStaticFileUrl(filename);
                     const paletteResponse = await fetch(filePath);
                     if (!paletteResponse.ok) {
                         throw new Error(`Palette fetch failed: ${filePath} (${paletteResponse.status})`);
