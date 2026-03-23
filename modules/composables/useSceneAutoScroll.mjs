@@ -15,10 +15,28 @@ const MAX_AUTOSCROLL_VELOCITY = 10.0
 const MIN_AUTOSCROLL_VELOCITY = 2.0
 const AUTOSCROLL_CHANGE_THRESHOLD = 2.0
 
-const CURSORS_BASE = '/static_content/icons/cursors'
+function getRuntimeBase() {
+  const envBase = (import.meta?.env?.BASE_URL || '/')
+  let base = envBase
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname || '/'
+    const parts = path.split('/').filter(Boolean)
+    const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase))
+    if (useSubpath) base = `/${parts[0]}/`
+  }
+  return base.endsWith('/') ? base : `${base}/`
+}
+
+function basePathJoin(relPath) {
+  const b = getRuntimeBase()
+  const p = relPath.startsWith('/') ? relPath.slice(1) : relPath
+  return `${b}${p}`
+}
+
+const CURSORS_BASE = basePathJoin('static_content/icons/cursors')
 const EDGE_THRESHOLD_PX = 5
 
-/** 32x32 PNG icons. */
+/** 32x32 PNG icons (base-path aware for GitHub Pages). */
 export const AUTOSCROLL_UP_SRC = `${CURSORS_BASE}/up-32-grey.png`
 export const AUTOSCROLL_DOWN_SRC = `${CURSORS_BASE}/down-32-grey.png`
 export const AUTOSCROLL_TOP_SRC = `${CURSORS_BASE}/top-32-grey.png`
