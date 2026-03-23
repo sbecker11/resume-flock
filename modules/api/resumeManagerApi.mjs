@@ -285,6 +285,26 @@ export async function getResumeOtherSections(resumeId) {
 }
 
 /**
+ * Get education data for a resume
+ * @param {string} resumeId
+ * @returns {Promise<Object>}
+ */
+export async function getResumeEducation(resumeId) {
+    if (hasServer()) {
+        try {
+            return await fetchJsonOrThrow(basePathJoin(`api/resumes/${encodeURIComponent(resumeId)}/education`));
+        } catch (error) {
+            reportError(error, `[ResumeManagerAPI] Failed to get education for ${resumeId}`, 'Falling back to static parsed_resumes education.json (if available)');
+            const base = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}`);
+            return fetchJsonOrThrow(`${base}/education.json`).catch(() => ({}));
+        }
+    } else {
+        const base = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}`);
+        return fetchJsonOrThrow(`${base}/education.json`).catch(() => ({}));
+    }
+}
+
+/**
  * Get resume data (jobs, skills, categories) for a specific resume
  * @param {string} resumeId - The resume ID (e.g., 'resume-1' or 'default')
  * @returns {Promise<Object>} Resume data with jobs, skills, and categories

@@ -543,6 +543,38 @@ app.patch('/api/resumes/:id/other-sections', async (req, res) => {
     }
 });
 
+// GET /api/resumes/:id/education: Return education.json data
+app.get('/api/resumes/:id/education', async (req, res) => {
+    const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Invalid resume id.' });
+    const filePath = path.join(PARSED_RESUMES_DIR, id, 'education.json');
+    try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        const data = JSON.parse(content);
+        res.json(data || {});
+    } catch {
+        res.status(404).json({ error: 'education.json not found for this resume.' });
+    }
+});
+
+// PATCH /api/resumes/:id/education: Update or create education.json
+app.patch('/api/resumes/:id/education', async (req, res) => {
+    const { id } = req.params;
+    if (!id || id === 'default') return res.status(400).json({ error: 'Cannot update education for default resume.' });
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') return res.status(400).json({ error: 'Invalid payload.' });
+    const dir = path.join(PARSED_RESUMES_DIR, id);
+    const filePath = path.join(dir, 'education.json');
+    try {
+        await fs.mkdir(dir, { recursive: true });
+        await atomicWriteWithLock(filePath, JSON.stringify(payload, null, 2));
+        res.json(payload);
+    } catch (err) {
+        console.error('[PATCH education]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // PATCH /api/resumes/:id/categories: Update or create categories.json
 app.patch('/api/resumes/:id/categories', async (req, res) => {
     const { id } = req.params;

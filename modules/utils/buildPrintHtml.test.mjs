@@ -118,4 +118,21 @@ describe('buildPrintHtml', () => {
         });
         expect(html).toContain('<a href="https://example.com">https://example.com</a>');
     });
+
+    it('includes education section from indexed education data', () => {
+        const html = buildPrintHtml([], {}, {}, {}, {
+            '0': {
+                index: 0,
+                degree: 'BA in Economics',
+                institution: 'Stanford University',
+                start: '9/XX',
+                end: '12/XX',
+                description: 'Relevant Coursework: Econometrics'
+            }
+        });
+        expect(html).toContain('section-head">Education');
+        expect(html).toContain('BA in Economics');
+        expect(html).toContain('Stanford University');
+        expect(html).toContain('Relevant Coursework: Econometrics');
+    });
 });

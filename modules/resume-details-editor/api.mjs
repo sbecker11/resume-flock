@@ -183,6 +183,60 @@ export async function updateResumeOtherSections(resumeId, payload) {
 }
 
 /**
+ * @param {string} resumeId
+ * @returns {Promise<Record<string, { index?: number, degree?: string, institution?: string, start?: string, end?: string, description?: string }>>}
+ */
+export async function getResumeEducation(resumeId) {
+    if (hasServer()) {
+        try {
+            return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/education`);
+        } catch (e) {
+            if (e?.message?.includes('404') || e?.message?.includes('not found')) {
+                try {
+                    const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/education.json`);
+                    const res = await fetch(url);
+                    if (res.ok) return res.json();
+                } catch (_) {}
+                return {};
+            }
+            throw e;
+        }
+    } else {
+        if (resumeId !== 'default') {
+            try {
+                const url = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/education.json`);
+                const res = await fetch(url);
+                if (res.ok) return res.json();
+            } catch (_) {}
+        }
+        return {};
+    }
+}
+
+/**
+ * @param {string} resumeId
+ * @param {Record<string, { index?: number, degree?: string, institution?: string, start?: string, end?: string, description?: string }>} payload
+ * @returns {Promise<Object>}
+ */
+export async function updateResumeEducation(resumeId, payload) {
+    if (hasServer()) {
+        try {
+            return await apiJson(`/api/resumes/${encodeURIComponent(resumeId)}/education`, {
+                method: 'PATCH',
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            reportError(e, '[resume-details-editor/api] Failed to update education', 'Downloading a JSON patch for manual application');
+            downloadJson(`${resumeId}-education.patch.json`, { resumeId, operation: 'updateResumeEducation', payload });
+            throw e;
+        }
+    } else {
+        downloadJson(`${resumeId}-education.patch.json`, { resumeId, operation: 'updateResumeEducation', payload });
+        throw new Error('Save is not available on static hosting. A patch file was downloaded for manual application.');
+    }
+}
+
+/**
  * @param {string} resumeId - use 'default' for static content
  * @returns {Promise<{ jobs: Array, skills: Object, categories: Object }>}
  */

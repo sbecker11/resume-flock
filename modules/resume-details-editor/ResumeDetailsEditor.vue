@@ -38,6 +38,11 @@
             :data="otherSections"
             @update:data="onOtherSectionsUpdate"
           />
+          <EducationTab
+            v-if="activeTab === 'education'"
+            :data="education"
+            @update:data="onEducationUpdate"
+          />
           <JobsTab
             v-if="activeTab === 'resume-jobs'"
             :resume-id="resumeId"
@@ -75,6 +80,7 @@
 import { ref, shallowRef, computed, watch, nextTick } from 'vue';
 import MetaTab from './tabs/MetaTab.vue';
 import OtherSectionsTab from './tabs/OtherSectionsTab.vue';
+import EducationTab from './tabs/EducationTab.vue';
 import JobsTab from './tabs/JobsTab.vue';
 import SkillsTab from './tabs/SkillsTab.vue';
 import * as api from './api.mjs';
@@ -98,6 +104,7 @@ const emit = defineEmits(['close', 'saved']);
 const tabs = [
   { id: 'meta', label: 'Meta' },
   { id: 'other-sections', label: 'Other sections' },
+  { id: 'education', label: 'Education' },
   { id: 'resume-jobs', label: 'Resume jobs' },
   { id: 'job-skills', label: 'Job skills' }
 ];
@@ -107,11 +114,13 @@ const activeTab = ref('meta');
 const skillsPreselectJobIndex = ref(null);
 const meta = shallowRef({});
 const otherSections = shallowRef({});
+const education = shallowRef({});
 const saving = ref(false);
 
 // Pending edits (only save what changed)
 const pendingMeta = shallowRef(null);
 const pendingOtherSections = shallowRef(null);
+const pendingEducation = shallowRef(null);
 
 // Modal dimensions and position (center-based with drag offset)
 const modalRef = ref(null);
@@ -275,14 +284,17 @@ watch(() => [props.isOpen, props.resumeId], ([open, id]) => {
   clampDragOffset();
   pendingMeta.value = null;
   pendingOtherSections.value = null;
+  pendingEducation.value = null;
   setTimeout(async () => {
     try {
-      const [metaRes, otherRes] = await Promise.all([
+      const [metaRes, otherRes, educationRes] = await Promise.all([
         api.getResumeMeta(id).catch(() => ({})),
-        api.getResumeOtherSections(id).catch(() => ({}))
+        api.getResumeOtherSections(id).catch(() => ({})),
+        api.getResumeEducation(id).catch(() => ({}))
       ]);
       meta.value = typeof metaRes === 'object' && metaRes !== null ? { ...metaRes } : metaRes;
       otherSections.value = typeof otherRes === 'object' && otherRes !== null ? { ...otherRes } : otherRes;
+      education.value = typeof educationRes === 'object' && educationRes !== null ? { ...educationRes } : {};
     } catch (err) {
       console.error('[ResumeDetailsEditor] load failed:', err);
     }
@@ -294,6 +306,9 @@ function onMetaUpdate(updates) {
 }
 function onOtherSectionsUpdate(data) {
   pendingOtherSections.value = data;
+}
+function onEducationUpdate(data) {
+  pendingEducation.value = data;
 }
 
 function onJobsSaved() {
@@ -323,6 +338,9 @@ async function save() {
     }
     if (pendingOtherSections.value !== null) {
       await api.updateResumeOtherSections(id, pendingOtherSections.value);
+    }
+    if (pendingEducation.value !== null) {
+      await api.updateResumeEducation(id, pendingEducation.value);
     }
     emit('saved', { metaSaved: true });
     emit('close');

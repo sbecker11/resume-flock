@@ -7,7 +7,7 @@ import { applyPaletteToElement } from '@/modules/composables/useColorPalette.mjs
 import { useResizeHandle } from '@/modules/composables/useResizeHandle.mjs';
 import { useResumeListController } from '@/modules/core/globalServices';
 import { parseFlexibleDateString } from '@/modules/utils/dateUtils.mjs';
-import { listResumes, getResumeOtherSections, getResumeData } from '@/modules/api/resumeManagerApi.mjs';
+import { listResumes, getResumeOtherSections, getResumeEducation, getResumeData } from '@/modules/api/resumeManagerApi.mjs';
 import { buildPrintHtml } from '@/modules/utils/buildPrintHtml.mjs';
 import ResumeManager from './ResumeManager.vue';
 import ResumeManagerDelete from './ResumeManagerDelete.vue';
@@ -121,12 +121,13 @@ async function printResume() {
   try {
     // Get live jobs from memory
     const liveJobs = getGlobalJobsDependency().getJobsData();
-    // Fetch skills/categories and other-sections in parallel
-    const [resumeData, otherSections] = await Promise.all([
+    // Fetch skills/categories, other-sections, and education in parallel
+    const [resumeData, otherSections, education] = await Promise.all([
       getResumeData(id),
       getResumeOtherSections(id),
+      getResumeEducation(id),
     ]);
-    const html = buildPrintHtml(liveJobs, resumeData.skills, resumeData.categories, otherSections);
+    const html = buildPrintHtml(liveJobs, resumeData.skills, resumeData.categories, otherSections, education);
     const win = window.open('', '_blank');
     win.document.write(html);
     win.document.close();

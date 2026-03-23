@@ -81,15 +81,19 @@ function buildSkillsByCategory(skills, categories) {
  * @param {Object|Array} skills - Skills data from getResumeData
  * @param {Object|Array} categories - Categories data from getResumeData
  * @param {Object} otherSections - Data from /api/resumes/:id/other-sections
+ * @param {Object} [educationData] - Data from /api/resumes/:id/education
  * @returns {string} Complete HTML document string
  */
-export function buildPrintHtml(jobs, skills, categories, otherSections) {
+export function buildPrintHtml(jobs, skills, categories, otherSections, educationData = {}) {
     const contact = otherSections?.contact || {};
     const title = otherSections?.title || '';
     const summary = otherSections?.summary || '';
     const certifications = otherSections?.certifications || [];
     const websites = otherSections?.websites || [];
     const otherSectionsList = otherSections?.custom_sections ?? otherSections?.other_sections ?? [];
+    const educationItems = Object.values(educationData || {})
+        .filter(item => item && typeof item === 'object')
+        .sort((a, b) => (Number(a.index) || 0) - (Number(b.index) || 0));
     const skillsByCategory = buildSkillsByCategory(skills, categories);
 
     // --- Header ---
@@ -158,6 +162,23 @@ export function buildPrintHtml(jobs, skills, categories, otherSections) {
     </ul>
   </section>` : '';
 
+    // --- Education ({ "0": { degree, institution, start, end, description } }) ---
+    const educationHtml = educationItems.length > 0 ? `
+  <section class="section">
+    <h2 class="section-head">Education</h2>
+    ${educationItems.map(ed => {
+        const dateText = [ed.start, ed.end].filter(Boolean).join(' – ');
+        return `<div class="edu-item">
+      <div class="edu-head">
+        <span class="edu-degree">${escapeHtml(ed.degree || '')}</span>
+        ${dateText ? `<span class="edu-dates">${escapeHtml(dateText)}</span>` : ''}
+      </div>
+      ${ed.institution ? `<div class="edu-inst">${escapeHtml(ed.institution)}</div>` : ''}
+      ${ed.description ? `<div class="edu-desc">${linkify(ed.description)}</div>` : ''}
+    </div>`;
+    }).join('')}
+  </section>` : '';
+
     // --- Other sections (supports { title, content? } or { title, subtitle?, description? }) ---
     const otherHtml = otherSectionsList.map(sec => {
         const content = sec.content ?? [sec.subtitle, sec.description].filter(Boolean).join('\n');
@@ -203,6 +224,12 @@ export function buildPrintHtml(jobs, skills, categories, otherSections) {
     .section-sub { font-size: 0.9rem; font-weight: 600; margin: 0 0 0.35rem 0; color: var(--text); }
     .websites-list { list-style: none; padding-left: 0; }
     .websites-list li { margin-bottom: 0.35rem; }
+    .edu-item { margin-bottom: 0.7rem; }
+    .edu-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; }
+    .edu-degree { font-weight: 600; }
+    .edu-dates { color: var(--muted); font-size: 0.9rem; }
+    .edu-inst { font-style: italic; margin-top: 0.15rem; }
+    .edu-desc { white-space: pre-line; margin-top: 0.2rem; }
     .other-section .content { white-space: pre-line; font-size: 0.95rem; }
     a { color: #1967d2; text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -224,6 +251,7 @@ export function buildPrintHtml(jobs, skills, categories, otherSections) {
   ${skillsHtml}
   ${certsHtml}
   ${websitesHtml}
+  ${educationHtml}
   ${otherHtml}
 </body>
 </html>`;
