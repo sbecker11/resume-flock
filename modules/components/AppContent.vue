@@ -50,7 +50,7 @@
       <img
         v-show="focalPointIsDragging"
         class="focal-point-crosshair"
-        src="/static_content/icons/x-hairs/32/dragging-32-white.png"
+        :src="focalCrosshairSrc"
         width="32"
         height="32"
         alt=""
@@ -241,6 +241,24 @@ const focalPointY = computed(() => store.focalPoint.y)
 // =============================================================================
 // COMPUTED PROPERTIES
 // =============================================================================
+
+function getRuntimeBase() {
+  const envBase = (import.meta?.env?.BASE_URL || '/')
+  let base = envBase
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname || '/'
+    const parts = path.split('/').filter(Boolean)
+    const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase))
+    if (useSubpath) base = `/${parts[0]}/`
+  }
+  return base.endsWith('/') ? base : `${base}/`
+}
+function basePathJoin(relPath) {
+  const b = getRuntimeBase()
+  const p = relPath.startsWith('/') ? relPath.slice(1) : relPath
+  return `${b}${p}`
+}
+const focalCrosshairSrc = basePathJoin('static_content/icons/x-hairs/32/dragging-32-white.png')
 
 /** Opacity-only hide for scene UI: focal/bulls-eye stay in DOM and parallax still uses them (opacity 0).
  *  Respects 3D settings focalPoint visibility; no longer hides during autoscroll. */

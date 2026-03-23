@@ -70,9 +70,38 @@ export function useJobsDependency() {
     }
 
     const apiUrl = basePathJoin(`api/resumes/${encodeURIComponent(resumeId)}/data`)
-    const staticJobsUrl = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/jobs.json`)
-    const staticSkillsUrl = basePathJoin(`parsed_resumes/${encodeURIComponent(resumeId)}/skills.json`)
-    console.log('[useJobsDependency] 🔄 Loading jobs', hasServer() ? 'from API:' : '(static host)', hasServer() ? apiUrl : staticJobsUrl)
+    const indexPath = basePathJoin('parsed_resumes/index.json')
+    const getStaticUrls = (id) => ({
+      jobs: basePathJoin(`parsed_resumes/${encodeURIComponent(id)}/jobs.json`),
+      skills: basePathJoin(`parsed_resumes/${encodeURIComponent(id)}/skills.json`),
+    })
+    let effectiveResumeId = resumeId
+    const resolveDefaultFromIndex = async () => {
+      const idxRes = await fetch(indexPath)
+      if (!idxRes.ok) throw new Error(`Resume index not found: ${indexPath}`)
+      const index = await idxRes.json()
+      const id = index.defaultResumeId
+      if (!id) throw new Error('No default resume in parsed_resumes (index.json has no defaultResumeId).')
+      return id
+    }
+    const getStaticPayload = async (id) => {
+      const effectiveId = id === 'default' ? await resolveDefaultFromIndex() : id
+      const { jobs: u1, skills: u2 } = getStaticUrls(effectiveId)
+      const [jobsRes, skillsRes] = await Promise.all([
+        fetch(u1),
+        fetch(u2).catch(() => null),
+      ])
+      if (!jobsRes.ok) {
+        const errBody = await jobsRes.text().catch(() => '')
+        throw new Error(`Static resume jobs not found: ${u1}${errBody ? ` — ${errBody}` : ''}`)
+      }
+      const jobs = await jobsRes.json()
+      const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
+      return { jobs, skills }
+    }
+
+    const logStaticUrl = resumeId === 'default' ? basePathJoin('parsed_resumes/[default]/jobs.json') : getStaticUrls(resumeId).jobs
+    console.log('[useJobsDependency] 🔄 Loading jobs', hasServer() ? 'from API:' : '(static host)', hasServer() ? apiUrl : logStaticUrl)
     jobsState.value.isLoading = true
     jobsState.value.error = null
 
@@ -91,30 +120,10 @@ export function useJobsDependency() {
           if (!is404OrNotFound) {
             reportError(e, '[useJobsDependency] Failed to fetch resume data from API', 'Attempting static /parsed_resumes fallback')
           }
-          const [jobsRes, skillsRes] = await Promise.all([
-            fetch(staticJobsUrl),
-            fetch(staticSkillsUrl).catch(() => null),
-          ])
-          if (!jobsRes.ok) {
-            const errBody = await jobsRes.text().catch(() => '')
-            throw new Error(`Static resume jobs not found: ${staticJobsUrl}${errBody ? ` — ${errBody}` : ''}`)
-          }
-          const jobs = await jobsRes.json()
-          const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
-          payload = { jobs, skills }
+          payload = await getStaticPayload(resumeId)
         }
       } else {
-        const [jobsRes, skillsRes] = await Promise.all([
-          fetch(staticJobsUrl),
-          fetch(staticSkillsUrl).catch(() => null),
-        ])
-        if (!jobsRes.ok) {
-          const errBody = await jobsRes.text().catch(() => '')
-          throw new Error(`Static resume jobs not found: ${staticJobsUrl}${errBody ? ` — ${errBody}` : ''}`)
-        }
-        const jobs = await jobsRes.json()
-        const skills = (skillsRes && skillsRes.ok) ? await skillsRes.json() : {}
-        payload = { jobs, skills }
+        payload = await getStaticPayload(resumeId)
       }
 
       const rawJobs = toJobsArray(payload?.jobs ?? payload)

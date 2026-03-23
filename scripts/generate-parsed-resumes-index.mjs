@@ -84,7 +84,8 @@ async function main() {
   }
 
   resumes.sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
-  const out = { resumes, generatedAt: new Date().toISOString() };
+  const defaultResumeId = resumes.length > 0 ? resumes[0].id : null;
+  const out = { resumes, defaultResumeId, generatedAt: new Date().toISOString() };
   const outPath = path.join(parsedResumesDir, 'index.json');
   await fs.writeFile(outPath, JSON.stringify(out, null, 2) + '\n', 'utf8');
   console.log(`[generate-parsed-resumes-index] Wrote ${resumes.length} resumes to ${outPath}`);

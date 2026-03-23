@@ -237,13 +237,30 @@ const layoutButtonText = computed(() => {
 /** Current mode only (no next-mode preview on hover). */
 const displayedIconMode = computed(() => String(focalPointMode.value).toLowerCase());
 
+function getRuntimeBase() {
+  const envBase = (import.meta?.env?.BASE_URL || '/');
+  let base = envBase;
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname || '/';
+    const parts = path.split('/').filter(Boolean);
+    const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase));
+    if (useSubpath) base = `/${parts[0]}/`;
+  }
+  return base.endsWith('/') ? base : `${base}/`;
+}
+function basePathJoin(relPath: string) {
+  const b = getRuntimeBase();
+  const p = relPath.startsWith('/') ? relPath.slice(1) : relPath;
+  return `${b}${p}`;
+}
+
 /** 15x15 PNG path for LOCKED and DRAGGING only. FOLLOWING keeps SVG (no changes). */
 const focalTriStateIconSrc = computed(() => {
   const mode = focalPointMode.value;
   if (mode === FOCALPOINT_MODES.FOLLOWING) return null;
   const variant = isHovering.value ? 'black' : 'white';
   const iconMode = String(mode).toLowerCase();
-  return `/static_content/icons/x-hairs/15/${iconMode}-15-${variant}.png`;
+  return basePathJoin(`static_content/icons/x-hairs/15/${iconMode}-15-${variant}.png`);
 });
 
 // CSS classes for the button

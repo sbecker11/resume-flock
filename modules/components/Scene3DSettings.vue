@@ -80,7 +80,7 @@
               <span class="focal-mode-icon">
                 <img
                   v-if="opt.icon !== 'following'"
-                  :src="`/static_content/icons/x-hairs/15/${opt.icon}-15-white.png`"
+                  :src="getFocalIconSrc(opt.icon)"
                   width="15"
                   height="15"
                   alt=""
@@ -124,6 +124,26 @@ import { reportError } from '../utils/errorReporting.mjs'
 
 const { appState, updateAppState } = useAppState()
 const { store, actions: appStoreActions } = useAppStore()
+
+function getRuntimeBase() {
+  const envBase = (import.meta?.env?.BASE_URL || '/')
+  let base = envBase
+  if (typeof window !== 'undefined') {
+    const path = window.location.pathname || '/'
+    const parts = path.split('/').filter(Boolean)
+    const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase))
+    if (useSubpath) base = `/${parts[0]}/`
+  }
+  return base.endsWith('/') ? base : `${base}/`
+}
+function basePathJoin(relPath) {
+  const b = getRuntimeBase()
+  const p = relPath.startsWith('/') ? relPath.slice(1) : relPath
+  return `${b}${p}`
+}
+function getFocalIconSrc(icon) {
+  return basePathJoin(`static_content/icons/x-hairs/15/${icon}-15-white.png`)
+}
 
 const FOCAL_MODE_OPTIONS = [
   {

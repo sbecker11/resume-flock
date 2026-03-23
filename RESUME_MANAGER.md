@@ -251,15 +251,13 @@ resume-flock/
 │   └── resume/
 │       └── resumeReinitializer.mjs    # Resume switching logic (EXISTING)
 ├── parsed_resumes/                     # Resume storage
-│   ├── resume-0/                       # Default resume
-│   ├── resume-1/                       # User uploaded resumes
-│   │   ├── jobs.mjs
-│   │   ├── skills.mjs
-│   │   ├── categories.mjs
-│   │   ├── other-sections.mjs
-│   │   ├── resume.html
-│   │   └── meta.json                  # Metadata (NEW)
-│   └── ...
+│   ├── index.json                      # List + defaultResumeId (first non-_local- by displayName)
+│   └── <id>/                           # e.g. shawn-becker-full-stack-developer-ai-ml-engineer
+│       ├── jobs.json
+│       ├── skills.json
+│       ├── categories.json
+│       ├── resume.html
+│       └── meta.json
 └── uploads/                            # Temporary upload directory
 
 ../resume-parser/                       # Python parser (EXTERNAL)
@@ -347,7 +345,7 @@ resume-flock/
 2. Verify `reinitializeResumeSystem()` is called
 3. Check app_state.json for currentResumeId update
 4. Ensure resume data files exist in parsed_resumes/{id}/
-5. Verify jobs.mjs and skills.mjs have valid exports
+5. Verify jobs.json and skills.json exist and are valid
 
 ## Performance Notes
 

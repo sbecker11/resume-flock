@@ -73,33 +73,36 @@ describe('resume-parser compatibility (integration)', () => {
     });
   });
 
-  describe('static_content format (when available)', () => {
-    const staticJobsPath = path.join(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
-    const staticSkillsPath = path.join(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
+  describe('parsed_resumes format (when default available)', () => {
+    const parsedDir = path.join(PROJECT_ROOT, 'parsed_resumes');
+    const indexPath = path.join(parsedDir, 'index.json');
 
-    it('reads and parses static_content jobs.mjs and skills.mjs when present', async () => {
-      let jobsContent, skillsContent;
+    it('reads and parses default parsed_resumes jobs.json and skills.json when present', async () => {
+      let index, jobsContent, skillsContent;
       try {
-        jobsContent = await fs.readFile(staticJobsPath, 'utf-8');
-        skillsContent = await fs.readFile(staticSkillsPath, 'utf-8');
+        index = JSON.parse(await fs.readFile(indexPath, 'utf-8'));
+        const defaultId = index.defaultResumeId;
+        if (!defaultId) return; // skip when no default
+        const dir = path.join(parsedDir, defaultId);
+        jobsContent = await fs.readFile(path.join(dir, 'jobs.json'), 'utf-8');
+        skillsContent = await fs.readFile(path.join(dir, 'skills.json'), 'utf-8');
       } catch (e) {
-        if (e.code === 'ENOENT') {
-          return; // skip when not in repo or path not available
-        }
+        if (e.code === 'ENOENT') return; // skip when not in repo or path not available
         throw e;
       }
-      const rawJobs = parseMjsExport(jobsContent, 'jobs');
-      const skills = parseMjsExport(skillsContent, 'skills');
-      expect(Array.isArray(rawJobs)).toBe(true);
-      expect(rawJobs.length).toBeGreaterThan(0);
-      expect(rawJobs[0]).toHaveProperty('index');
-      expect(rawJobs[0]).toHaveProperty('role');
-      expect(rawJobs[0]).toHaveProperty('employer');
-      expect(rawJobs[0]).toHaveProperty('Description');
+      const rawJobs = JSON.parse(jobsContent);
+      const rawSkills = JSON.parse(skillsContent);
+      const jobs = normalizeParserJobs(rawJobs);
+      const skills = normalizeParserSkills(rawSkills);
+      expect(Array.isArray(jobs)).toBe(true);
+      expect(jobs.length).toBeGreaterThan(0);
+      expect(jobs[0]).toHaveProperty('role');
+      expect(jobs[0]).toHaveProperty('employer');
+      expect(jobs[0]).toHaveProperty('Description');
       expect(typeof skills).toBe('object');
 
-      const enriched = enrichJobsWithSkills(rawJobs, skills);
-      expect(enriched).toHaveLength(rawJobs.length);
+      const enriched = enrichJobsWithSkills(jobs, skills);
+      expect(enriched).toHaveLength(jobs.length);
       enriched.forEach((job) => {
         expect(job).toHaveProperty('references');
         expect(job).toHaveProperty('job-skills');

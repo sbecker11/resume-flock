@@ -25,9 +25,6 @@ const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palet
 /** Persisted app state (layout, theme, currentResumeId, system-constants, etc.). */
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
 const STATE_DEFAULT_PATH = path.resolve(PROJECT_ROOT, 'public', 'app_state.default.json');
-const STATIC_JOBS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'jobs', 'jobs.mjs');
-const STATIC_SKILLS_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'skills', 'skills.mjs');
-const STATIC_CATEGORIES_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'categories.mjs');
 /** Overridable via process.env.PARSED_RESUMES_DIR for integration tests */
 const PARSED_RESUMES_DIR = process.env.PARSED_RESUMES_DIR || path.resolve(PROJECT_ROOT, 'parsed_resumes');
 const SYNC_LOGS_DIR = path.resolve(PROJECT_ROOT, 'sync-logs');
@@ -176,16 +173,50 @@ app.post('/api/state', async (req, res) => {
 // Note: GitHub Pages cannot write back to these files; writes still require the API.
 app.use('/parsed_resumes', express.static(PARSED_RESUMES_DIR));
 
-// GET /api/resumes/default/data: Jobs and skills from static_content (default resume)
+/** First non-_local- resume folder in parsed_resumes (by displayName, matching generate-parsed-resumes-index). */
+async function getDefaultResumeId() {
+    const entries = await fs.readdir(PARSED_RESUMES_DIR, { withFileTypes: true });
+    const candidates = [];
+    for (const ent of entries) {
+        if (!ent.isDirectory()) continue;
+        if (ent.name.startsWith('.') || ent.name.startsWith('_local-')) continue;
+        const dir = path.join(PARSED_RESUMES_DIR, ent.name);
+        const jobsPath = path.join(dir, 'jobs.json');
+        let displayName = ent.name;
+        try {
+            await fs.access(jobsPath);
+            const metaPath = path.join(dir, 'meta.json');
+            try {
+                const meta = JSON.parse(await fs.readFile(metaPath, 'utf-8'));
+                displayName = meta.displayName || meta.name || ent.name;
+            } catch {
+                /* use id */
+            }
+            candidates.push({ id: ent.name, displayName });
+        } catch {
+            /* skip */
+        }
+    }
+    candidates.sort((a, b) => String(a.displayName).localeCompare(String(b.displayName)));
+    return candidates.length > 0 ? candidates[0].id : null;
+}
+
+// GET /api/resumes/default/data: Jobs and skills from first parsed_resumes folder (non-_local-)
 app.get('/api/resumes/default/data', async (req, res) => {
     try {
-        await fs.access(STATIC_JOBS_PATH);
-        await fs.access(STATIC_SKILLS_PATH);
-        const { jobs, skills, categories } = await readAndNormalizeResumeData(STATIC_JOBS_PATH, STATIC_SKILLS_PATH, STATIC_CATEGORIES_PATH);
+        const defaultId = await getDefaultResumeId();
+        if (!defaultId) {
+            return res.status(404).json({ error: 'Default resume not found (no parsed_resumes folder with jobs.json).' });
+        }
+        const dir = path.join(PARSED_RESUMES_DIR, defaultId);
+        const jobsPath = path.join(dir, 'jobs.json');
+        const skillsPath = path.join(dir, 'skills.json');
+        const categoriesPath = path.join(dir, 'categories.json');
+        const { jobs, skills, categories } = await readAndNormalizeResumeData(jobsPath, skillsPath, categoriesPath);
         res.json({ jobs, skills, categories });
     } catch (error) {
         if (error.code === 'ENOENT') {
-            res.status(404).json({ error: 'Default resume data not found (static_content/jobs, static_content/skills).' });
+            res.status(404).json({ error: 'Default resume data not found (parsed_resumes).' });
         } else {
             console.error('Error reading default resume data:', error);
             res.status(500).json({ error: 'Failed to read default resume data.' });
