@@ -291,9 +291,12 @@ export function useColorPalette() {
                 ensureSyntheticPaletteFilenamesForClient(catalogJson);
             };
 
-            // Production static hosts: avoid GET /api/palette-catalog (404 + noisy console); use baked S3 URL only.
-            if (import.meta.env.PROD && s3Url) {
-                await loadCatalogFromS3();
+            // Production bundles are deployed to static hosts (e.g. GitHub Pages) with no /api — never fetch
+            // /api/palette-catalog there (avoids 404 console noise). Dev uses the local Express catalog first.
+            if (import.meta.env.PROD) {
+                if (s3Url) {
+                    await loadCatalogFromS3();
+                }
             } else {
                 const apiCatalogRes = await fetch(getPaletteCatalogApiUrl());
                 if (apiCatalogRes.ok) {
@@ -344,6 +347,11 @@ export function useColorPalette() {
             }
 
             if (!loadedFromV2) {
+                if (import.meta.env.PROD) {
+                    throw new Error(
+                        '[ColorPalette] Production: no palette catalog loaded. The static Pages build must bake a catalog URL (S3_COLOR_PALETTES_JSON_URL or bucket/region/key in CI, or config/github-pages-palette-catalog.url). See scripts/verify-palette-catalog-env.mjs.'
+                    );
+                }
                 const response = await fetch(getPaletteManifestApiUrl());
                 if (!response.ok) throw new Error('Failed to fetch palette manifest');
                 const manifestData = await response.json();
