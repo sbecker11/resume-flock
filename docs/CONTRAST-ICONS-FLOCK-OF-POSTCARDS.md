@@ -1,8 +1,8 @@
-# Contrast Icons – How flock-of-postcards Uses Them
+# Contrast Icons – How resume-flyer Uses Them
 
-Resume-flock uses the same contrast icon concept as **flock-of-postcards**. This doc summarizes how flock-of-postcards uses url/back/img icons so we can mirror that pattern.
+resume-flyer uses the same contrast icon concept as **resume-flyer**. This doc summarizes how resume-flyer uses url/back/img icons so we can mirror that pattern.
 
-## In flock-of-postcards
+## In resume-flyer
 
 ### Icon types and assets
 
@@ -39,7 +39,7 @@ Resume-flock uses the same contrast icon concept as **flock-of-postcards**. This
   - `iconElement.src = 'static_content/icons/icons8-' + iconType + '-16-' + iconColor + '.png'`.
 - So when the card switches to selected (new background/text color), every icon’s `src` is updated to the correct black or white asset.
 
-## In resume-flock (palette-utils + useColorPalette)
+## In resume-flyer (palette-utils + useColorPalette)
 
 - We use **palette-utils-ts** `getIconSetForBackgroundColor(hex, { iconBase })` (or `getContrastIconSet`):
   - Returns **one set of paths** (black PNGs only): `url`, `back`, `img`.
@@ -68,4 +68,4 @@ Url/back/img icons can appear **inside card description content** (scene biz car
 2. Give each icon one of the classes **`url-icon`**, **`back-icon`**, or **`img-icon`** so the stylesheet can apply **`filter: invert(1)`** when the card’s variant for that state is `'white'` (white on dark background).
 3. When the card’s state changes (normal ↔ hovered ↔ selected), either re-set each icon’s `src` from the card’s corresponding `data-icon-set-*` / `data-icon-set-hovered-*` / `data-icon-set-selected-*` attributes, or rely on CSS: the card keeps the same data attributes and CSS vars, and the **variant** selectors (e.g. `[data-icon-set-variant="white"] .url-icon`) apply invert automatically for the active state.
 
-So: same **rule** as flock-of-postcards (white on dark, black on light); we use **one asset + invert** instead of two assets.
+So: same **rule** as resume-flyer (white on dark, black on light); we use **one asset + invert** instead of two assets.

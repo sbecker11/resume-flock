@@ -1,4 +1,4 @@
-# Future Work - Resume Flock
+# Future Work - Resume Flyer
 
 ## 📄 Resume Upload & LLM Parsing System
 
@@ -7,7 +7,7 @@
 2. **LLM Agent** - Parse resume into structured sections
 3. **Data Transformation** - Convert parsed data to existing job format
 4. **Preview & Edit** - Allow users to review and modify parsed data
-5. **Integration** - Seamlessly integrate with existing flock visualization
+5. **Integration** - Seamlessly integrate with existing resume visualization
 
 ### Implementation Plan
 
@@ -445,7 +445,7 @@ export const useResumeStore = defineStore('resume', {
 ## 🎯 Implementation Priority
 
 ### Phase 1 (Week 1-2): Foundation
-1. Project renaming to `resume-flock`
+1. Project renaming to `resume-flyer`
 2. Basic file upload system
 3. LLM parsing integration
 4. Data transformation pipeline

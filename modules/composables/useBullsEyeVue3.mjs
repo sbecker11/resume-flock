@@ -166,15 +166,15 @@ export function useBullsEye() {
     appContext.registerDependency(BULLS_EYE_KEY, bullsEyeInstance)
     provideDependency(BULLS_EYE_KEY, bullsEyeInstance)
     
-    // Single app-state object: window.resumeFlock
+    // Single app-state object: window.resumeFlyer
     if (typeof window !== 'undefined') {
       const bullsEyeApi = {
         recenter: () => recenter(),
         getPosition: () => ({ x: x.value, y: y.value }),
         isReady: () => isReady.value
       }
-      window.resumeFlock = window.resumeFlock || {}
-      window.resumeFlock.bullsEye = bullsEyeApi
+      window.resumeFlyer = window.resumeFlyer || {}
+      window.resumeFlyer.bullsEye = bullsEyeApi
     }
     
     return bullsEyeInstance

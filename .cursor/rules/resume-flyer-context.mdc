@@ -1,9 +1,9 @@
 ---
-description: Resume Flock project context — recent behavior and where to find full history
+description: Resume Flyer project context — recent behavior and where to find full history
 alwaysApply: true
 ---
 
-# Resume Flock — Project Context
+# Resume Flyer — Project Context
 
 Use this for continuity when starting a new session. Full session history and architecture notes live in **CLAUDE.local.md** at the project root.
 

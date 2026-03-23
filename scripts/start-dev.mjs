@@ -126,7 +126,7 @@ async function main() {
                 if (res.ok) {
                     const text = await res.text();
                     // Only open if this looks like our app (Vite dev server or our index)
-                    if (text.includes('vite') || text.includes('resume-flock') || text.includes('id="app"')) {
+                    if (text.includes('vite') || text.includes('resume-flyer') || text.includes('id="app"')) {
                         console.log(`Opening ${useChrome ? 'Chrome' : 'browser'} at ${openUrl}`);
                         let child;
                         if (useChrome && process.platform === 'darwin') {

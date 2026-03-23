@@ -18,7 +18,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PARSED_RESUMES_DIR = process.env.PARSED_RESUMES_DIR || path.join(PROJECT_ROOT, 'parsed_resumes');
 
 /** Python module to run (resume-parser package). Override with RESUME_PARSER_MODULE if the package uses a different entry point. */
-const PARSER_MODULE = process.env.RESUME_PARSER_MODULE || 'resume_parser.resume_to_flock';
+const PARSER_MODULE = process.env.RESUME_PARSER_MODULE || 'resume_parser.resume_to_flyer';
 const TIMEOUT_MS = 120_000;
 
 /** Env var names that should not be inherited so the parser uses its own .env. */
@@ -47,7 +47,7 @@ Required:
 
 Output (exactly one):
   --id <id>       Output folder will be parsed_resumes/<id>.
-  --out <dir>     Output directory; use --out ./parsed_resumes/<id> to write to resume-flock's folder. (If both --id and --out are given, --out wins.)
+  --out <dir>     Output directory; use --out ./parsed_resumes/<id> to write to resume-flyer's folder. (If both --id and --out are given, --out wins.)
 
 Options:
   --force         Overwrite output dir if it already contains jobs (default: exit with error).
@@ -55,13 +55,13 @@ Options:
 
 Environment:
   PARSED_RESUMES_DIR  Default output parent (default: ./parsed_resumes).
-  RESUME_PARSER_MODULE  Python -m module (default: resume_parser.resume_to_flock). Install package: pip install -r requirements.txt
+  RESUME_PARSER_MODULE  Python -m module (default: resume_parser.resume_to_flyer). Install package: pip install -r requirements.txt
 
 Example:
   npm run parse-resume -- --docx ~/Documents/resume.docx --id my-resume
 
 After a successful run, set app_state.json user-settings.currentResumeId to the same <id> value (e.g. "6" or "resume-6")
-to use this parsed resume in the app. Use --out ./parsed_resumes/<id> to write directly to resume-flock's parsed_resumes folder.
+to use this parsed resume in the app. Use --out ./parsed_resumes/<id> to write directly to resume-flyer's parsed_resumes folder.
 `);
 }
 
@@ -164,7 +164,7 @@ async function main() {
       if (code === 0) {
         console.log('Parser wrote output to:', outDir);
         if (id != null) {
-          console.log('To use in resume-flock, set app_state.json user-settings.currentResumeId to:', JSON.stringify(id));
+          console.log('To use in resume-flyer, set app_state.json user-settings.currentResumeId to:', JSON.stringify(id));
         }
         resolve();
       } else {

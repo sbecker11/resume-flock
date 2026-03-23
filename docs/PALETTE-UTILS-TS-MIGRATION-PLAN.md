@@ -1,6 +1,6 @@
 # Migration Plan: Replace color-palette Logic with palette-utils-ts
 
-This document plans how to replace all color-palette–related color management in resume-flock with the shared TypeScript package **palette-utils-ts** (folder `palette-utils-ts/`), using its README-ts.md as the API reference.
+This document plans how to replace all color-palette–related color management in resume-flyer with the shared TypeScript package **palette-utils-ts** (folder `palette-utils-ts/`), using its README-ts.md as the API reference.
 
 ---
 
@@ -16,7 +16,7 @@ This document plans how to replace all color-palette–related color management 
   - **Colors:** `formatHexDisplay(hex)`, `hexToRgb(hex)`, `rgbToHex(r,g,b)`, `getHighContrastMono(hex)`, `getHighlightColor(hex, options?)`, `getContrastIconSet(hex, options?)`
 - **Contrast:** Uses luminance (0–1) for black/white choice; highlight uses LCH and `highlightPercent` (default 135) and `nearlyWhiteL` for nearly-white handling.
 
-### 1.2 Current color stack in resume-flock
+### 1.2 Current color stack in resume-flyer
 
 | Layer | File(s) | Role |
 |-------|---------|------|
@@ -94,7 +94,7 @@ This document plans how to replace all color-palette–related color management 
 
 ### 3.6 Icon set (optional)
 
-- palette-utils-ts has `getContrastIconSet(hex, { iconBase })`. If resume-flock uses contrast-dependent icon paths, consider switching to this and pass `iconBase` to match existing static paths (e.g. `static_content/icons/anchors`).
+- palette-utils-ts has `getContrastIconSet(hex, { iconBase })`. If resume-flyer uses contrast-dependent icon paths, consider switching to this and pass `iconBase` to match existing static paths (e.g. `static_content/icons/anchors`).
 
 ### 3.7 Tests and validation
 

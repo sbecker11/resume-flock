@@ -1,6 +1,6 @@
 # Resume Manager UI Feature
 
-A complete resume management system for the resume-flock application, allowing users to upload, parse, and switch between multiple resumes.
+A complete resume management system for the resume-flyer application, allowing users to upload, parse, and switch between multiple resumes.
 
 ## Overview
 
@@ -41,7 +41,7 @@ The Resume Manager provides:
 2. Server saves to uploads/ directory
 3. Validates file type and size (10MB max)
 4. Creates output directory: parsed_resumes/resume-{timestamp}/
-5. Calls Python parser: resume_to_flock.py
+5. Calls Python parser: resume_to_flyer.py
 6. Parser generates:
    - jobs.mjs (job history)
    - skills.mjs (skills list)
@@ -124,9 +124,9 @@ const data = await getResumeData(resumeId)
 ## Python Parser Requirements
 
 The system expects a Python parser script at one of these locations:
-- `{project_root}/resume_to_flock.py`
-- `{project_root}/../resume-parser/resume_to_flock.py`
-- `{project_root}/scripts/resume_to_flock.py`
+- `{project_root}/resume_to_flyer.py`
+- `{project_root}/../resume-parser/resume_to_flyer.py`
+- `{project_root}/scripts/resume_to_flyer.py`
 
 ### Parser Interface
 
@@ -159,7 +159,7 @@ Based on CLAUDE.local.md documentation, the parser is located at:
 git@github.com:sbecker11/resume-parser
 ```
 
-Make sure this repository is cloned to `../resume-parser/` relative to the resume-flock project.
+Make sure this repository is cloned to `../resume-parser/` relative to the resume-flyer project.
 
 ## Usage
 
@@ -240,7 +240,7 @@ const { jobs, skills, categories } = await getResumeData('resume-123')
 ## File Structure
 
 ```
-resume-flock/
+resume-flyer/
 ├── server.mjs                          # Backend API endpoints (MODIFIED)
 ├── modules/
 │   ├── api/
@@ -263,7 +263,7 @@ resume-flock/
 └── uploads/                            # Temporary upload directory
 
 ../resume-parser/                       # Python parser (EXTERNAL)
-└── resume_to_flock.py                 # Parser script
+└── resume_to_flyer.py                 # Parser script
 ```
 
 ## Security Considerations
@@ -314,18 +314,18 @@ resume-flock/
 
 ### "Parser not found" Error
 
-**Problem**: Server can't locate resume_to_flock.py
+**Problem**: Server can't locate resume_to_flyer.py
 
 **Solutions**:
 1. Clone resume-parser repository:
    ```bash
-   cd /Users/sbecker11/workspace-flock/
+   cd /Users/sbecker11/workspace-resume/
    git clone git@github.com:sbecker11/resume-parser
    ```
 
 2. Or create symlink:
    ```bash
-   ln -s /path/to/resume-parser/resume_to_flock.py /path/to/resume-flock/
+   ln -s /path/to/resume-parser/resume_to_flyer.py /path/to/resume-flyer/
    ```
 
 ### Upload Fails with "Processing Error"
@@ -334,7 +334,7 @@ resume-flock/
 
 **Debug Steps**:
 1. Check server console for parser stderr output
-2. Manually run parser: `python3 resume_to_flock.py test.docx output/`
+2. Manually run parser: `python3 resume_to_flyer.py test.docx output/`
 3. Verify Python dependencies are installed
 4. Check .docx file format validity
 

@@ -240,7 +240,7 @@ const sortOptions = SORT_OPTIONS;
 
 // Methods for buttons - these will now call the legacy controller via provide/inject
 function selectFirst() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToFirstResumeItem();
   } else {
@@ -248,7 +248,7 @@ function selectFirst() {
   }
 }
 function selectLast() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToLastResumeItem();
   } else {
@@ -256,7 +256,7 @@ function selectLast() {
   }
 }
 function clearAllResumeDivs() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller && typeof controller.clearAllResumeDivsFromListing === 'function') {
     controller.clearAllResumeDivsFromListing();
   } else {
@@ -264,7 +264,7 @@ function clearAllResumeDivs() {
   }
 }
 function selectNext() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToNextResumeItem();
   } else {
@@ -272,7 +272,7 @@ function selectNext() {
   }
 }
 function selectPrevious() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToPreviousResumeItem();
   } else {
@@ -280,7 +280,7 @@ function selectPrevious() {
   }
 }
 
-// Resume-view skill card (flock-of-postcards): one card with back links to referencing biz cards and total years (sum of months rounded up)
+// Resume-view skill card (resume-flyer): one card with back links to referencing biz cards and total years (sum of months rounded up)
 const selectedCardSnapshot = ref(null);
 /** When true, the skill card is removed from the resume listing container (hidden) until selection changes. */
 const resumeSkillCardDismissed = ref(false);
@@ -494,7 +494,7 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     return false;
   }
   // Single ordered list = scroll container's contentHolder (#resume-content-div-list).
-  const scroller = (resumeListController || window.resumeFlock?.resumeListController)?.scrollContainer;
+  const scroller = (resumeListController || window.resumeFlyer?.resumeListController)?.scrollContainer;
   const listEl = document.getElementById('resume-content-div-list');
   const appendTarget = listEl || document.getElementById('resume-content-div');
   if (!appendTarget) {
@@ -539,11 +539,11 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     closeBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const rlc = resumeListController || window.resumeFlock?.resumeListController;
+      const rlc = resumeListController || window.resumeFlyer?.resumeListController;
       if (rlc && typeof rlc.removeSkillFromResumeListOrder === 'function') {
         rlc.removeSkillFromResumeListOrder(skillCardId);
       }
-      const allDivs = window.resumeFlock?.allDivs;
+      const allDivs = window.resumeFlyer?.allDivs;
       if (allDivs && Array.isArray(allDivs.skillResumeDivs)) {
         const i = allDivs.skillResumeDivs.indexOf(copy);
         if (i !== -1) allDivs.skillResumeDivs.splice(i, 1);
@@ -604,10 +604,10 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
   } else {
     appendTarget.appendChild(copy);
   }
-  const allDivs = window.resumeFlock?.allDivs;
+  const allDivs = window.resumeFlyer?.allDivs;
   if (allDivs && Array.isArray(allDivs.skillResumeDivs)) allDivs.skillResumeDivs.push(copy);
 
-  const rlc = resumeListController || window.resumeFlock?.resumeListController;
+  const rlc = resumeListController || window.resumeFlyer?.resumeListController;
   if (rlc && typeof rlc.notifySkillAddedToResumeListing === 'function') {
     rlc.notifySkillAddedToResumeListing(skillCardId);
   }
@@ -663,7 +663,7 @@ watch(
 );
 
 function syncSortRuleKeyFromController() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller && typeof controller.getCurrentSortRule === 'function') {
     const rule = controller.getCurrentSortRule();
     sortRuleKey.value = sortRuleToKey(rule);
@@ -720,7 +720,7 @@ function onResumeSkillCardClick(event) {
 <template>
     <div id="resume-content">
         <div id="resume-content-header">
-            <p class="intro">Welcome to your resume-flock!</p>
+            <p class="intro">Welcome to your resume-flyer!</p>
             <!-- Resume Selector + Print Button Row -->
             <div class="resume-selector-row">
                 <div class="resume-selector" ref="resumeSelectorRef">

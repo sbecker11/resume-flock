@@ -1,5 +1,5 @@
 /**
- * Resume-flock-only helpers for palette/color logic that palette-utils-ts does not provide.
+ * resume-flyer-only helpers for palette/color logic that palette-utils-ts does not provide.
  * All color conversion and contrast logic comes from color-palette-utils-ts; this module
  * only adds luminance comparison, hex validation, and compatibility wrappers.
  */

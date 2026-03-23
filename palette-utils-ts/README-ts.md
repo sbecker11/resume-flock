@@ -48,12 +48,12 @@ Then run `npm install` in `palette-utils-ts` to install devDependencies and buil
 cd palette-utils-ts && npm install && npm run build
 ```
 
-## Updating a TypeScript project (e.g. resume-flock)
+## Updating a TypeScript project (e.g. resume-flyer)
 
-Use these steps to add Color Palette Maker–style palettes to an existing TypeScript app (e.g. [resume-flock](https://github.com/sbecker11/resume-flock)) that will consume exported palette JSON files.
+Use these steps to add Color Palette Maker–style palettes to an existing TypeScript app (e.g. [resume-flyer](https://github.com/sbecker11/resume-flyer)) that will consume exported palette JSON files.
 
 1. **Add the dependency**  
-   From your project root (e.g. `resume-flock`), add the package as a file dependency. If both repos are siblings:
+   From your project root (e.g. `resume-flyer`), add the package as a file dependency. If both repos are siblings:
    ```bash
    npm install ../color-palette-maker-react/palette-utils-ts
    ```
@@ -190,7 +190,7 @@ for (const hex of palette.colors) {
 }
 ```
 
-## Selected border / theme colors (resume-flock)
+## Selected border / theme colors (resume-flyer)
 
 In the app, **all colors for the selected bizCard border (clone and bizCardLineItem) come from palette-utils**, except the **white separator layer** (`#ffffff`), which is fixed. The purple layers (e.g. `#801a81` for the 2px inner border and 5px outer ring) should be sourced from the palette or from a theme constant defined via palette-utils so that selected-border styling stays consistent with the rest of the palette.
 

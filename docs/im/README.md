@@ -12,7 +12,7 @@
 
 ## Overview
 
-The Initialization Manager (IM) is a sophisticated **dependency management system** that orchestrates the startup sequence of JavaScript modules and Vue.js components in the resume-flock project. It provides a declarative way to manage component dependencies, prevents circular dependencies, and ensures proper initialization order without tight coupling between components.
+The Initialization Manager (IM) is a sophisticated **dependency management system** that orchestrates the startup sequence of JavaScript modules and Vue.js components in the resume-flyer project. It provides a declarative way to manage component dependencies, prevents circular dependencies, and ensures proper initialization order without tight coupling between components.
 
 ### ⚡ **IM Compliance Status**
 

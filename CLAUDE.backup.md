@@ -1,4 +1,4 @@
-# CLAUDE Session Backup - Resume Flock IM Migration
+# CLAUDE Session Backup - Resume Flyer IM Migration
 
 ## Session Overview
 **Date**: 2025-07-29  

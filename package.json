@@ -1,7 +1,7 @@
 {
-  "name": "resume-flock",
+  "name": "resume-flyer",
   "version": "0.9.0",
-  "description": "Dark, chaotic, and deep. This app creates an animated flock of postcards from a resume. The resume is defined as a job.xlsx file where each row describes a job, with start/end dates and a descriptive paragraph that includes links to related skills. Each job is visualized as a large business card. Each skill is visualized as smaller chips. The flock is rendered in the left panel with motion parallax as the mouse is moved around. Skill chips fly above the darker business cards. The right panel shows a readable version of selected jobs and skills.",
+  "description": "Dark, chaotic, and deep. This provides a novel way of exploring a resume. The resume is defined as a collection of jobs, skills, and categories parsed from a DOCX or PDF formatted resume file by the resume-parser utility.",
   "keywords": [
     "javascript",
     "vue",
@@ -15,13 +15,13 @@
     "design-systems",
     "reactive"
   ],
-  "homepage": "https://github.com/sbecker11/resume-flock#readme",
+  "homepage": "https://github.com/sbecker11/resume-flyer#readme",
   "bugs": {
-    "url": "https://github.com/sbecker11/resume-flock/issues"
+    "url": "https://github.com/sbecker11/resume-flyer/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sbecker11/resume-flock.git"
+    "url": "git+https://github.com/sbecker11/resume-flyer.git"
   },
   "license": "MIT",
   "author": "Shawn Becker",

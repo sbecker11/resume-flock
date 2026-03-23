@@ -38,9 +38,9 @@ export function createBizResumeDetailsDiv(bizResumeDiv, bizCardDiv) {
     e.preventDefault();
 
     // Clear selection state first
-    if (window.resumeFlock?.selectionManager) {
+    if (window.resumeFlyer?.selectionManager) {
       console.log('[bizDetailsDivModule] Calling clearSelection');
-      window.resumeFlock.selectionManager.clearSelection('biz-resume-close-btn');
+      window.resumeFlyer.selectionManager.clearSelection('biz-resume-close-btn');
     }
 
     // Remove the parent bizResumeDiv from DOM with scroll adjustment

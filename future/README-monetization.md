@@ -1,8 +1,8 @@
-# Resume Flock - Monetization Strategy
+# Resume Flyer - Monetization Strategy
 
 ## Overview
 
-This document outlines the commercial potential of various components and systems within the Resume Flock project. Each component has been analyzed for revenue potential, target markets, and implementation strategies.
+This document outlines the commercial potential of various components and systems within the Resume Flyer project. Each component has been analyzed for revenue potential, target markets, and implementation strategies.
 
 ## 🎯 High-Value Commercial Opportunities
 
@@ -309,7 +309,7 @@ This document outlines the commercial potential of various components and system
 
 ## 🎉 Conclusion
 
-The Resume Flock project contains multiple high-value commercial opportunities, with the resume parser and color palette system offering the highest revenue potential. By following a phased implementation strategy and focusing on developer experience, these components can generate significant revenue while providing value to the broader development community.
+The Resume Flyer project contains multiple high-value commercial opportunities, with the resume parser and color palette system offering the highest revenue potential. By following a phased implementation strategy and focusing on developer experience, these components can generate significant revenue while providing value to the broader development community.
 
 The key to success will be:
 1. **Extracting and modularizing** components effectively
