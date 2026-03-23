@@ -11,6 +11,8 @@ These files are in `.gitignore` and are **never committed or pushed**. They are 
 
 ## Local vs GitHub Pages
 
+For **CI steps, palette URL verification, `VITE_BASE`, and post-deploy checks**, see **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
 How **app state** and **.env** behave in each environment:
 
 ### App state
