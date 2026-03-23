@@ -1,6 +1,6 @@
 ## `parsed_resumes/` folder naming (publishable vs local-only)
 
-`resume-flock` persists parsed resume datasets under the project’s `parsed_resumes/` directory.
+`resume-flyer` persists parsed resume datasets under the project’s `parsed_resumes/` directory.
 
 ### Summary
 

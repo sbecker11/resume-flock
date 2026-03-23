@@ -159,9 +159,9 @@ if (serviceUpdater) {
   serviceUpdater.updateServices({
     bullsEye: bullsEyeForInject,
     focalPoint: null,
-    resumeListController: window.resumeFlock?.resumeListController ?? null,
-    resumeItemsController: window.resumeFlock?.resumeItemsController ?? null,
-    appState: window.resumeFlock?.appState ?? null,
+    resumeListController: window.resumeFlyer?.resumeListController ?? null,
+    resumeItemsController: window.resumeFlyer?.resumeItemsController ?? null,
+    appState: window.resumeFlyer?.appState ?? null,
     debugFunctions
   })
 }
@@ -181,8 +181,8 @@ if (serviceUpdater) {
   serviceUpdater.updateServices({ focalPoint: focalPointApi })
 }
 if (typeof window !== 'undefined') {
-  window.resumeFlock = window.resumeFlock || {}
-  window.resumeFlock.focalPoint = focalPointApi
+  window.resumeFlyer = window.resumeFlyer || {}
+  window.resumeFlyer.focalPoint = focalPointApi
 }
 
 // Vue 3 enhanced parallax system (using provide/inject)
@@ -385,7 +385,7 @@ async function selectFirstCardWhenReady() {
   // via a Vue watcher, so rDivs may be ready before cDivs are in the DOM.
   const deadline = Date.now() + 3000
   while (Date.now() < deadline) {
-    const rlc = window.resumeFlock?.resumeListController
+    const rlc = window.resumeFlyer?.resumeListController
     const items = rlc?.scrollContainer?.originalItems
     const cDivCount = document.querySelectorAll('.biz-card-div').length
     if (Array.isArray(items) && items.length > 0 && cDivCount > 0) break
@@ -393,7 +393,7 @@ async function selectFirstCardWhenReady() {
   }
 
   // Scale settle time by resume size: 50ms per job, min 500ms, max 2000ms
-  const rlcForCount = window.resumeFlock?.resumeListController
+  const rlcForCount = window.resumeFlyer?.resumeListController
   const jobCount = rlcForCount?.scrollContainer?.originalItems?.length ?? 0
   const settleMs = Math.min(2000, Math.max(500, jobCount * 50))
   await new Promise(resolve => setTimeout(resolve, settleMs))
@@ -415,7 +415,7 @@ async function scrollSceneToLatestCard() {
   if (bizCards.length === 0) return
 
   // Use first card in sorted order if available
-  const rlc = window.resumeFlock?.resumeListController
+  const rlc = window.resumeFlyer?.resumeListController
   const firstJobIndex = rlc?.sortedIndices?.[0] ?? null
   let targetCard = firstJobIndex !== null
     ? document.getElementById(`biz-card-div-${firstJobIndex}`)
@@ -484,14 +484,14 @@ async function handleResumeSelected(resumeId) {
     }
 
     // Clear card registry (single app-state object)
-    if (window.resumeFlock?.cardRegistry) {
-      window.resumeFlock.cardRegistry.clearRegistry?.()
+    if (window.resumeFlyer?.cardRegistry) {
+      window.resumeFlyer.cardRegistry.clearRegistry?.()
       console.log('[AppContent] ✅ Cleared card registry')
     }
 
     // STEP 2: Clear selection state (prevents restoring old resume's selections)
-    if (window.resumeFlock?.selectionManager) {
-      window.resumeFlock.selectionManager.clearSelection?.()
+    if (window.resumeFlyer?.selectionManager) {
+      window.resumeFlyer.selectionManager.clearSelection?.()
       console.log('[AppContent] ✅ Cleared selection state')
     }
 
@@ -502,9 +502,9 @@ async function handleResumeSelected(resumeId) {
 
     // STEP 4: Initialize or reinitialize the resume system with the new resume
     const effectiveResumeId = resumeId === 'default' ? null : resumeId
-    const controllersReady = !!(window.resumeFlock?.resumeListController && window.resumeFlock?.resumeItemsController)
+    const controllersReady = !!(window.resumeFlyer?.resumeListController && window.resumeFlyer?.resumeItemsController)
     if (!controllersReady) {
-      // First resume load after fresh start — controllers not yet on window.resumeFlock
+      // First resume load after fresh start — controllers not yet on window.resumeFlyer
       console.log('[AppContent] Controllers not ready, calling initializeResumeSystem with:', effectiveResumeId)
       await initializeResumeSystem(effectiveResumeId)
       registerResumeListReinit(async (bizCardDivs) => {
@@ -688,8 +688,8 @@ onMounted(async () => {
     debugFunctions.checkResumeDivs = checkResumeDivs
     debugFunctions.testScrolling = testScrolling
     
-    // Update services from single app-state object (window.resumeFlock)
-    const app = window.resumeFlock || {}
+    // Update services from single app-state object (window.resumeFlyer)
+    const app = window.resumeFlyer || {}
     if (serviceUpdater) {
       serviceUpdater.updateServices({
         bullsEye: app.bullsEye || bullsEyeService,
@@ -703,9 +703,9 @@ onMounted(async () => {
     window.testResumeSystem = testResumeSystem
     window.checkResumeDivs = checkResumeDivs
     window.testScrolling = testScrolling
-    // Attach to single app-state object so replacing window.resumeFlock replaces all state
-    window.resumeFlock = window.resumeFlock || {}
-    window.resumeFlock.cardRegistry = cardRegistry
+    // Attach to single app-state object so replacing window.resumeFlyer replaces all state
+    window.resumeFlyer = window.resumeFlyer || {}
+    window.resumeFlyer.cardRegistry = cardRegistry
     console.log('[AppContent] 📋 Card registry made globally available for DOM query optimization')
     
     // PHASE 7: Global event handlers (now handled by Vue 3 composables)

@@ -1,6 +1,6 @@
-# Migration Plan (historical): palette-utils-ts → resume-flock + color-palette-utils-ts
+# Migration Plan (historical): palette-utils-ts → resume-flyer + color-palette-utils-ts
 
-> **Current architecture:** **`color-palette-utils-ts`** is vendored **read-only** (S3 catalog only). App color math lives in **`modules/utils/resumeFlockPaletteColors.mjs`**. See root **README.md** and **`color-palette-utils-ts/README-ts.md`** for S3 setup.
+> **Current architecture:** **`color-palette-utils-ts`** is vendored **read-only** (S3 catalog only). App color math lives in **`modules/utils/resumeFlyerPaletteColors.mjs`**. See root **README.md** and **`color-palette-utils-ts/README-ts.md`** for S3 setup.
 
 This document originally planned migrating color logic into the shared TypeScript package **palette-utils-ts** (later renamed / split). It is kept for history; paths and folder names below may be outdated.
 
@@ -18,7 +18,7 @@ This document originally planned migrating color logic into the shared TypeScrip
   - **Colors:** `formatHexDisplay(hex)`, `hexToRgb(hex)`, `rgbToHex(r,g,b)`, `getHighContrastMono(hex)`, `getHighlightColor(hex, options?)`, `getContrastIconSet(hex, options?)`
 - **Contrast:** Uses luminance (0–1) for black/white choice; highlight uses LCH and `highlightPercent` (default 135) and `nearlyWhiteL` for nearly-white handling.
 
-### 1.2 Current color stack in resume-flock
+### 1.2 Current color stack in resume-flyer
 
 | Layer | File(s) | Role |
 |-------|---------|------|
@@ -96,7 +96,7 @@ This document originally planned migrating color logic into the shared TypeScrip
 
 ### 3.6 Icon set (optional)
 
-- palette-utils-ts has `getContrastIconSet(hex, { iconBase })`. If resume-flock uses contrast-dependent icon paths, consider switching to this and pass `iconBase` to match existing static paths (e.g. `static_content/icons/anchors`).
+- palette-utils-ts has `getContrastIconSet(hex, { iconBase })`. If resume-flyer uses contrast-dependent icon paths, consider switching to this and pass `iconBase` to match existing static paths (e.g. `static_content/icons/anchors`).
 
 ### 3.7 Tests and validation
 

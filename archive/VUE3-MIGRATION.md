@@ -84,7 +84,7 @@
 
 ## Systems Removed/Archived
 
-### Moved to /tmp/resume-flock-cleanup/:
+### Moved to /tmp/resume-flyer-cleanup/:
 - Original IM framework files
 - Hybrid composables with IM compatibility
 - Aim point system (simplified to focal point only)

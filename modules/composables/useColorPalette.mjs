@@ -6,7 +6,7 @@ import {
     formatHexDisplay,
     hexToRgb,
     rgbToHex,
-} from '@/modules/utils/resumeFlockPaletteColors.mjs';
+} from '@/modules/utils/resumeFlyerPaletteColors.mjs';
 import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 import { hasServer } from '@/modules/core/hasServer.mjs';
@@ -62,7 +62,7 @@ function getRuntimeBase() {
         const path = window.location.pathname || '/';
         const parts = path.split('/').filter(Boolean);
         // When envBase is '/', path.startsWith('/') is always true so we never override.
-        // If path has a first segment (e.g. /resume-flock/), use it as base so subpath hosting works.
+        // If path has a first segment (e.g. /resume-flyer/), use it as base so subpath hosting works.
         const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase));
         if (useSubpath) {
             base = `/${parts[0]}/`;
@@ -759,7 +759,7 @@ export async function applyPaletteToElement(element) {
         throw new Error(`Color palette not found for name: ${paletteName}`);
     }
 
-    // Calculate base colors (resumeFlockPaletteColors: LCH highlight, high-contrast text + icons from single call)
+    // Calculate base colors (resumeFlyerPaletteColors: LCH highlight, high-contrast text + icons from single call)
     const backgroundColor = formatHexDisplay(colorPalette[paletteColorIndex % colorPalette.length]) || colorPalette[paletteColorIndex % colorPalette.length];
     const normalStyle = resolveTextAndIconStyle(backgroundColor);
     const foregroundColor = normalStyle.textColor;

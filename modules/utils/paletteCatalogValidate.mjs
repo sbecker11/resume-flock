@@ -1,4 +1,4 @@
-import { normalizePaletteColors, hexToRgb } from './resumeFlockPaletteColors.mjs';
+import { normalizePaletteColors, hexToRgb } from './resumeFlyerPaletteColors.mjs';
 
 /**
  * Fast-fail validation for palette catalog bundle (S3 NDJSON → parsePaletteBundleFromImageMetadataJsonl).

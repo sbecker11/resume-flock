@@ -1,6 +1,6 @@
 # Resume Manager UI Feature
 
-A complete resume management system for the resume-flock application, allowing users to upload, parse, and switch between multiple resumes.
+A complete resume management system for the resume-flyer application, allowing users to upload, parse, and switch between multiple resumes.
 
 ## Overview
 
@@ -159,7 +159,7 @@ Based on CLAUDE.local.md documentation, the parser is located at:
 git@github.com:sbecker11/resume-parser
 ```
 
-Make sure this repository is cloned to `../resume-parser/` relative to the resume-flock project.
+Make sure this repository is cloned to `../resume-parser/` relative to the resume-flyer project.
 
 ## Usage
 
@@ -240,7 +240,7 @@ const { jobs, skills, categories } = await getResumeData('resume-123')
 ## File Structure
 
 ```
-resume-flock/
+resume-flyer/
 ├── server.mjs                          # Backend API endpoints (MODIFIED)
 ├── modules/
 │   ├── api/
@@ -323,7 +323,7 @@ resume-flock/
 
 2. Or create symlink:
    ```bash
-   ln -s /path/to/resume-parser/resume_to_flock.py /path/to/resume-flock/
+   ln -s /path/to/resume-parser/resume_to_flock.py /path/to/resume-flyer/
    ```
 
 ### Upload Fails with "Processing Error"

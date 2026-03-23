@@ -27,7 +27,7 @@ function getRuntimeBase(): string {
         const path = window.location.pathname || '/'
         const parts = path.split('/').filter(Boolean)
         // When envBase is '/', path.startsWith('/') is always true so we never override.
-        // If path has a first segment (e.g. /resume-flock/), use it as base so subpath hosting works.
+        // If path has a first segment (e.g. /resume-flyer/), use it as base so subpath hosting works.
         const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase))
         if (useSubpath) {
             base = `/${parts[0]}/`
@@ -52,7 +52,7 @@ const loadError: Ref<Error | null> = ref(null)
 /** When false, state API is unavailable (e.g. static hosting); save only to localStorage and skip POST to avoid 405 in console. */
 let stateApiAvailable: boolean | null = null
 
-const STATE_API_UNAVAILABLE_KEY = 'resume-flock/state_api_unavailable'
+const STATE_API_UNAVAILABLE_KEY = 'resume-flyer/state_api_unavailable'
 const DEFAULT_STATE_PATH = 'app_state.default.json'
 
 const REQUIRED_RENDERING_LIMITS_KEYS = ['blurAtMaxZ', 'saturationAtMaxZ', 'brightnessAtMaxZ', 'parallaxScaleAtMinZ', 'parallaxScaleAtMaxZ'] as const
@@ -478,7 +478,7 @@ async function loadStateFromServer(): Promise<AppState> {
                     const fromDefault = await loadStateFromDefaultFile()
                     if (fromDefault) {
                         try {
-                            const raw = localStorage.getItem('resume-flock/app_state')
+                            const raw = localStorage.getItem('resume-flyer/app_state')
                             if (raw) {
                                 const saved = migrateState(JSON.parse(raw))
                                 const merged = deepMerge(fromDefault, {
@@ -494,7 +494,7 @@ async function loadStateFromServer(): Promise<AppState> {
                         return fromDefault
                     }
                     try {
-                        const raw = localStorage.getItem('resume-flock/app_state')
+                        const raw = localStorage.getItem('resume-flyer/app_state')
                         if (raw) {
                             const state = deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
                             validateRequiredState(state)
@@ -563,7 +563,7 @@ async function loadStateFromServer(): Promise<AppState> {
         const fromDefault = await loadStateFromDefaultFile()
         if (fromDefault) {
             try {
-                const raw = localStorage.getItem('resume-flock/app_state')
+                const raw = localStorage.getItem('resume-flyer/app_state')
                 if (raw) {
                     const saved = migrateState(JSON.parse(raw))
                     // Merge saved user state on top of default; default wins for system-constants (e.g. renderingLimits)
@@ -580,7 +580,7 @@ async function loadStateFromServer(): Promise<AppState> {
             return fromDefault
         }
         try {
-            const raw = localStorage.getItem('resume-flock/app_state')
+            const raw = localStorage.getItem('resume-flyer/app_state')
             if (raw) {
                 const state = deepMerge(getDefaultState(), migrateState(JSON.parse(raw)))
                 validateRequiredState(state)
@@ -622,7 +622,7 @@ async function saveStateToServer(state: AppState): Promise<void> {
             // GitHub Pages / static hosting: no API (404/405). Persist to localStorage and continue without logging an error.
             const isStaticHosting = response.status === 404 || response.status === 405
             try {
-                localStorage.setItem('resume-flock/app_state', JSON.stringify(state))
+                localStorage.setItem('resume-flyer/app_state', JSON.stringify(state))
                 if (isStaticHosting) {
                     console.log('[AppState] State saved to localStorage (no server API on static hosting)')
                 } else {
@@ -637,7 +637,7 @@ async function saveStateToServer(state: AppState): Promise<void> {
         console.log('[AppState] ✅ State saved to server successfully')
         } else {
             if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('resume-flock/app_state', JSON.stringify(state))
+                localStorage.setItem('resume-flyer/app_state', JSON.stringify(state))
                 if (!hasServer()) console.log('[AppState] State saved to localStorage (static host, no server)')
             }
             return

@@ -1,6 +1,6 @@
 # Resume-parser package CLI (parse)
 
-The **resume-parser** package provides the parse CLI. Resume-flock invokes it with **command-line arguments** (no in-process import). Contract markdown lives in the resume-parser repo: **contracts/** (see [contracts/README.md](https://github.com/sbecker11/resume-parser/blob/main/contracts/README.md)).
+The **resume-parser** package provides the parse CLI. Resume-flyer invokes it with **command-line arguments** (no in-process import). Contract markdown lives in the resume-parser repo: **contracts/** (see [contracts/README.md](https://github.com/sbecker11/resume-parser/blob/main/contracts/README.md)).
 
 ## Parse CLI (resume-to-flock)
 
@@ -12,4 +12,4 @@ The **resume-parser** package provides the parse CLI. Resume-flock invokes it wi
 
 Install: `pip install -r requirements.txt`.
 
-The resume-parser package also provides a **render-resume-html** CLI (see [contracts/RENDER_RESUME_HTML-v1.0.md](https://github.com/sbecker11/resume-parser/blob/main/contracts/RENDER_RESUME_HTML-v1.0.md)); resume-flock does not expose a Render button or render API.
+The resume-parser package also provides a **render-resume-html** CLI (see [contracts/RENDER_RESUME_HTML-v1.0.md](https://github.com/sbecker11/resume-parser/blob/main/contracts/RENDER_RESUME_HTML-v1.0.md)); resume-flyer does not expose a Render button or render API.

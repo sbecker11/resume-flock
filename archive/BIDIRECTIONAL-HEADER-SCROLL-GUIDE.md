@@ -2,7 +2,7 @@
 
 ## Overview
 
-The resume-flock application now implements a complete bidirectional synchronization system where:
+The resume-flyer application now implements a complete bidirectional synchronization system where:
 
 - **rDiv selection** → scrolls **cDiv header elements** into view
 - **cDiv selection** → scrolls **rDiv header elements** into view

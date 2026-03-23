@@ -215,7 +215,7 @@ export function useCardsController() {
             applyConcurrentJobOffsets(jobs, cards)
 
             bizCardDivs.value = cards
-            const allDivs = window.resumeFlock?.allDivs
+            const allDivs = window.resumeFlyer?.allDivs
             if (allDivs) allDivs.bizCardDivs = [...cards]
 
             // Build unique skills and which jobs reference each (one skill card per skill, shared by multiple biz cards)
@@ -282,7 +282,7 @@ export function useCardsController() {
                     }
                 }
                 console.log('[SkillCard] Created', Object.keys(skillCardIdsBySkillName).length, 'skill cards')
-                if (window.resumeFlock?.allDivs) window.resumeFlock.allDivs.skillCardDivs = [...skillCardsCreated]
+                if (window.resumeFlyer?.allDivs) window.resumeFlyer.allDivs.skillCardDivs = [...skillCardsCreated]
 
                 // Stamp data-skill-card-id onto all biz-resume-div skill spans now that the ID map is complete
                 document.querySelectorAll('.biz-resume-div .biz-card-skill-title[data-skill-name]').forEach(span => {
@@ -1011,12 +1011,12 @@ export function useCardsController() {
         }
     }
 
-    // Use single app-state object: window.resumeFlock
+    // Use single app-state object: window.resumeFlyer
     const setupEventListenersFixed = () => {
         console.debug('[CardsController] setting up event listeners (fixed)')
-        const globalSelectionManager = window.resumeFlock?.selectionManager
+        const globalSelectionManager = window.resumeFlyer?.selectionManager
         if (!globalSelectionManager) {
-            console.error('[CardsController] window.resumeFlock.selectionManager not available')
+            console.error('[CardsController] window.resumeFlyer.selectionManager not available')
             return false
         }
         try {
@@ -1058,7 +1058,7 @@ export function useCardsController() {
         setupAttempts++
         console.log(`[useCardsController] Setup attempt ${setupAttempts}/${maxSetupAttempts}`)
         
-        if (window.resumeFlock?.selectionManager) {
+        if (window.resumeFlyer?.selectionManager) {
             const success = setupEventListenersFixed()
             if (success) {
                 console.log('[useCardsController] ✅ Event listener setup successful!')
@@ -1080,7 +1080,7 @@ export function useCardsController() {
     // Also try in onMounted as backup
     onMounted(() => {
         console.log('[useCardsController] onMounted called, listeners ready:', !!window._cardsControllerListenersReady)
-        if (!window._cardsControllerListenersReady && window.resumeFlock?.selectionManager) {
+        if (!window._cardsControllerListenersReady && window.resumeFlyer?.selectionManager) {
             console.log('[useCardsController] Retrying event listener setup in onMounted...')
             setupEventListenersFixed()
         }
@@ -2013,8 +2013,8 @@ export function useCardsController() {
             console.log('1. Checking selectionManager instances:')
             console.log('   - useCardsController selectionManager exists:', !!selectionManager)
             console.log('   - useCardsController selectionManager instanceId:', selectionManager?.instanceId)
-            const sm = window.resumeFlock?.selectionManager
-            console.log('   - window.resumeFlock.selectionManager exists:', !!sm)
+            const sm = window.resumeFlyer?.selectionManager
+            console.log('   - window.resumeFlyer.selectionManager exists:', !!sm)
             console.log('   - selectionManager instanceId:', sm?.instanceId)
             console.log('   - Same instance:', selectionManager === sm)
             
@@ -2024,8 +2024,8 @@ export function useCardsController() {
             console.log('   - handleJobSelected type:', typeof handleJobSelected)
             
             console.log('\n3. Checking resume system:')
-            const rlc = window.resumeFlock?.resumeListController
-            console.log('   - window.resumeFlock.resumeListController exists:', !!rlc)
+            const rlc = window.resumeFlyer?.resumeListController
+            console.log('   - window.resumeFlyer.resumeListController exists:', !!rlc)
             console.log('   - resumeListController.handleBizResumeDivClickEvent type:', typeof rlc?.handleBizResumeDivClickEvent)
             
             console.log('\n4. Checking DOM elements:')
@@ -2047,12 +2047,12 @@ export function useCardsController() {
             
             return {
                 selectionManagerOk: !!selectionManager,
-                resumeControllerOk: !!window.resumeFlock?.resumeListController,
+                resumeControllerOk: !!window.resumeFlyer?.resumeListController,
                 resumeDivCount: resumeDivs.length,
                 cardDivCount: cardDivs.length,
                 handleJobSelectedType: typeof handleJobSelected,
                 listenersReady: !!window._cardsControllerListenersReady,
-                sameInstance: selectionManager === window.resumeFlock?.selectionManager
+                sameInstance: selectionManager === window.resumeFlyer?.selectionManager
             }
         }
         
@@ -2090,8 +2090,8 @@ export function useCardsController() {
             
             // Test 4: Try direct selection
             console.log('\n🎯 Testing direct selection...')
-            if (window.resumeFlock?.selectionManager?.selectJobNumber) {
-                window.resumeFlock.selectionManager.selectJobNumber(8, 'quick-test')
+            if (window.resumeFlyer?.selectionManager?.selectJobNumber) {
+                window.resumeFlyer.selectionManager.selectJobNumber(8, 'quick-test')
                 setTimeout(() => {
                     console.log('⏱️ Direct selection test completed (check logs above)')
                 }, 1500)
@@ -2185,7 +2185,7 @@ export function useCardsController() {
         isInitialized.value = false
         isInitializing = false  // CRITICAL: Reset mutex to allow reinit
         bizCardDivs.value = []
-        const allDivs = window.resumeFlock?.allDivs
+        const allDivs = window.resumeFlyer?.allDivs
         if (allDivs) {
             allDivs.bizCardDivs = []
             allDivs.skillCardDivs = []

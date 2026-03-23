@@ -213,7 +213,7 @@ body .biz-resume-div.selected a,
     filter: none !important;
     z-index: 99;
 }
-/* Contrast icons (url/back/img): palette-utils uses black PNGs only; when variant is white, invert so icon is white on dark. See docs/CONTRAST-ICONS-FLOCK-OF-POSTCARDS.md. */
+/* Contrast icons (url/back/img): palette-utils uses black PNGs only; when variant is white, invert so icon is white on dark. See docs/CONTRAST-ICONS-RESUME-FLYER.md. */
 .biz-card-div.clone[data-icon-set-selected-variant="white"] .url-icon,
 .biz-card-div.clone[data-icon-set-selected-variant="white"] .back-icon,
 .biz-card-div.clone[data-icon-set-selected-variant="white"] .img-icon {

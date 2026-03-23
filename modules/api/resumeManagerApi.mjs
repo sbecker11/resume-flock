@@ -12,7 +12,7 @@ function getRuntimeBase() {
         const path = window.location.pathname || '/';
         const parts = path.split('/').filter(Boolean);
         // When envBase is '/', path.startsWith('/') is always true so we never override.
-        // If path has a first segment (e.g. /resume-flock/), use it as base so subpath hosting works.
+        // If path has a first segment (e.g. /resume-flyer/), use it as base so subpath hosting works.
         const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase));
         if (useSubpath) {
             base = `/${parts[0]}/`;

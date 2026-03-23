@@ -1,5 +1,5 @@
 /**
- * Integration tests: resume-flock compatibility with resume-parser output.
+ * Integration tests: resume-flyer compatibility with resume-parser output.
  * Parser may produce legacy (jobs array, skills name-keyed) or new format (jobs/skills/categories dicts by ID).
  * Server normalizes via parsedResumeAdapter; these tests ensure parseMjsExport + adapter + enrichJobsWithSkills work.
  */

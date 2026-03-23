@@ -254,7 +254,7 @@ Application state and content were not cleanly separated in the original design.
 |---|-----------------|-------------|
 | **Stored** | `app_state.json` only | Loaded/reloaded in memory; not persisted as content |
 | **Scope** | App shell, layout, and user choices | The resume’s data and the DOM built from it |
-| **Examples** | bullsEye, focalPoint, resumeListing, colorPalette, timeline, resizeHandle and their parent elements; `currentResumeId`, `selectedJobNumber`, layout split, theme | `window.resumeFlock.allDivs`: bizCardDivs, skillCardDivs, bizResumeDivs, skillResumeDivs |
+| **Examples** | bullsEye, focalPoint, resumeListing, colorPalette, timeline, resizeHandle and their parent elements; `currentResumeId`, `selectedJobNumber`, layout split, theme | `window.resumeFlyer.allDivs`: bizCardDivs, skillCardDivs, bizResumeDivs, skillResumeDivs |
 | **Lifecycle** | Persisted across sessions; survives reload | Built when a resume is loaded (initial or manager load); replaced when the resume changes |
 
 Application = *how* the app is set up and what the user has selected. Content = *what* is shown for the current resume (jobs, cards, list items). Content is derived from the resume payload and from `allDivs`; the raw content is not stored in `app_state.json`.
@@ -274,7 +274,7 @@ A pass over the codebase confirms the following:
 | `scrollPositions` (sceneContentScrollTop, resumeContentScrollTop) | user-settings | **Application (view/session)** — scroll position of panels; acceptable as session state |
 | `system-constants` (zIndex, cards, timeline, etc.) | system-constants | **Application** — app configuration |
 
-**Not in app_state (correct):** Job data, bizCardDivs, skillCardDivs, bizResumeDivs, skillResumeDivs, any div references or payloads. These live in memory and in `window.resumeFlock.allDivs` and are loaded/reloaded with the resume.
+**Not in app_state (correct):** Job data, bizCardDivs, skillCardDivs, bizResumeDivs, skillResumeDivs, any div references or payloads. These live in memory and in `window.resumeFlyer.allDivs` and are loaded/reloaded with the resume.
 
 **In-memory only (content-related, not persisted):** `removedJobNumbers` / `dismissedJobNumbers` (which jobs the user hid from the listing via the red X) live only on the controllers and are reset when the resume changes. If we ever persist “hidden jobs” per resume, that should be a per-resume content preference (e.g. alongside the resume or a separate content-level store), not in `app_state.json`.
 
@@ -282,7 +282,7 @@ A pass over the codebase confirms the following:
 
 ### How hard is it to implement this separation?
 
-**Already in place:** Content is not persisted in app_state. Job data and divs live in memory and in `window.resumeFlock.allDivs`; timeline/scene bounds and card geometry are computed per load and not saved. So the separation (content vs app state) is largely implemented.
+**Already in place:** Content is not persisted in app_state. Job data and divs live in memory and in `window.resumeFlyer.allDivs`; timeline/scene bounds and card geometry are computed per load and not saved. So the separation (content vs app state) is largely implemented.
 
 **Remaining work (optional / cleanup):**
 

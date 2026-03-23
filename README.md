@@ -1,14 +1,14 @@
-# resume-flock
+# resume-flyer
 
-<img src="https://raw.githubusercontent.com/sbecker11/resume-flock/master/static_content/movie.gif" height="420" alt="resume-flock demo animation">
+<img src="https://raw.githubusercontent.com/sbecker11/resume-flyer/master/static_content/movie.gif" height="420" alt="resume-flyer demo animation">
 
-**Live app (GitHub Pages):** [https://sbecker11.github.io/resume-flock/](https://sbecker11.github.io/resume-flock/)
+**Live app (GitHub Pages):** [https://sbecker11.github.io/resume-flyer/](https://sbecker11.github.io/resume-flyer/)
 
 <br><br>
 
 # Dark, chaotic, and deep
 
-**resume-flock** is an interactive resume explorer. The name comes from the original concept “flock-of-postcards” (later “flock-of-cards”): your resume is explored like a *flock of birds*—business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
+**resume-flyer** is an interactive resume explorer. The name comes from the original concept “flock-of-postcards” (later “flock-of-cards”): your resume is explored like a *flock of birds*—business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
 
 ### High-level functionality
 
@@ -47,7 +47,7 @@ The folder **`color-palette-utils-ts/`** is a **vendored copy** of the package f
 
 **S3 palette catalog (top-level):** Set either **`S3_COLOR_PALETTES_JSON_URL`** (full URL, same as `color-palette-utils-ts` / CPM-ts) **or** **`S3_BUCKET`**, **`S3_REGION`**, and **`S3_COLOR_PALETTES_OBJECT_KEY`** (same values as in `color-palette-utils-ts` docs/tests, e.g. `sbecker11-color-palette-images`, `us-west-1`, `metadata/color_palettes.jsonl`). Vite `envPrefix` includes `S3_` in `vite.config.js`. The app **loads the NDJSON catalog from S3 on every startup and hard refresh** (`cache: 'no-store'`). The catalog in S3 can change at any time; the next load picks it up. A **read-only snapshot** of the last successful response is kept in **`localStorage`** (`modules/utils/paletteCatalogCache.mjs`) for fast recovery if the network request fails; it is **never mutated**—only replaced after a successful fetch.
 
-**What lives in resume-flock:** network fetch + cache orchestration in **`useColorPalette.mjs`**; all **color math** in **`modules/utils/resumeFlockPaletteColors.mjs`** (and `paletteHelpers.mjs`, `domUtils.mjs`). Root `package.json`: `"color-palette-utils-ts": "file:./color-palette-utils-ts"` (still used for package tests / alignment with CPM-ts).
+**What lives in resume-flyer:** network fetch + cache orchestration in **`useColorPalette.mjs`**; all **color math** in **`modules/utils/resumeFlyerPaletteColors.mjs`** (and `paletteHelpers.mjs`, `domUtils.mjs`). Root `package.json`: `"color-palette-utils-ts": "file:./color-palette-utils-ts"` (still used for package tests / alignment with CPM-ts).
 
 **Fallback:** If S3 is unset or fails with no cache, the app uses the API manifest (with server) or **`static_content/color_palettes.jsonl`**.
 
@@ -288,13 +288,13 @@ one or more return icons
  that serve as clickable links back to jobs that used that skill. The number  
 of return icons indicates the number of jobs and the amount of time used to hone that skill.
 
-# Run the `resume-flock` career resume web app using Cursor with Claude Code agent
+# Run the `resume-flyer` career resume web app using Cursor with Claude Code agent
 
 ## Clone this repo to your local development folder
 
 `cd <your-local-dev-folder>`  
-`git clone git@github.com:sbecker11/resume-flock.git`  
-`cd <your-local-dev-folder>/resume-flock`
+`git clone git@github.com:sbecker11/resume-flyer.git`  
+`cd <your-local-dev-folder>/resume-flyer`
 
 **Resume parser:** DOCX and PDF resumes are parsed at runtime. The app uses the **resume-parser** package to convert uploaded resumes into flock data (jobs and skills). To work on or extend the parser locally, clone the resume-parser repo:  
 `git clone git@github.com:sbecker11/resume-parser.git`
@@ -914,7 +914,7 @@ This **Infinite Scrolling Container** represents a significant advancement in vi
 - Updated installation and customization instructions in README.md
 - Deployed latest to github
 
-[https://sbecker11.github.io/resume-flock](https://sbecker11.github.io/resume-flock/)
+[https://sbecker11.github.io/resume-flyer](https://sbecker11.github.io/resume-flyer/)
 
 ### version 1.0    March 8, 2024
 

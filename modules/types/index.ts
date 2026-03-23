@@ -1,4 +1,4 @@
-// Core type definitions for resume-flock application
+// Core type definitions for resume-flyer application
 // Provides type safety for Vue 3 components and composables
 
 export interface JobData {

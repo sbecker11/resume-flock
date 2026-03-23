@@ -47,7 +47,7 @@ Required:
 
 Output (exactly one):
   --id <id>       Output folder will be parsed_resumes/<id>.
-  --out <dir>     Output directory; use --out ./parsed_resumes/<id> to write to resume-flock's folder. (If both --id and --out are given, --out wins.)
+  --out <dir>     Output directory; use --out ./parsed_resumes/<id> to write to resume-flyer's folder. (If both --id and --out are given, --out wins.)
 
 Options:
   --force         Overwrite output dir if it already contains jobs (default: exit with error).
@@ -61,7 +61,7 @@ Example:
   npm run parse-resume -- --docx ~/Documents/resume.docx --id my-resume
 
 After a successful run, set app_state.json user-settings.currentResumeId to the same <id> value (e.g. "6" or "resume-6")
-to use this parsed resume in the app. Use --out ./parsed_resumes/<id> to write directly to resume-flock's parsed_resumes folder.
+to use this parsed resume in the app. Use --out ./parsed_resumes/<id> to write directly to resume-flyer's parsed_resumes folder.
 `);
 }
 
@@ -164,7 +164,7 @@ async function main() {
       if (code === 0) {
         console.log('Parser wrote output to:', outDir);
         if (id != null) {
-          console.log('To use in resume-flock, set app_state.json user-settings.currentResumeId to:', JSON.stringify(id));
+          console.log('To use in resume-flyer, set app_state.json user-settings.currentResumeId to:', JSON.stringify(id));
         }
         resolve();
       } else {

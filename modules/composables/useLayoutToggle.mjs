@@ -10,7 +10,7 @@ function programmaticSoftRefresh() {
   window.CONSOLE_LOG_IGNORE('[LayoutToggle] Starting programmatic soft refresh');
   
   // Step 1: Clear all existing state and positions
-  const app = window.resumeFlock;
+  const app = window.resumeFlyer;
   if (app?.bullsEye) {
     app.bullsEye.cleanup?.();
   }

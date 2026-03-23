@@ -623,12 +623,12 @@ class SelectionManager {
         let bullsEyeCenterY = '50%';
 
         // Try to get bulls-eye position from single app-state object
-        const bullsEyeApi = window.resumeFlock?.bullsEye;
+        const bullsEyeApi = window.resumeFlyer?.bullsEye;
         if (bullsEyeApi && typeof bullsEyeApi.getPosition === 'function') {
             const bullsEyePos = bullsEyeApi.getPosition();
             if (bullsEyePos && typeof bullsEyePos.x === 'number') {
                 bullsEyeCenterX = bullsEyePos.x;
-                console.debug('[SelectionManager] bulls-eye X from window.resumeFlock.bullsEye', bullsEyeCenterX);
+                console.debug('[SelectionManager] bulls-eye X from window.resumeFlyer.bullsEye', bullsEyeCenterX);
             }
         }
 

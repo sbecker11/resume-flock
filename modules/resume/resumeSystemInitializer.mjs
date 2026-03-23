@@ -3,7 +3,7 @@
  * State of the app itself is stored only in app_state.json (bullsEye, focalPoint,
  * resumeListing, colorPalette, timeline, resizeHandle and their parent elements).
  *
- * Content (the divs) is loaded/reloaded separately: window.resumeFlock.allDivs holds
+ * Content (the divs) is loaded/reloaded separately: window.resumeFlyer.allDivs holds
  * { bizCardDivs, skillCardDivs, bizResumeDivs, skillResumeDivs } and is repopulated on
  * each resume load (initial and manager load). Replacing allDivs replaces all resume-loaded
  * content; it is not persisted to app_state.json.
@@ -25,12 +25,12 @@ export async function buildResumeListFromCards(bizCardDivs) {
         console.warn('[ResumeSystemInitializer] buildResumeListFromCards: no cards provided');
         return false;
     }
-    const app = window.resumeFlock;
-    if (!app) throw new Error('[ResumeSystemInitializer] buildResumeListFromCards: window.resumeFlock not set');
+    const app = window.resumeFlyer;
+    if (!app) throw new Error('[ResumeSystemInitializer] buildResumeListFromCards: window.resumeFlyer not set');
     const rlc = app.resumeListController;
     const ric = app.resumeItemsController;
     if (!rlc || !ric) {
-        throw new Error('[ResumeSystemInitializer] buildResumeListFromCards: resumeListController or resumeItemsController not on window.resumeFlock');
+        throw new Error('[ResumeSystemInitializer] buildResumeListFromCards: resumeListController or resumeItemsController not on window.resumeFlyer');
     }
     const listEl = rlc.resumeContentDiv || document.getElementById('resume-content-div-list');
     if (!listEl) {
@@ -98,9 +98,9 @@ export async function initializeResumeSystem(resumeId = null) {
         // Get the global jobs dependency manager
         const jobsDependency = getGlobalJobsDependency();
         
-        // Single app-state object: replace window.resumeFlock to replace all application state
-        window.resumeFlock = window.resumeFlock || {};
-        const app = window.resumeFlock;
+        // Single app-state object: replace window.resumeFlyer to replace all application state
+        window.resumeFlyer = window.resumeFlyer || {};
+        const app = window.resumeFlyer;
         app.resumeListController = resumeListController;
         app.resumeItemsController = resumeItemsController;
         app.selectionManager = selectionManager;
@@ -134,8 +134,8 @@ export async function initializeResumeSystem(resumeId = null) {
                 
                 if (resumeContentDivList && resumeContentWrapper) {
                     console.debug('[ResumeSystemInitializer] DOM elements found');
-                    const rlc = window.resumeFlock?.resumeListController;
-                    if (!rlc) throw new Error('[ResumeSystemInitializer] resumeListController not on window.resumeFlock');
+                    const rlc = window.resumeFlyer?.resumeListController;
+                    if (!rlc) throw new Error('[ResumeSystemInitializer] resumeListController not on window.resumeFlyer');
                     rlc.resumeContentDiv = resumeContentDivList;
                     rlc.resumeContentWrapper = resumeContentWrapper;
                     rlc.resumecontentdivElement = resumeContentDivList;
@@ -164,7 +164,7 @@ export async function initializeResumeSystem(resumeId = null) {
         indicator.style.cssText = 'position: fixed; bottom: 10px; left: 10px; background: green; color: white; padding: 5px; z-index: 9999; font-size: 12px; line-height: 1.2;';
         
         const totalJobs = jobsData.length;
-        const rlc = window.resumeFlock?.resumeListController;
+        const rlc = window.resumeFlyer?.resumeListController;
         const createdDivs = rlc?.bizResumeDivs?.length || 0;
         const scrollItemCount = rlc?.scrollContainer?.originalItems?.length || 0;
         
@@ -185,7 +185,7 @@ export async function initializeResumeSystem(resumeId = null) {
  * Check if the resume system is properly initialized
  */
 export function isResumeSystemInitialized() {
-    const app = window.resumeFlock;
+    const app = window.resumeFlyer;
     return !!(app?.resumeListController && app?.resumeItemsController);
 }
 
@@ -195,8 +195,8 @@ export function isResumeSystemInitialized() {
  */
 export function testResumeSystem() {
     console.log('=== RESUME SYSTEM TEST (Vue 3 Dependencies) ===');
-    const app = window.resumeFlock;
-    console.log('window.resumeFlock exists:', !!app);
+    const app = window.resumeFlyer;
+    console.log('window.resumeFlyer exists:', !!app);
     console.log('resumeListController exists:', !!app?.resumeListController);
     console.log('resumeItemsController exists:', !!app?.resumeItemsController);
     
@@ -279,7 +279,7 @@ export function testScrolling() {
         console.log('- Can scroll:', wrapper.scrollHeight > wrapper.clientHeight);
     }
     
-    const app = window.resumeFlock;
+    const app = window.resumeFlyer;
     const rlc = app?.resumeListController;
     if (rlc?.scrollContainer) {
         console.log('ResumeListScrollContainer status:');

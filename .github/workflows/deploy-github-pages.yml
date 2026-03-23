@@ -61,7 +61,7 @@ jobs:
 
       - name: Build (Vite)
         env:
-          VITE_BASE: /resume-flock/
+          VITE_BASE: /resume-flyer/
         run: npm run build
 
       - name: Copy parsed resumes (static)

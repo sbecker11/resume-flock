@@ -1,4 +1,4 @@
-# Future Work - Resume Flock
+# Future Work - Resume Flyer
 
 ## 📄 Resume Upload & LLM Parsing System
 
@@ -445,7 +445,7 @@ export const useResumeStore = defineStore('resume', {
 ## 🎯 Implementation Priority
 
 ### Phase 1 (Week 1-2): Foundation
-1. Project renaming to `resume-flock`
+1. Project renaming to `resume-flyer`
 2. Basic file upload system
 3. LLM parsing integration
 4. Data transformation pipeline

@@ -1,5 +1,5 @@
 /**
- * Normalize resume-parser output for consumption by resume-flock.
+ * Normalize resume-parser output for consumption by resume-flyer.
  * Parser may emit jobs/skills as dicts keyed by ID; the app expects jobs as array and skills name-keyed for enrichment.
  *
  * - Jobs: array → unchanged; object keyed by jobID → array sorted by jobID, each item gains jobID.

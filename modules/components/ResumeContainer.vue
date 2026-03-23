@@ -266,7 +266,7 @@ const sortOptions = SORT_OPTIONS;
 
 // Methods for buttons - these will now call the legacy controller via provide/inject
 function selectFirst() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToFirstResumeItem();
   } else {
@@ -274,7 +274,7 @@ function selectFirst() {
   }
 }
 function selectLast() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToLastResumeItem();
   } else {
@@ -282,7 +282,7 @@ function selectLast() {
   }
 }
 function clearAllResumeDivs() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller && typeof controller.clearAllResumeDivsFromListing === 'function') {
     controller.clearAllResumeDivsFromListing();
   } else {
@@ -290,7 +290,7 @@ function clearAllResumeDivs() {
   }
 }
 function selectNext() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToNextResumeItem();
   } else {
@@ -298,7 +298,7 @@ function selectNext() {
   }
 }
 function selectPrevious() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller) {
     controller.goToPreviousResumeItem();
   } else {
@@ -383,7 +383,7 @@ const detailsEditorInitialFocusField = ref(null);
 const isAboutModalOpen = ref(false);
 const README_PREVIEW_PATH = 'readme-preview.html';
 const aboutHtml = `
-<strong>resume-flock</strong> is an interactive resume explorer. The name comes from the original concept "flock-of-postcards" (later "flock-of-cards"): your resume is explored like a <em>flock of birds</em> - business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as <strong>business cards</strong> (one per job) and <strong>skill cards</strong> (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
+<strong>resume-flyer</strong> is an interactive resume explorer. The name comes from the original concept "flock-of-postcards" (later "flock-of-cards"): your resume is explored like a <em>flock of birds</em> - business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as <strong>business cards</strong> (one per job) and <strong>skill cards</strong> (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
 `.trim();
 
 function openAboutModal() {
@@ -543,7 +543,7 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     return false;
   }
   // Single ordered list = scroll container's contentHolder (#resume-content-div-list).
-  const scroller = (resumeListController || window.resumeFlock?.resumeListController)?.scrollContainer;
+  const scroller = (resumeListController || window.resumeFlyer?.resumeListController)?.scrollContainer;
   const listEl = document.getElementById('resume-content-div-list');
   const appendTarget = listEl || document.getElementById('resume-content-div');
   if (!appendTarget) {
@@ -588,11 +588,11 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
     closeBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      const rlc = resumeListController || window.resumeFlock?.resumeListController;
+      const rlc = resumeListController || window.resumeFlyer?.resumeListController;
       if (rlc && typeof rlc.removeSkillFromResumeListOrder === 'function') {
         rlc.removeSkillFromResumeListOrder(skillCardId);
       }
-      const allDivs = window.resumeFlock?.allDivs;
+      const allDivs = window.resumeFlyer?.allDivs;
       if (allDivs && Array.isArray(allDivs.skillResumeDivs)) {
         const i = allDivs.skillResumeDivs.indexOf(copy);
         if (i !== -1) allDivs.skillResumeDivs.splice(i, 1);
@@ -653,10 +653,10 @@ function appendSkillCardCopyToResumeListing(skillCardId, retryCount = 0) {
   } else {
     appendTarget.appendChild(copy);
   }
-  const allDivs = window.resumeFlock?.allDivs;
+  const allDivs = window.resumeFlyer?.allDivs;
   if (allDivs && Array.isArray(allDivs.skillResumeDivs)) allDivs.skillResumeDivs.push(copy);
 
-  const rlc = resumeListController || window.resumeFlock?.resumeListController;
+  const rlc = resumeListController || window.resumeFlyer?.resumeListController;
   if (rlc && typeof rlc.notifySkillAddedToResumeListing === 'function') {
     rlc.notifySkillAddedToResumeListing(skillCardId);
   }
@@ -712,7 +712,7 @@ watch(
 );
 
 function syncSortRuleKeyFromController() {
-  const controller = resumeListController || window.resumeFlock?.resumeListController;
+  const controller = resumeListController || window.resumeFlyer?.resumeListController;
   if (controller && typeof controller.getCurrentSortRule === 'function') {
     const rule = controller.getCurrentSortRule();
     sortRuleKey.value = sortRuleToKey(rule);
@@ -775,12 +775,12 @@ function onResumeSkillCardClick(event) {
               class="intro about-trigger"
               role="button"
               tabindex="0"
-              aria-label="About resume-flock"
+              aria-label="About resume-flyer"
               @click="openAboutModal"
               @keydown.enter.prevent="openAboutModal"
               @keydown.space.prevent="openAboutModal"
             >
-              Welcome to your resume-flock!
+              Welcome to your resume-flyer!
             </p>
             <!-- Resume Selector + Print Button Row -->
             <div class="resume-selector-row">
@@ -922,7 +922,7 @@ function onResumeSkillCardClick(event) {
               class="about-modal"
               role="dialog"
               aria-modal="true"
-              aria-label="About resume-flock"
+              aria-label="About resume-flyer"
             >
               <button
                 type="button"

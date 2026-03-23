@@ -1,16 +1,16 @@
 /**
- * Resume-flock-only helpers on top of {@link resumeFlockPaletteColors.mjs}
+ * Resume-flyer-only helpers on top of {@link resumeFlyerPaletteColors.mjs}
  * (local color math; color-palette-utils-ts is vendor/readonly for S3 catalog only).
  */
-import { formatHexDisplay, hexToRgb, rgbToHex } from './resumeFlockPaletteColors.mjs';
+import { formatHexDisplay, hexToRgb, rgbToHex } from './resumeFlyerPaletteColors.mjs';
 
-/** sRGB channel to linear (WCAG / resumeFlockPaletteColors). */
+/** sRGB channel to linear (WCAG / resumeFlyerPaletteColors). */
 function srgbToLinear(c) {
     return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 
 /**
- * Relative luminance 0–1 for a hex color (matches resumeFlockPaletteColors logic for ordering).
+ * Relative luminance 0–1 for a hex color (matches resumeFlyerPaletteColors logic for ordering).
  * @param {string} hex
  * @returns {number}
  */

@@ -1,5 +1,5 @@
 /**
- * Resume-flock local color utilities (formerly from palette-utils-ts).
+ * Resume-flyer local color utilities (formerly from palette-utils-ts).
  * S3-only catalog fetch (no fallbacks) lives in useColorPalette; color-palette-utils-ts is vendor/readonly (see README-ts.md).
  *
  * Ported for parity: LAB L* contrast, LCH highlights, hex normalize.

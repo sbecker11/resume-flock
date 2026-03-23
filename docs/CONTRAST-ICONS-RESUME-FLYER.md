@@ -1,6 +1,6 @@
 # Contrast Icons – How flock-of-postcards Uses Them
 
-Resume-flock uses the same contrast icon concept as **flock-of-postcards**. This doc summarizes how flock-of-postcards uses url/back/img icons so we can mirror that pattern.
+Resume-flyer uses the same contrast icon concept as **flock-of-postcards**. This doc summarizes how flock-of-postcards uses url/back/img icons so we can mirror that pattern.
 
 ## In flock-of-postcards
 
@@ -39,9 +39,9 @@ Resume-flock uses the same contrast icon concept as **flock-of-postcards**. This
   - `iconElement.src = 'static_content/icons/icons8-' + iconType + '-16-' + iconColor + '.png'`.
 - So when the card switches to selected (new background/text color), every icon’s `src` is updated to the correct black or white asset.
 
-## In resume-flock (palette-utils + useColorPalette)
+## In resume-flyer (palette-utils + useColorPalette)
 
-- We use **resume-flock** `getHighContrastForBackground(hex, { iconBase })` from `modules/utils/resumeFlockPaletteColors.mjs` (icons: black PNGs + CSS invert when variant is white):
+- We use **resume-flyer** `getHighContrastForBackground(hex, { iconBase })` from `modules/utils/resumeFlyerPaletteColors.mjs` (icons: black PNGs + CSS invert when variant is white):
   - Returns **one set of paths** (black PNGs only): `url`, `back`, `img`.
   - Returns **variant:** `'black'` | `'white'` (same rule as text: `getHighContrastMono` — white on dark, black on light). The icon set always matches the high-contrast text color for the given background.
 - **Transparent background:** The icon set is always displayed with a transparent background; `.url-icon`, `.back-icon`, `.img-icon` have `background: transparent` in CSS so icons never show an opaque background.

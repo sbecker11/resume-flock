@@ -1,7 +1,7 @@
 // modules/utils/domUtils.mjs
 
 import * as utils from './utils.mjs';
-import { getHighContrastMono } from './resumeFlockPaletteColors.mjs';
+import { getHighContrastMono } from './resumeFlyerPaletteColors.mjs';
 import { get_RGB_from_Hex, isHexColor, isHexColorString } from './paletteHelpers.mjs';
 
 export { get_RGB_from_Hex, isHexColorString };
