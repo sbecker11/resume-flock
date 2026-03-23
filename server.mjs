@@ -16,12 +16,16 @@ import {
     getCachedPaletteCatalogBundle,
     getLastPaletteCatalogSourceUrl,
     hasPaletteCatalogCache,
+    primePaletteCatalogCacheFromBundle,
 } from './modules/utils/paletteCatalogServerCache.mjs';
+import { resolvePaletteCatalogS3UrlFromRecord } from './modules/utils/paletteCatalogS3Url.mjs';
 import { DEFAULT_RESUME_PARSER_PYTHON_MODULE } from './modules/config/defaultResumeParserModule.mjs';
 // Load .env from project root (see docs/REPLICATE-PORTS-CONFIG.md)
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 const PROJECT_ROOT = process.cwd();
+/** Local palette JSON directory (GET /api/palette-catalog, startup cache when S3 unset). */
+const PALETTE_DIR_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'colorPalettes');
 const CSS_FILE_PATH = path.resolve(PROJECT_ROOT, 'static_content', 'css', 'palette-styles.css');
 /** Persisted app state (layout, theme, currentResumeId, system-constants, etc.). */
 const STATE_FILE_PATH = path.resolve(PROJECT_ROOT, 'app_state.json');
@@ -917,17 +921,75 @@ async function getPaletteCatalogBundleV2() {
     return { version: 2, palettes };
 }
 
+/** Filenames from S3-warmed in-memory bundle (same sort as getPaletteFilenameList). */
+function paletteFilenamesFromCachedBundle(bundle) {
+    const jsonFiles = [];
+    for (const p of bundle.palettes) {
+        const fn = p && (p.filename || p.key);
+        if (typeof fn === 'string' && fn.length > 0) {
+            jsonFiles.push(fn);
+        }
+    }
+    jsonFiles.sort((a, b) => {
+        const regex = /^(\d+)-/;
+        const matchA = a.match(regex);
+        const matchB = b.match(regex);
+        const numA = matchA ? parseInt(matchA[1], 10) : -1;
+        const numB = matchB ? parseInt(matchB[1], 10) : -1;
+        if (numA !== -1 && numB !== -1) return numA - numB;
+        if (numA !== -1) return -1;
+        if (numB !== -1) return 1;
+        return a.localeCompare(b);
+    });
+    return jsonFiles;
+}
+
+/** Log once: fallback runs on every palette API hit when local dir is absent — avoid spamming the terminal. */
+let loggedMissingLocalPaletteDirNotice = false;
+function logMissingLocalPaletteDirOnce() {
+    if (loggedMissingLocalPaletteDirNotice) return;
+    loggedMissingLocalPaletteDirNotice = true;
+    console.log(
+        `[palette-catalog] static_content/colorPalettes not found — serving from in-memory catalog (${getLastPaletteCatalogSourceUrl()}). Expected for S3-only setup; add that folder to prefer local JSON files.`
+    );
+}
+
+/** Prefer local JSON; if the directory is missing or empty, use startup S3/local-memory catalog. */
+async function getPaletteCatalogBundleV2ForApi() {
+    try {
+        return await getPaletteCatalogBundleV2();
+    } catch (e) {
+        if (hasPaletteCatalogCache()) {
+            logMissingLocalPaletteDirOnce();
+            return getCachedPaletteCatalogBundle();
+        }
+        throw e;
+    }
+}
+
+async function getPaletteManifestForApi() {
+    try {
+        return await getPaletteFilenameList();
+    } catch (e) {
+        if (hasPaletteCatalogCache()) {
+            logMissingLocalPaletteDirOnce();
+            return paletteFilenamesFromCachedBundle(getCachedPaletteCatalogBundle());
+        }
+        throw e;
+    }
+}
+
 // GET /api/palette-manifest: Provides a sorted list of color palettes
 app.get('/api/palette-manifest', async (req, res) => {
     try {
-        res.json(await getPaletteFilenameList());
+        res.json(await getPaletteManifestForApi());
     } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        console.error('[palette-catalog] GET /api/palette-catalog failed:', msg);
+        console.error('[palette-catalog] GET /api/palette-manifest failed:', msg);
         res.status(503).json({
             error: 'Palette catalog unavailable',
             message: msg,
-            hint: 'S3 fetch/parse/validate failed — see server console for PALETTE S3 FAILED banner',
+            hint: 'No local static_content/colorPalettes and no warmed server catalog — configure S3 or add palette JSON files',
         });
     }
 });
@@ -935,7 +997,7 @@ app.get('/api/palette-manifest', async (req, res) => {
 // GET /api/palette-catalog: version-2 bundle { version: 2, palettes: [...] } for S3-style catalog clients
 app.get('/api/palette-catalog', async (req, res) => {
     try {
-        res.json(await getPaletteCatalogBundleV2());
+        res.json(await getPaletteCatalogBundleV2ForApi());
     } catch (error) {
         const status = error.code === 'ENOENT' ? 404 : 500;
         res.status(status).json({ error: 'Failed to build palette catalog.', details: error.message });
@@ -2555,15 +2617,24 @@ const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve
 if (isMain) {
     (async () => {
         try {
-            await refreshPaletteCatalogCache();
+            if (resolvePaletteCatalogS3UrlFromRecord(process.env)) {
+                await refreshPaletteCatalogCache();
+            } else {
+                console.warn(
+                    '[palette-catalog] Startup: S3 palette catalog URL not set — priming cache from static_content/colorPalettes (local dev)'
+                );
+                const localBundle = await getPaletteCatalogBundleV2();
+                primePaletteCatalogCacheFromBundle(localBundle, 'local:static_content/colorPalettes');
+            }
             const bundle = getCachedPaletteCatalogBundle();
             console.log(
-                `[palette-catalog] Startup: warmed from S3 (${getLastPaletteCatalogSourceUrl()}) — ${bundle.palettes.length} palette(s)`
+                `[palette-catalog] Startup: catalog ready (${getLastPaletteCatalogSourceUrl()}) — ${bundle.palettes.length} palette(s)`
             );
-        } catch {
+        } catch (e) {
             console.error(
-                '[palette-catalog] Startup: S3 warm failed — exiting (fast-fail). Fix .env and S3; see PALETTE S3 FAILED banner above.'
+                '[palette-catalog] Startup: catalog warm failed — exiting (fast-fail). Fix S3/.env or local palettes under static_content/colorPalettes.'
             );
+            if (e instanceof Error && e.stack) console.error(e.stack);
             process.exit(1);
         }
         startServer(START_PORT);

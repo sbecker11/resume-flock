@@ -1,6 +1,6 @@
 /**
- * In-memory S3 palette catalog for the Node server. Refreshed on process startup and when
- * GET /api/palette-catalog receives X-Palette-Catalog-Refresh: 1 (browser hard reload).
+ * In-memory palette catalog for the Node server. On startup: S3 when URL is configured,
+ * otherwise callers may prime from local JSON (see server.mjs).
  */
 import fetch from 'node-fetch';
 import { parsePaletteBundleFromImageMetadataJsonl } from './paletteBundleFromImageMetadata.mjs';
@@ -9,11 +9,45 @@ import { assertValidPaletteCatalogBundle } from './paletteCatalogValidate.mjs';
 import { reportError } from './errorReporting.mjs';
 import { complainLoudlyPaletteS3Failure } from './paletteS3LoudError.mjs';
 
+/** Stable fake filename for theme.colorPalette when S3 NDJSON has no file key (matches local *.json style). */
+function slugifyPaletteFilename(name) {
+    const s = String(name)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    return `${s || 'palette'}.json`;
+}
+
+/** Mutates bundle: NDJSON entries often lack filename/key; client requires them for v2 catalog load. */
+function ensureSyntheticPaletteFilenames(bundle) {
+    if (!bundle?.palettes) return;
+    for (const p of bundle.palettes) {
+        if (p.filename || p.key) continue;
+        if (typeof p.name !== 'string' || !p.name.trim()) continue;
+        const fn = slugifyPaletteFilename(p.name);
+        p.filename = fn;
+        p.key = fn;
+    }
+}
+
 /** @type {{ version: number, palettes: unknown[] } | null} */
 let cachedBundle = null;
 
 /** @type {string} */
 let lastFetchedUrl = '';
+
+/**
+ * Store a pre-built v2 bundle (e.g. from static_content/colorPalettes) after validation.
+ * @param {{ version: number, palettes: unknown[] }} bundle
+ * @param {string} [sourceLabel] - logged / returned by getLastPaletteCatalogSourceUrl
+ */
+export function primePaletteCatalogCacheFromBundle(bundle, sourceLabel = 'local') {
+    assertValidPaletteCatalogBundle(bundle);
+    ensureSyntheticPaletteFilenames(bundle);
+    cachedBundle = bundle;
+    lastFetchedUrl = sourceLabel;
+}
 
 /**
  * Fetch catalog from S3, validate, replace in-memory cache. Throws on any failure.
@@ -35,6 +69,7 @@ export async function refreshPaletteCatalogCache() {
         const raw = await res.text();
         const bundle = parsePaletteBundleFromImageMetadataJsonl(raw);
         assertValidPaletteCatalogBundle(bundle);
+        ensureSyntheticPaletteFilenames(bundle);
 
         cachedBundle = bundle;
         lastFetchedUrl = s3Url;

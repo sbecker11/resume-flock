@@ -12,6 +12,40 @@ import {
 import { getPerceivedBrightness } from '@/modules/utils/paletteHelpers.mjs';
 import { injectGlobalElementRegistry } from './useGlobalElementRegistry.mjs';
 import { reportError } from '@/modules/utils/errorReporting.mjs';
+import { complainLoudlyPaletteS3Failure } from '@/modules/utils/paletteS3LoudError.mjs';
+
+/** True when the error is from catalog/manifest/fetch (show S3/catalog loud banner). */
+function isPaletteCatalogOrS3Failure(error) {
+    if (!(error instanceof Error)) return false;
+    const msg = error.message;
+    if (/AppState not loaded/i.test(msg)) return false;
+    if (/Unknown theme\.colorPalette/i.test(msg)) return false;
+    if (/Invalid hex in palette/i.test(msg)) return false;
+    if (/Invalid palette JSON/i.test(msg)) return false;
+    if (/palette manifest is not an array/i.test(msg)) return true;
+    if (/Failed to fetch palette manifest/i.test(msg)) return true;
+    if (/Palette fetch failed/i.test(msg)) return true;
+    if (error.name === 'TypeError' && /fetch|network|Failed to fetch/i.test(msg)) return true;
+    return false;
+}
+
+function getRuntimeBase() {
+    const envBase = (import.meta?.env?.BASE_URL || '/');
+    let base = envBase;
+    if (typeof window !== 'undefined') {
+        const path = window.location.pathname || '/';
+        const parts = path.split('/').filter(Boolean);
+        const useSubpath = parts.length > 0 && (envBase === '/' || !path.startsWith(envBase));
+        if (useSubpath) base = `/${parts[0]}/`;
+    }
+    return base.endsWith('/') ? base : `${base}/`;
+}
+
+function basePathJoin(relPath) {
+    const b = getRuntimeBase();
+    const p = relPath.startsWith('/') ? relPath.slice(1) : relPath;
+    return `${b}${p}`;
+}
 
 const PALETTE_DIR = './static_content/colorPalettes/';
 const CATALOG_ENDPOINT = '/api/palette-catalog';
@@ -335,8 +369,6 @@ export function useColorPalette() {
                 currentPaletteFilename.value = null;
             }
 
-            currentPaletteFilename.value = resolvedKey;
-
             // Ensure scene view background is updated when restoring selected palette from state (initial load / hard refresh)
             applySceneBackgroundFromCurrentPalette();
 
@@ -374,29 +406,29 @@ export function useColorPalette() {
             }
             filename = fileKey;
             const previousFilename = currentPaletteFilename.value;
-            window.CONSOLE_LOG_IGNORE(`[ColorPalette] setCurrentPalette called: ${previousFilename} → ${canonical}`);
+            window.CONSOLE_LOG_IGNORE(`[ColorPalette] setCurrentPalette called: ${previousFilename} → ${filename}`);
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] appState.theme.colorPalette: ${appState.value?.["user-settings"]?.theme?.colorPalette}`);
             window.CONSOLE_LOG_IGNORE(`[ColorPalette] currentPaletteFilename.value: ${currentPaletteFilename.value}`);
             
             // Check if appState and reactive state are in sync
             if (appState.value?.["user-settings"]?.theme?.colorPalette !== currentPaletteFilename.value) {
                 // console.warn(`[ColorPalette] State mismatch detected! appState: ${appState.value?.theme?.colorPalette}, reactive: ${currentPaletteFilename.value}`);
-                window.CONSOLE_LOG_IGNORE(`[ColorPalette] User selected ${canonical}, proceeding with user choice`);
+                window.CONSOLE_LOG_IGNORE(`[ColorPalette] User selected ${filename}, proceeding with user choice`);
             }
             
             // Only proceed if actually changing to a different palette from what user selected
-            if (currentPaletteFilename.value === canonical && appState.value?.['user-settings']?.theme?.colorPalette === canonical) {
-                window.CONSOLE_LOG_IGNORE(`[ColorPalette] No change needed - already using ${canonical}`);
+            if (currentPaletteFilename.value === filename && appState.value?.['user-settings']?.theme?.colorPalette === filename) {
+                window.CONSOLE_LOG_IGNORE(`[ColorPalette] No change needed - already using ${filename}`);
                 return;
             }
             
-            currentPaletteFilename.value = canonical;
+            currentPaletteFilename.value = filename;
             
             // Update appState with new palette selection
             await updateAppState({
                 "user-settings": {
                     theme: {
-                        colorPalette: canonical
+                        colorPalette: filename
                     }
                 }
             });
@@ -435,8 +467,8 @@ export function useColorPalette() {
             // Dispatch event for components that need to respond to palette changes
             window.dispatchEvent(new CustomEvent('color-palette-changed', {
                 detail: { 
-                    filename: canonical,
-                    paletteName: canonical,
+                    filename,
+                    paletteName: map[filename] || filename,
                     previousFilename: previousFilename
                 }
             }));

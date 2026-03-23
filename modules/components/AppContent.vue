@@ -81,6 +81,7 @@ import { useLayoutToggle } from '../composables/useLayoutToggle.mjs'
 import { useResizeHandle } from '../composables/useResizeHandle.mjs'
 import { useAppState } from '../composables/useAppState.ts'
 import { get_filterStr_from_z } from '../core/filters.mjs'
+import { selectionManager } from '../core/selectionManager.mjs'
 import { updateContrastForBrightness } from '../composables/useColorPalette.mjs'
 import { reportError } from '../utils/errorReporting.mjs'
 import { listResumes } from '../api/resumeManagerApi.mjs'
@@ -183,6 +184,8 @@ if (serviceUpdater) {
 if (typeof window !== 'undefined') {
   window.resumeFlyer = window.resumeFlyer || {}
   window.resumeFlyer.focalPoint = focalPointApi
+  // Before SceneContainer/useCardsController setup runs — same singleton as initializeResumeSystem
+  window.resumeFlyer.selectionManager = selectionManager
 }
 
 // Vue 3 enhanced parallax system (using provide/inject)
