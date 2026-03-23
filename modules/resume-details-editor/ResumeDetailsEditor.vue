@@ -104,9 +104,9 @@ const emit = defineEmits(['close', 'saved']);
 const tabs = [
   { id: 'meta', label: 'Meta' },
   { id: 'other-sections', label: 'Other sections' },
-  { id: 'education', label: 'Education' },
   { id: 'resume-jobs', label: 'Resume jobs' },
-  { id: 'job-skills', label: 'Job skills' }
+  { id: 'job-skills', label: 'Job skills' },
+  { id: 'education', label: 'Education' }
 ];
 
 const activeTab = ref('meta');
