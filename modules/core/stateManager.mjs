@@ -1,7 +1,7 @@
 import { deepMerge } from '../utils/utils.mjs';
 import { reportError } from '../utils/errorReporting.mjs';
 
-const STORAGE_KEY = 'flockOfPostcards_appState';
+const STORAGE_KEY = 'resumeFlyer_appState';
 
 /**
  * Gets the default state for the application.

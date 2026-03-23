@@ -485,7 +485,7 @@ export function useCardsController() {
                 
                 let sceneHeight = sceneBottom - sceneTop
                 
-                // Enforce minimum height (from flock-of-postcards MIN_BIZCARD_HEIGHT)
+                // Enforce minimum height (legacy postcard-stack MIN_BIZCARD_HEIGHT)
                 if (sceneHeight < MIN_BIZCARD_HEIGHT) {
                     sceneHeight = MIN_BIZCARD_HEIGHT
                 }
@@ -741,7 +741,7 @@ export function useCardsController() {
             skillCard.setAttribute('data-color-index', firstJobIndex)
         }
         // Z = distance from viewer = maxZ - z_index; skill z_index 4–13 so they stack above biz (1–3)
-        const skillZIndex = mathUtils.getRandomInt(zUtils.FLOCK_SKILL_Z_INDEX_MIN, zUtils.FLOCK_SKILL_Z_INDEX_MAX)
+        const skillZIndex = mathUtils.getRandomInt(zUtils.SCENE_CARD_STACK_SKILL_MIN, zUtils.SCENE_CARD_STACK_SKILL_MAX)
         const sceneZ = zUtils.Z_from_z_index(skillZIndex)
         skillCard.setAttribute('data-sceneZ', sceneZ)
         skillCard.style.zIndex = String(skillZIndex)

@@ -4,7 +4,7 @@
  * the scene-content scrolls vertically (works in any focal point mode). The cursor is hidden
  * and 32x32 PNG icons at top-right and bottom-right indicate the active zone.
  *
- * Ported from flock-of-postcards main.mjs (updateAutoScrollVelocity / handleFocalPointMove).
+ * Ported from legacy postcard-stack main (updateAutoScrollVelocity / handleFocalPointMove).
  */
 
 import { ref } from 'vue'

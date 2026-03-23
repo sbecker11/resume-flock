@@ -1,4 +1,4 @@
-# Resume-Flock Vue Architecture
+# Resume-flyer Vue architecture
 
 This document breaks the application into 8 logical subsections, each with its own diagram, plus a top-level diagram that ties them all together.
 

@@ -1,4 +1,5 @@
 node_modules/
+dist/
 .env
 coverage/
 color-palette-utils-ts/coverage/

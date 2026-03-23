@@ -8,7 +8,7 @@
 
 # Dark, chaotic, and deep
 
-**resume-flyer** is an interactive resume explorer. The name comes from the original concept “flock-of-postcards” (later “flock-of-cards”): your resume is explored like a *flock of birds*—business and skill cards glide into place as you browse. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill) in 3D or in a linear list. Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
+**resume-flyer** is an interactive resume explorer. Business and skill cards glide into place as you browse your career in 3D or in a linear list. Upload a DOCX or PDF resume and it is parsed into your employment experience and technical skills. You explore them as **business cards** (one per job) and **skill cards** (one per skill). Add details, dates, and skills for each job, then print your revised resume as a new HTML file.
 
 ### High-level functionality
 
@@ -262,17 +262,16 @@ This **layered approach** ensures that dependency problems are caught early in d
 
 ## Application Overview
 
-The flock
+The scene
 
-Large `business cards`are used to describe various jobs, each with its role,  
-employer, and time period. These cards are larger, slowing moving, and further away from your view. Each `business card` is surrounded by its flock of  
-smaller `skill cards` that hover around them. Business cards include a list of skills learned or used during that job. Click on any skill to see that skill card. Each skill card includes a back arrow that points to each job that used that skill.
+Large `business cards` are used to describe various jobs, each with its role,  
+employer, and time period. These cards are larger, slow moving, and further away from your view. Each `business card` is surrounded by smaller `skill cards` that hover around it. Business cards include a list of skills learned or used during that job. Click on any skill to see that skill card. Each skill card includes a back arrow that points to each job that used that skill.
 
-Mouse motion over the scene plane causes your point of view to move around, using `motion parallax` and a fuzzy `depth of field` to give the flock its sense of depth. Besides focal-point–driven motion parallax, a sense of 3D depth is enhanced by blur and darkness that increase with distance from the view plane.
+Mouse motion over the scene plane causes your point of view to move around, using `motion parallax` and a fuzzy `depth of field` to give the layout its sense of depth. Besides focal-point–driven motion parallax, a sense of 3D depth is enhanced by blur and darkness that increase with distance from the view plane.
 
 Moving the mouse vertically also causes your view to slide over the `career timeline` shown at the scene edge. 
 
-Click on a `business card` or `skill card` to make it pop into focus at the top of the flock, and to see its details in the details area. Use the color palette selector to enhance the viewing experience.
+Click on a `business card` or `skill card` to make it pop into focus in front of the other cards, and to see its details in the details area. Use the color palette selector to enhance the viewing experience.
 
 Each job has a description (from your uploaded resume). Skills, terms, and tools can be marked in the resume details editor. Each skill is displayed as a clickable link that pops up its `skill card`.
 
@@ -296,7 +295,7 @@ of return icons indicates the number of jobs and the amount of time used to hone
 `git clone git@github.com:sbecker11/resume-flyer.git`  
 `cd <your-local-dev-folder>/resume-flyer`
 
-**Resume parser:** DOCX and PDF resumes are parsed at runtime. The app uses the **resume-parser** package to convert uploaded resumes into flock data (jobs and skills). To work on or extend the parser locally, clone the resume-parser repo:  
+**Resume parser:** DOCX and PDF resumes are parsed at runtime. The app uses the **resume-parser** package to convert uploaded resumes into structured job and skill data. To work on or extend the parser locally, clone the resume-parser repo:  
 `git clone git@github.com:sbecker11/resume-parser.git`
 
 ## Cursor IDE with Vite
@@ -310,7 +309,7 @@ This runs the Vite dev server (frontend) and the backend API. Open the URL shown
 
 - **Skill card contrast guard (diagnostics):** In dev (`import.meta.env.DEV`), or add `?debugSkillContrast=1` to the URL, the app installs `modules/debug/skillCardContrastGuard.mjs`, which watches scene + resume skill rows and `console.warn`s when `data-icon-set-*-variant` disagrees with **inline** `--data-foreground-color*` (not `getComputedStyle().color`, which can interpolate during `transition: color`) or with icon `filter: invert()`. Re-checks on `rendering-changed` (Z / 3D filter updates); it does **not** observe `style` for every parallax `transform` tick.
 
-# Behold your flock of skill cards and business cards
+# Behold your skill cards and business cards
 
 ## Naming Conventions
 
@@ -963,13 +962,13 @@ call highlightTheCardDivCardBackArrow
 
 ### version 0.5:   June 26, 2023
 
-- A flock of small skill cards and larger business cards float over the scene-plane column (layout can put the scene on the left or right).
+- Small skill cards and larger business cards float over the scene-plane column (layout can put the scene on the left or right).
 - A timeline is displayed at ground level, to visualize the date range of employment for each business card.
 - A 3-D parallax effect on cards is controlled by the "focalPoint", which tracks the mouse while over the scene-plane.
 - Add line items to the resume column by selecting business cards.
 - Select a skill card or resume line item by clicking it, click again to deselect it.
 - Selected skill cards and line-items have a red-dashed border.
-- Once selected, a skill card or business card is temporarily moved above the flock where it is not subject to motion parallax.
+- Once selected, a skill card or business card is temporarily moved to the foreground where it is not subject to motion parallax.
 - Click on a skill card to select and scroll its resume line item into view.
 - Click on a resume line item to select and scroll its skill card into view.
 - The scene-plane viewPort shows "BullsEye" with a plus sign at scene-plane center, where parallax effect is zero.
@@ -980,7 +979,7 @@ call highlightTheCardDivCardBackArrow
 - Click on a resume line item's top-right delete button to delete it.
 - Click on the bottom-right green next button to open and select the resume line item for the next business card.
 - Skill cards inherit the color of their parent business card.
-- Click the underlined text in a business card's resume line item to select and bring that skill card into view over the flock.
+- Click the underlined text in a business card's resume line item to select and bring that skill card into view in the foreground.
 
 ### version 0.4:   June 18, 2023
 

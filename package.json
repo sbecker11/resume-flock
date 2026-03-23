@@ -1,7 +1,7 @@
 {
   "name": "resume-flyer",
   "version": "0.9.0",
-  "description": "Dark, chaotic, and deep. This app creates an animated flock of postcards from a resume. The resume is defined as a job.xlsx file where each row describes a job, with start/end dates and a descriptive paragraph that includes links to related skills. Each job is visualized as a large business card. Each skill is visualized as smaller chips. The flock is rendered in the left panel with motion parallax as the mouse is moved around. Skill chips fly above the darker business cards. The right panel shows a readable version of selected jobs and skills.",
+  "description": "Dark, chaotic, and deep. Interactive resume explorer: jobs and skills as business cards and chips in a 3D scene with motion parallax, plus a readable resume panel. Upload DOCX/PDF to parse at runtime. Each job is a large business card; each skill is a smaller chip. Cards render in the scene panel with parallax as you move the pointer; skill chips sit above the darker business cards. The opposite panel shows selected jobs and skills in list form.",
   "keywords": [
     "javascript",
     "vue",
@@ -37,12 +37,16 @@
     "build": "vite build",
     "kill-listeners": "pkill -f 'node server.mjs' && pkill -f 'nodemon' && pkill -f 'vite' || true",
     "clean": "npm run kill-listeners && rm -rf node_modules dist .vite npm-debug.log* && npm cache clean --force",
-    "test": "vitest run --config vitest.config.js && (cd color-palette-utils-ts && npm test)",
+    "test": "node scripts/run-tests.mjs",
     "test:watch": "vitest --config vitest.config.js",
-    "test:coverage": "vitest run --config vitest.config.js --coverage && (cd color-palette-utils-ts && npm run test:coverage)",
+    "test:coverage": "npm run test:vitest:coverage && npm run test:color-palette-utils-ts:coverage",
     "parse-resume": "node scripts/run-parse-resume.mjs",
     "compliance": "node scripts/run-compliance-scan.mjs",
-    "sync:color-palette-utils-ts": "rsync -a --delete --exclude node_modules --exclude coverage /Users/sbecker11/workspace-color-palette-maker/color-palette-maker-react/color-palette-utils-ts/ ./color-palette-utils-ts/"
+    "sync:color-palette-utils-ts": "rsync -a --delete --exclude node_modules --exclude coverage /Users/sbecker11/workspace-color-palette-maker/color-palette-maker-react/color-palette-utils-ts/ ./color-palette-utils-ts/",
+    "test:vitest": "vitest run --config vitest.config.js",
+    "test:color-palette-utils-ts": "npm --prefix color-palette-utils-ts test",
+    "test:vitest:coverage": "vitest run --config vitest.config.js --coverage",
+    "test:color-palette-utils-ts:coverage": "npm --prefix color-palette-utils-ts run test:coverage"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

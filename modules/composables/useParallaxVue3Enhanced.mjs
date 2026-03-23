@@ -14,13 +14,13 @@ import { linearInterp } from '../utils/mathUtils.mjs'
 import { getRendering } from '../core/renderingConfig.mjs'
 import { logger } from '../utils/logger.mjs'
 
-// Parallax constants (flock-of-postcards–aligned: Z 1 = far, Z 14 = close; higher Z = more parallax)
+// Parallax constants (Z 1 = far, Z 14 = close; higher scene Z = more parallax)
 const PARALLAX_X_EXAGGERATION = 0.9
 const PARALLAX_Y_EXAGGERATION = 1.0
 const CLONE_Z_SCALE = 0
-const PARALLAX_Z_MIN = zUtils.FLOCK_PARALLAX_Z_MIN
-const PARALLAX_Z_MAX = zUtils.FLOCK_PARALLAX_Z_MAX
-const PARALLAX_Z_RANGE = zUtils.FLOCK_PARALLAX_Z_RANGE
+const PARALLAX_Z_MIN = zUtils.PARALLAX_SCENE_Z_MIN
+const PARALLAX_Z_MAX = zUtils.PARALLAX_SCENE_Z_MAX
+const PARALLAX_Z_RANGE = zUtils.PARALLAX_SCENE_Z_RANGE
 // Base z-scale (built-in ramp): near = 0.9, far = 0; matches legacy MAX_Z_SCALE behavior.
 const BASE_Z_SCALE_AT_NEAR = 0.9
 const BASE_Z_SCALE_AT_FAR = 0

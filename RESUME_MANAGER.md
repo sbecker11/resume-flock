@@ -41,12 +41,12 @@ The Resume Manager provides:
 2. Server saves to uploads/ directory
 3. Validates file type and size (10MB max)
 4. Creates output directory: parsed_resumes/resume-{timestamp}/
-5. Calls Python parser: resume_to_flock.py
-6. Parser generates:
-   - jobs.mjs (job history)
-   - skills.mjs (skills list)
-   - categories.mjs (skill categories)
-   - other-sections.mjs (additional content)
+5. Calls the **resume-parser** Python package (`python3 -m …`; default module in `modules/config/defaultResumeParserModule.mjs`, overridable with `RESUME_PARSER_MODULE`)
+6. Parser generates (typical layout):
+   - jobs.json (job history)
+   - skills.json (skills list)
+   - categories.json (skill categories)
+   - other-sections.json (additional content)
    - resume.html (formatted output)
 7. Server generates meta.json with metadata
 8. Returns success response to client
@@ -123,10 +123,7 @@ const data = await getResumeData(resumeId)
 
 ## Python Parser Requirements
 
-The system expects a Python parser script at one of these locations:
-- `{project_root}/resume_to_flock.py`
-- `{project_root}/../resume-parser/resume_to_flock.py`
-- `{project_root}/scripts/resume_to_flock.py`
+Parsing is done by the **[resume-parser](https://github.com/sbecker11/resume-parser)** package (install with its `requirements.txt`). The server runs `python3 -m <module>`; the default module path is **`modules/config/defaultResumeParserModule.mjs`** (or set **`RESUME_PARSER_MODULE`** in the environment). Clone **resume-parser** next to this repo or on your `PYTHONPATH` per that project’s README.
 
 ### Parser Interface
 
@@ -134,8 +131,8 @@ The system expects a Python parser script at one of these locations:
 - Arg 1: Path to .docx file
 - Arg 2: Output directory path
 
-**Expected Output Files**:
-- `jobs.mjs` - Array of job objects with structure:
+**Expected Output Files** (current pipeline uses JSON at folder root):
+- `jobs.json` - Array of job objects with structure:
   ```javascript
   {
     index: 0,
@@ -147,9 +144,9 @@ The system expects a Python parser script at one of these locations:
   }
   ```
 
-- `skills.mjs` - Object mapping skill names to metadata
-- `categories.mjs` - Skill categories for organization
-- `other-sections.mjs` - Additional resume sections
+- `skills.json` - Object mapping skill names to metadata
+- `categories.json` - Skill categories for organization
+- `other-sections.json` - Additional resume sections
 - `resume.html` - Formatted HTML output
 
 ### Parser Location
@@ -260,8 +257,8 @@ resume-flyer/
 │       └── meta.json
 └── uploads/                            # Temporary upload directory
 
-../resume-parser/                       # Python parser (EXTERNAL)
-└── resume_to_flock.py                 # Parser script
+../resume-parser/                       # Python parser (EXTERNAL; see its README)
+└── (package layout per resume-parser)
 ```
 
 ## Security Considerations
@@ -312,19 +309,18 @@ resume-flyer/
 
 ### "Parser not found" Error
 
-**Problem**: Server can't locate resume_to_flock.py
+**Problem**: Server can’t run the resume-parser Python module (wrong path, missing venv, or package not installed).
 
 **Solutions**:
-1. Clone resume-parser repository:
+1. Clone **resume-parser** and install its dependencies:
    ```bash
-   cd /Users/sbecker11/workspace-flock/
+   cd /path/to/parent
    git clone git@github.com:sbecker11/resume-parser
+   cd resume-parser
+   # follow README: pip install -r requirements.txt (or equivalent)
    ```
 
-2. Or create symlink:
-   ```bash
-   ln -s /path/to/resume-parser/resume_to_flock.py /path/to/resume-flyer/
-   ```
+2. Ensure `python3` can import the module (see **`modules/config/defaultResumeParserModule.mjs`** or set **`RESUME_PARSER_MODULE`**).
 
 ### Upload Fails with "Processing Error"
 
@@ -332,7 +328,7 @@ resume-flyer/
 
 **Debug Steps**:
 1. Check server console for parser stderr output
-2. Manually run parser: `python3 resume_to_flock.py test.docx output/`
+2. Manually run the same command the server uses: `python3 -m <module> test.docx output/` (module from **`RESUME_PARSER_MODULE`** or the default config file above)
 3. Verify Python dependencies are installed
 4. Check .docx file format validity
 

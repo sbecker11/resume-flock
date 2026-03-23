@@ -17,6 +17,7 @@ import {
     getLastPaletteCatalogSourceUrl,
     hasPaletteCatalogCache,
 } from './modules/utils/paletteCatalogServerCache.mjs';
+import { DEFAULT_RESUME_PARSER_PYTHON_MODULE } from './modules/config/defaultResumeParserModule.mjs';
 // Load .env from project root (see docs/REPLICATE-PORTS-CONFIG.md)
 dotenv.config({ path: path.join(process.cwd(), '.env') });
 
@@ -759,7 +760,7 @@ app.post('/api/resumes/upload', upload.single('resume'), async (req, res) => {
         }
 
         // Invoke resume-parser package (pip install -r requirements.txt). Module override via RESUME_PARSER_MODULE.
-        const parserModule = process.env.RESUME_PARSER_MODULE || 'resume_parser.resume_to_flock';
+        const parserModule = process.env.RESUME_PARSER_MODULE || DEFAULT_RESUME_PARSER_PYTHON_MODULE;
         const pythonCommand = 'python3';
         const cleanEnv = {};
         for (const [key, value] of Object.entries(process.env)) {

@@ -1,8 +1,8 @@
-# Contrast Icons – How flock-of-postcards Uses Them
+# Contrast icons – reference stack vs resume-flyer
 
-Resume-flyer uses the same contrast icon concept as **flock-of-postcards**. This doc summarizes how flock-of-postcards uses url/back/img icons so we can mirror that pattern.
+Resume-flyer uses the same contrast icon concept as an earlier **postcard-stack** visualization. This doc summarizes how that stack used url/back/img icons so we can mirror the pattern.
 
-## In flock-of-postcards
+## In the reference stack
 
 ### Icon types and assets
 
@@ -68,4 +68,4 @@ Url/back/img icons can appear **inside card description content** (scene biz car
 2. Give each icon one of the classes **`url-icon`**, **`back-icon`**, or **`img-icon`** so the stylesheet can apply **`filter: invert(1)`** when the card’s variant for that state is `'white'` (white on dark background).
 3. When the card’s state changes (normal ↔ hovered ↔ selected), either re-set each icon’s `src` from the card’s corresponding `data-icon-set-*` / `data-icon-set-hovered-*` / `data-icon-set-selected-*` attributes, or rely on CSS: the card keeps the same data attributes and CSS vars, and the **variant** selectors (e.g. `[data-icon-set-variant="white"] .url-icon`) apply invert automatically for the active state.
 
-So: same **rule** as flock-of-postcards (white on dark, black on light); we use **one asset + invert** instead of two assets.
+So: same **rule** as the reference stack (white on dark, black on light); we use **one asset + invert** instead of two assets.
