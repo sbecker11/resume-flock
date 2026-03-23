@@ -340,6 +340,11 @@ export function useColorPalette() {
                         tempBackgroundSwatchIndexByPalette[p.name] =
                             Math.max(0, Math.floor(p.backgroundSwatchIndex)) % p.colors.length;
                     }
+                    // Optional source image URL used by ResumeContainer's palette-image-btn.
+                    // ResumeContainer indexes this map by the selected filename key.
+                    if (typeof p.imagePublicUrl === 'string' && p.imagePublicUrl.trim()) {
+                        tempImageUrls[filename] = p.imagePublicUrl.trim();
+                    }
                     tempFilenameToNameMap[filename] = p.name;
                     tempOrderedNames.push(p.name);
                 }
@@ -397,6 +402,7 @@ export function useColorPalette() {
             backgroundSwatchIndexByPalette.value = tempBackgroundSwatchIndexByPalette;
             filenameToNameMap.value = tempFilenameToNameMap;
             orderedPaletteNames.value = tempOrderedNames;
+            imagePublicUrlByPaletteName.value = tempImageUrls;
 
             const filenames = Object.keys(tempFilenameToNameMap);
             const savedThemePalette = appState.value["user-settings"].theme.colorPalette;
